@@ -1,0 +1,5 @@
+# Scenario: players may explore, but leaving the marked play area is flagged
+# and blocked so a roleplay/PvE session doesn't wander off the map.
+event leaveBoundary:
+    warn "stay within the zone"
+    block

@@ -1,0 +1,8 @@
+# Join-gate sample: Alice (normal) joins, Eve (pre-banned in SP store) is denied.
+# Seed Eve as banned via ModerationConsole or the dogfood setup, then:
+#   dotnet run --project src/NL.Server -- --game generic --config samples/configs/generic.nle --source samples/events/join-gate-sample.ndjson --replay --join-gate --streamer default-streamer
+
+{"event":"playerJoin","player":"Alice","ts":1700000000000,"props":{"player.sessionJoinCount":1}}
+{"event":"playerJoin","player":"Eve","ts":1700000000100,"props":{"player.sessionJoinCount":1}}
+{"event":"shoot","player":"Alice","ts":1700000001000,"props":{"weapon.damage":10}}
+{"event":"playerLeave","player":"Alice","ts":1700000002000}

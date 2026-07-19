@@ -1,0 +1,25 @@
+# Sample NLEvents config for the Phase 3 generic (any-game) NDJSON adapter.
+# Event names are whatever your game emits — these match samples/events/generic-sample.ndjson.
+
+event playerJoin:
+    warn "Welcome — NLEvents are active for this session."
+    allow
+
+event shoot:
+    block
+
+event playerChat:
+    if chat.capsRatio > 0.8 and chat.length > 10:
+        warn "please avoid excessive caps"
+        block
+    else:
+        allow
+
+event respawn:
+    if player.health > 0:
+        block
+    else:
+        allow
+
+event playerLeave:
+    allow

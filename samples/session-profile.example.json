@@ -1,0 +1,11 @@
+{
+  "StreamerId": "default-streamer",
+  "Game": "minecraft",
+  "ConfigPath": "samples/configs/session-minecraft.nle",
+  "SourcePath": "C:\\\\path\\\\to\\\\server\\\\logs\\\\latest.log",
+  "RconEndpoint": "127.0.0.1:25575:changeme",
+  "AntiCheat": true,
+  "JoinGate": true,
+  "AnomalyAutoMod": false,
+  "UseDefaultDataPaths": true
+}

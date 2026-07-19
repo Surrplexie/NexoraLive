@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>NL.Server</RootNamespace>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NL.Core\NL.Core.csproj" />
+    <ProjectReference Include="..\NL.Server.Core\NL.Server.Core.csproj" />
+    <ProjectReference Include="..\NL.Moderation.Core\NL.Moderation.Core.csproj" />
+    <ProjectReference Include="..\NL.Moderation\NL.Moderation.csproj" />
+    <ProjectReference Include="..\NL.AntiCheat.Core\NL.AntiCheat.Core.csproj" />
+  </ItemGroup>
+
+</Project>

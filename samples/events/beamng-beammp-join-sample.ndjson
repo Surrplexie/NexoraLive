@@ -1,0 +1,10 @@
+# BeamMP-style join/leave for join-gate demos (generic NDJSON).
+# Seed Guest as banned, then:
+#   --game generic --config samples/configs/beamng.nle --source samples/events/beamng-beammp-join-sample.ndjson --replay --join-gate
+
+{"event":"sessionStart","player":"Host","ts":1700002000000,"props":{"map.id":1}}
+{"event":"playerJoin","player":"Host","ts":1700002000100,"props":{"player.alive":1,"beammp":1}}
+{"event":"playerJoin","player":"Guest","ts":1700002000200,"props":{"player.alive":1,"beammp":1}}
+{"event":"move","player":"Host","ts":1700002001000,"props":{"player.x":0,"player.y":0,"player.z":1,"vehicle.speed":10,"player.alive":1}}
+{"event":"playerLeave","player":"Guest","ts":1700002002000,"props":{"player.alive":0,"beammp":1}}
+{"event":"sessionEnd","player":"Host","ts":1700002003000}

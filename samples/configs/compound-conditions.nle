@@ -1,0 +1,44 @@
+# Demonstration of "and" / "or" compound conditions (Phase 0.7+).
+#
+# Grammar: if <cond> and <cond> or <cond>:
+#   - Left-associative: "A and B or C" evaluates as "(A and B) or C"
+#   - Short-circuit: "and" stops on first false, "or" stops on first true
+#   - Only one level of joins per "if" line (no parentheses in v0.1)
+
+# Block respawning ONLY when the player is alive AND already carrying an item.
+# (Prevents "free restart with item" exploits in a scenario where items survive death.)
+event respawn:
+    if player.health > 0 and player.hasItem == 1:
+        warn "can't respawn while alive and holding an item"
+        block
+    else:
+        allow
+
+# Allow shooting only when both health is positive AND the player is in-zone.
+# This models a "practice zone only" rule — no shooting outside or while dead.
+event shoot:
+    if player.health > 0 and player.inZone == 1:
+        allow
+    else:
+        warn "shooting blocked: must be alive and inside the practice zone"
+        block
+
+# Warn (but still allow) leaving the boundary if the player is low on health
+# OR is carrying a critical item — both conditions warrant a nudge.
+event leaveBoundary:
+    if player.health < 20 or player.hasItem == 1:
+        warn "leaving boundary with low health or a key item — be careful"
+        allow
+    else:
+        allow
+
+# A three-part chain: block useItem if health is full AND item has been used
+# already AND the player is in-zone. If any condition is false, allow it.
+#   (health == 100) and (hasItem == 0) and (inZone == 1)
+#   Left-assoc: ((health == 100) and (hasItem == 0)) and (inZone == 1)
+event useItem:
+    if player.health == 100 and player.hasItem == 0 and player.inZone == 1:
+        warn "item blocked: health is full, item already used, still in zone"
+        block
+    else:
+        allow

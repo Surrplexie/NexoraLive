@@ -1,0 +1,46 @@
+# Phase 5 anti-cheat sample config.
+# Pair with samples/events/anti-cheat-sample.ndjson and NL.Server --anti-cheat.
+# Anomaly GameEvents (anomalyImpossibleAction / anomalyRateSpike / anomalyTeleport) are
+# emitted by detectors and enforced here like any other event — RuleEngine unchanged.
+
+event playerJoin:
+    warn "NLEvents + anti-cheat signals are active."
+    allow
+
+event playerLeave:
+    allow
+
+event playerDeath:
+    allow
+
+event respawn:
+    if player.health > 0:
+        block
+    else:
+        allow
+
+event shoot:
+    allow
+
+event move:
+    allow
+
+# --- Phase 5 anomaly signals (produced by --anti-cheat detectors) -----------------
+
+event anomalyImpossibleAction:
+    warn "impossible action — kick candidate"
+    block
+
+event anomalyRateSpike:
+    if anomaly.count >= 8:
+        warn "rate spike — possible macro / flood"
+        block
+    else:
+        allow
+
+event anomalyTeleport:
+    if anomaly.distance > 40:
+        warn "impossible locomotion — teleport / speed signal"
+        block
+    else:
+        allow

@@ -1,0 +1,26 @@
+# Sample NLEvents config for the Phase 3 NL.Server (Minecraft) integration.
+# See docs/NLSERVER_MINECRAFT.md for the full event/property vocabulary.
+
+event playerJoin:
+    warn "Welcome! NLEvents rules are active for this session."
+    allow
+
+event playerLeave:
+    allow
+
+event playerChat:
+    if chat.capsRatio > 0.8 and chat.length > 10:
+        warn "please avoid excessive caps in chat"
+        block
+    else:
+        allow
+
+event playerDeath:
+    if player.sessionDeathCount > 3:
+        warn "frequent deaths this session - consider adjusting your approach"
+        allow
+    else:
+        allow
+
+event playerAdvancement:
+    allow
