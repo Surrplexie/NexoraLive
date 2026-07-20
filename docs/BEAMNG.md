@@ -40,6 +40,10 @@ powershell -File scripts/install-beamng-bridge.ps1
 Or copy [`beamng-mod/NL_BeamNGBridge`](../beamng-mod/NL_BeamNGBridge) to
 `<BeamNG user folder>/mods/unpacked/NL_BeamNGBridge`, enable the mod, load a map.
 
+The mod **must** include `scripts/NL_BeamNGBridge/modScript.lua` (calls `load("NL_bridge")`).
+Without it BeamNG shows the mod under **unpacked** but the GE extension never runs — no NDJSON,
+no UDP, **Decisions: 0** in Session Host.
+
 Optional threshold / port overrides: edit `bridge.json` in the mod folder (copied with install).
 
 Events append to `%LOCALAPPDATA%\NL\beamng-events.ndjson`.
