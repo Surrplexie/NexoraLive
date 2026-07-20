@@ -87,7 +87,9 @@ local function loadBridgeJson()
   -- Unpacked mod typical layout: .../mods/unpacked/NL_BeamNGBridge/bridge.json
   local localApp = os.getenv("LOCALAPPDATA")
   if localApp then
-    for _, ver in ipairs({ "", "0.37", "0.36", "0.35", "0.34", "0.33" }) do
+    -- BeamNG 0.38+ user data
+    table.insert(candidates, localApp .. "\\BeamNG\\BeamNG.drive\\current\\mods\\unpacked\\NL_BeamNGBridge\\bridge.json")
+    for _, ver in ipairs({ "", "0.38", "0.37", "0.36", "0.35", "0.34", "0.33" }) do
       local base = localApp .. "\\BeamNG.drive"
       if ver ~= "" then
         base = base .. "\\" .. ver

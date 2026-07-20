@@ -14,9 +14,10 @@ BeamNG has no Minecraft-style server log + RCON. NL integrates through the exist
 | Anti-cheat with `--beamng-cmd` | `AnomalyThresholds.BeamNgFreeroam` (teleport ≤150 / ≤90 u/s) |
 | BeamMP kick | Queue file + `NL_Kick` server plugin → `MP.DropPlayer` |
 | Live dogfood on this machine | Fill after install — see [DOGFOOD_BEAMNG.md](DOGFOOD_BEAMNG.md) |
+| Known Steam + user data (this workstation) | Game **0.38.6** at Steam `...\common\BeamNG.drive`; user data `%LOCALAPPDATA%\BeamNG\BeamNG.drive\current` |
 
-BeamNG.drive version varies by streamer install; the install script picks the newest
-`%LOCALAPPDATA%\BeamNG.drive\<version>` folder (override with `BEAMNG_USER_FOLDER`).
+Steam **game** folder ≠ **user** folder. Mods install under user data (`...\current\mods\unpacked\`).
+Override discovery with `BEAMNG_USER_FOLDER` if needed.
 
 ## Architecture
 
