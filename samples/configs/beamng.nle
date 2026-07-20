@@ -1,5 +1,7 @@
 # NLEvents config for BeamNG.drive via the NL_BeamNGBridge NDJSON stream.
 # Pair with samples/events/beamng-sample.ndjson (replay) or %LOCALAPPDATA%\NL\beamng-events.ndjson (live).
+# Emit thresholds live in beamng-mod/.../bridge.lua (and optional bridge.json); keep these Block
+# gates at or above those emit floors so recover/warn only fire on intentional severity.
 
 event sessionStart:
     warn "NL + BeamNG bridge active."
@@ -15,7 +17,7 @@ event playerLeave:
     allow
 
 event move:
-    if vehicle.speed > 50:
+    if vehicle.speed > 55:
         warn "speed limit — slow down"
         block
     else:
@@ -29,7 +31,7 @@ event crash:
         allow
 
 event airtime:
-    if airtime.seconds > 1.2:
+    if airtime.seconds > 1.5:
         warn "excessive airtime"
         block
     else:
@@ -49,21 +51,22 @@ event recover:
 event respawn:
     allow
 
-# Phase 5 anti-cheat (enable --anti-cheat / Session Host checkbox)
+# Phase 5 anti-cheat (enable --anti-cheat / Session Host checkbox).
+# Live BeamNG sessions with --beamng-cmd use AnomalyThresholds.BeamNgFreeroam (looser teleport).
 
 event anomalyImpossibleAction:
     warn "impossible action"
     block
 
 event anomalyRateSpike:
-    if anomaly.count >= 8:
+    if anomaly.count >= 12:
         warn "event spam / macro"
         block
     else:
         allow
 
 event anomalyTeleport:
-    if anomaly.distance > 40:
+    if anomaly.distance > 120:
         warn "teleport / speedhack signal"
         block
     else:

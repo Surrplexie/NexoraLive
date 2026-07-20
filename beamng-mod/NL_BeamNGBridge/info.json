@@ -1,6 +1,6 @@
 {
   "name": "NL_BeamNGBridge",
   "description": "NexoraLive (NL) bridge — emits throttled NDJSON session events for NL.Server / Session Host, and listens for warn/recover/despawn/kick commands on localhost UDP.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "NL"
 }

@@ -119,4 +119,23 @@ public class TeleportDetectorTests
         Assert.Empty(detector.Observe(Move("Alice", T0, 0, 0), T0));
         Assert.Empty(detector.Observe(Move("Alice", T0.AddMilliseconds(500), 2, 1), T0.AddMilliseconds(500)));
     }
+
+    [Fact]
+    public void BeamNgFreeroam_AllowsHighwayCadenceJump()
+    {
+        // ~55 m/s over 0.35s ≈ 19 m; freeroam profile must not trip on that.
+        var detector = new TeleportDetector(AnomalyThresholds.BeamNgFreeroam);
+        Assert.Empty(detector.Observe(Move("Driver", T0, 0, 0), T0));
+        Assert.Empty(detector.Observe(Move("Driver", T0.AddMilliseconds(350), 20, 0), T0.AddMilliseconds(350)));
+    }
+
+    [Fact]
+    public void BeamNgFreeroam_StillFlagsHugeJump()
+    {
+        var detector = new TeleportDetector(AnomalyThresholds.BeamNgFreeroam);
+        Assert.Empty(detector.Observe(Move("Cheater", T0, 0, 0), T0));
+        var signals = detector.Observe(Move("Cheater", T0.AddMilliseconds(100), 400, 0), T0.AddMilliseconds(100));
+        Assert.Single(signals);
+        Assert.Equal(AnomalyKind.Teleport, signals[0].Kind);
+    }
 }

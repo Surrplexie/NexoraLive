@@ -22,7 +22,7 @@ For the long-form NLE walkthrough, see [`NLE_GUIDE.md`](NLE_GUIDE.md). For build
 | **Moderation Console (Windows)** | Audit log + warn / ban / graylist / clear | Basic admin UI |
 | **Anti-cheat (early)** | Session-path anomaly signals (`anomaly*`) evaluated by the same `.nle` engine — see [Anti-cheat direction](#anti-cheat-direction) | Signal prototype; full packet path WIP |
 | **Session Host (Windows)** | One Start/Stop shell for a full session profile | Recommended entry for live |
-| **BeamNG.drive bridge** | Lua mod → NDJSON → rules → localhost UDP feedback | Freeroam / BeamMP path |
+| **BeamNG.drive bridge** | Lua mod → NDJSON → rules → localhost UDP + BeamMP kick queue | Freeroam / BeamMP operator path |
 
 **Not implemented yet:** hosted NLServers with in-path packet anti-play, economy / trading cards, mobile clients, cloud hosting, encrypted `.nle` packaging, and most of the broader platform vision. Treat this repo as an **early working guide**: enough to learn the model, validate configs, and dogfood a few real sessions — not a finished operator product.
 
@@ -237,7 +237,7 @@ Prove join gate: ban a test account in Moderation Console (exact in-game name), 
 powershell -File scripts/install-beamng-bridge.ps1
 ```
 
-Then Session Host → **Tools → Load BeamNG freeroam defaults** (generic NDJSON, `beamng.nle`, early anti-cheat signals on, join gate off for solo). Events append to `%LOCALAPPDATA%\NL\beamng-events.ndjson`; Blocks return over UDP `127.0.0.1:27022`. Guide: [`docs/BEAMNG.md`](docs/BEAMNG.md).
+Then Session Host → **Tools → Load BeamNG freeroam defaults** (generic NDJSON, `beamng.nle`, freeroam anti-cheat thresholds via `--beamng-cmd`, join gate off for solo). Events append to `%LOCALAPPDATA%\NL\beamng-events.ndjson`; Blocks return over UDP `127.0.0.1:27022`. BeamMP kicks use `scripts/install-beammp-nl-kick.ps1` + the kick queue. Guide: [`docs/BEAMNG.md`](docs/BEAMNG.md).
 
 ### Join-gate demo without Minecraft
 

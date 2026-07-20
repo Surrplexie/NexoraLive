@@ -85,8 +85,15 @@ public sealed class NlSessionRunner
 
         if (o.AntiCheat)
         {
-            source = new AnomalyDetectingEventSource(source);
-            Write("Anti-cheat: ON");
+            var thresholds = o.AnomalyThresholds
+                ?? (o.BeamngCommandEndpoint is not null ? AnomalyThresholds.BeamNgFreeroam : null);
+            var pipeline = thresholds is null
+                ? AnomalyPipeline.CreateDefault()
+                : AnomalyPipeline.CreateDefault(thresholds);
+            source = new AnomalyDetectingEventSource(source, pipeline);
+            Write(thresholds is null
+                ? "Anti-cheat: ON (default thresholds)"
+                : $"Anti-cheat: ON (teleport≤{thresholds.TeleportMaxDistance}, rate≤{thresholds.RateSpikeMaxEvents}/{thresholds.RateSpikeWindowMs}ms)");
         }
 
         var sink = await CreateSinkAsync(o, cancellationToken);

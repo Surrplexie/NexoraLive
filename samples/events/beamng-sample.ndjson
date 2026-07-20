@@ -2,22 +2,26 @@
 #   dotnet run --project src/NL.Server -- --game generic --config samples/configs/beamng.nle --source samples/events/beamng-sample.ndjson --replay --anti-cheat
 # Live path after installing beamng-mod/NL_BeamNGBridge:
 #   %LOCALAPPDATA%\NL\beamng-events.ndjson
+#
+# Driver moves are spaced for freeroam cadence (~0.35s). Cheater still jumps for anomalyTeleport.
 
 {"event":"sessionStart","player":"Driver","ts":1700001000000,"props":{"map.id":1}}
 {"event":"playerJoin","player":"Driver","ts":1700001000100,"props":{"player.alive":1,"beammp":0}}
 {"event":"move","player":"Driver","ts":1700001000500,"props":{"player.x":0,"player.y":0,"player.z":1,"vehicle.speed":12,"player.alive":1}}
-{"event":"move","player":"Driver","ts":1700001001000,"props":{"player.x":40,"player.y":5,"player.z":1,"vehicle.speed":28,"player.alive":1}}
-{"event":"move","player":"Driver","ts":1700001001500,"props":{"player.x":120,"player.y":10,"player.z":1,"vehicle.speed":55,"player.alive":1}}
-{"event":"crash","player":"Driver","ts":1700001002000,"props":{"crash.severity":14,"vehicle.speed":8,"vehicle.damage":56,"player.alive":1}}
-{"event":"airtime","player":"Driver","ts":1700001003000,"props":{"airtime.seconds":1.4,"vehicle.speed":32}}
-{"event":"rollover","player":"Driver","ts":1700001004000,"props":{"rollover.seconds":1.8,"vehicle.speed":3}}
-{"event":"leaveBoundary","player":"Driver","ts":1700001005000,"props":{"boundary.id":1,"player.x":6000,"player.y":0,"player.z":1}}
-{"event":"recover","player":"Driver","ts":1700001006000,"props":{"player.alive":1}}
-{"event":"respawn","player":"Driver","ts":1700001006100,"props":{"player.alive":1,"player.health":0}}
-{"event":"move","player":"Driver","ts":1700001007000,"props":{"player.x":10,"player.y":0,"player.z":1,"vehicle.speed":15,"player.alive":1}}
-{"event":"move","player":"Cheater","ts":1700001007500,"props":{"player.x":0,"player.y":0,"player.z":1,"vehicle.speed":20,"player.alive":1}}
-{"event":"move","player":"Cheater","ts":1700001007600,"props":{"player.x":250,"player.y":0,"player.z":1,"vehicle.speed":90,"player.alive":1}}
-{"event":"playerJoin","player":"Guest","ts":1700001008000,"props":{"player.alive":1,"beammp":1}}
-{"event":"playerLeave","player":"Guest","ts":1700001009000,"props":{"player.alive":0,"beammp":1}}
-{"event":"playerLeave","player":"Driver","ts":1700001010000,"props":{"player.alive":0}}
-{"event":"sessionEnd","player":"Driver","ts":1700001010100}
+{"event":"move","player":"Driver","ts":1700001000850,"props":{"player.x":8,"player.y":1,"player.z":1,"vehicle.speed":22,"player.alive":1}}
+{"event":"move","player":"Driver","ts":1700001001200,"props":{"player.x":18,"player.y":2,"player.z":1,"vehicle.speed":35,"player.alive":1}}
+{"event":"move","player":"Driver","ts":1700001001550,"props":{"player.x":32,"player.y":3,"player.z":1,"vehicle.speed":48,"player.alive":1}}
+{"event":"move","player":"Driver","ts":1700001001900,"props":{"player.x":50,"player.y":4,"player.z":1,"vehicle.speed":58,"player.alive":1}}
+{"event":"crash","player":"Driver","ts":1700001002300,"props":{"crash.severity":14,"vehicle.speed":8,"vehicle.damage":56,"player.alive":1}}
+{"event":"airtime","player":"Driver","ts":1700001003300,"props":{"airtime.seconds":1.7,"vehicle.speed":32}}
+{"event":"rollover","player":"Driver","ts":1700001004300,"props":{"rollover.seconds":1.9,"vehicle.speed":3}}
+{"event":"leaveBoundary","player":"Driver","ts":1700001005300,"props":{"boundary.id":1,"player.x":6000,"player.y":0,"player.z":1}}
+{"event":"recover","player":"Driver","ts":1700001006300,"props":{"player.alive":1}}
+{"event":"respawn","player":"Driver","ts":1700001006400,"props":{"player.alive":1,"player.health":0}}
+{"event":"move","player":"Driver","ts":1700001007400,"props":{"player.x":10,"player.y":0,"player.z":1,"vehicle.speed":15,"player.alive":1}}
+{"event":"move","player":"Cheater","ts":1700001007800,"props":{"player.x":0,"player.y":0,"player.z":1,"vehicle.speed":20,"player.alive":1}}
+{"event":"move","player":"Cheater","ts":1700001007900,"props":{"player.x":400,"player.y":0,"player.z":1,"vehicle.speed":90,"player.alive":1}}
+{"event":"playerJoin","player":"Guest","ts":1700001008500,"props":{"player.alive":1,"beammp":1}}
+{"event":"playerLeave","player":"Guest","ts":1700001009500,"props":{"player.alive":0,"beammp":1}}
+{"event":"playerLeave","player":"Driver","ts":1700001010500,"props":{"player.alive":0}}
+{"event":"sessionEnd","player":"Driver","ts":1700001010600}

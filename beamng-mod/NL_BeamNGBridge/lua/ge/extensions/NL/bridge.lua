@@ -5,19 +5,21 @@
 -- Install: copy/symlink NL_BeamNGBridge into <BeamNG user folder>/mods/unpacked/
 -- then enable the mod and load a map. Events append to:
 --   %LOCALAPPDATA%/NL/beamng-events.ndjson  (Windows)
--- Commands arrive on UDP 127.0.0.1:27022 with magic header "SCBN1".
+-- Commands arrive on UDP 127.0.0.1:<cmdPort> with magic header "SCBN1".
+-- Optional overrides: bridge.json next to this mod (cmdPort + emit thresholds).
 
 local M = {}
 
 local EVENT_PATH = nil
+local KICK_QUEUE_PATH = nil
 local CMD_PORT = 27022
 local MAGIC = "SCBN1"
 
-local MOVE_INTERVAL = 0.35          -- seconds between move events
-local CRASH_DV_THRESHOLD = 8.0      -- m/s delta-v style severity proxy
-local AIRTIME_THRESHOLD = 1.25      -- seconds wheels-ish airtime
-local ROLLOVER_THRESHOLD = 1.5      -- seconds inverted
-local BOUNDARY = {                  -- streamer-tunable axis-aligned box (world units)
+local MOVE_INTERVAL = 0.35
+local CRASH_DV_THRESHOLD = 10.0
+local AIRTIME_THRESHOLD = 1.5
+local ROLLOVER_THRESHOLD = 1.75
+local BOUNDARY = {
   minX = -5000, maxX = 5000,
   minY = -5000, maxY = 5000,
   minZ = -200,  maxZ = 2000,
@@ -31,11 +33,12 @@ local airtimeAcc = 0
 local rolloverAcc = 0
 local outsideBoundary = false
 local beammpEnabled = false
+local beammpPlayers = {} -- name(lower) -> playerId
 
 local udpSock = nil
+local udpReady = false
 
 local function ensureDir(path)
-  -- Best-effort; BeamNG/Windows usually already have LOCALAPPDATA\NL from Session Host.
   local sep = package.config:sub(1, 1)
   local acc = ""
   for part in string.gmatch(path, "[^/\\" .. sep .. "]+") do
@@ -48,12 +51,97 @@ local function ensureDir(path)
   end
 end
 
-local function resolveEventPath()
+local function nlDir()
   local localApp = os.getenv("LOCALAPPDATA") or os.getenv("HOME") or "."
   local sep = package.config:sub(1, 1)
   local dir = localApp .. sep .. "NL"
   ensureDir(dir)
+  return dir, sep
+end
+
+local function resolveEventPath()
+  local dir, sep = nlDir()
   return dir .. sep .. "beamng-events.ndjson"
+end
+
+local function resolveKickQueuePath()
+  local dir, sep = nlDir()
+  return dir .. sep .. "beamng-kicks.ndjson"
+end
+
+local function modRoot()
+  -- BeamNG often exposes this extension path; fall back to relative unpack layout.
+  if M.__extensionPath then
+    return M.__extensionPath
+  end
+  return nil
+end
+
+local function loadBridgeJson()
+  local candidates = {}
+  local root = modRoot()
+  if root then
+    table.insert(candidates, root .. "/bridge.json")
+    table.insert(candidates, root .. "\\bridge.json")
+  end
+  -- Unpacked mod typical layout: .../mods/unpacked/NL_BeamNGBridge/bridge.json
+  local localApp = os.getenv("LOCALAPPDATA")
+  if localApp then
+    for _, ver in ipairs({ "", "0.37", "0.36", "0.35", "0.34", "0.33" }) do
+      local base = localApp .. "\\BeamNG.drive"
+      if ver ~= "" then
+        base = base .. "\\" .. ver
+      end
+      table.insert(candidates, base .. "\\mods\\unpacked\\NL_BeamNGBridge\\bridge.json")
+    end
+  end
+  table.insert(candidates, "bridge.json")
+
+  for _, path in ipairs(candidates) do
+    local f = io.open(path, "r")
+    if f then
+      local raw = f:read("*a")
+      f:close()
+      if raw and #raw > 0 then
+        local ok, cfg = pcall(function()
+          if json and json.decode then
+            return json.decode(raw)
+          end
+          if Json and JsonDecode then
+            return JsonDecode(raw)
+          end
+          return nil
+        end)
+        if ok and type(cfg) == "table" then
+          if type(cfg.cmdPort) == "number" then
+            CMD_PORT = math.floor(cfg.cmdPort)
+          end
+          if type(cfg.moveInterval) == "number" then
+            MOVE_INTERVAL = cfg.moveInterval
+          end
+          if type(cfg.crashDvThreshold) == "number" then
+            CRASH_DV_THRESHOLD = cfg.crashDvThreshold
+          end
+          if type(cfg.airtimeThreshold) == "number" then
+            AIRTIME_THRESHOLD = cfg.airtimeThreshold
+          end
+          if type(cfg.rolloverThreshold) == "number" then
+            ROLLOVER_THRESHOLD = cfg.rolloverThreshold
+          end
+          if type(cfg.boundary) == "table" then
+            BOUNDARY.minX = cfg.boundary.minX or BOUNDARY.minX
+            BOUNDARY.maxX = cfg.boundary.maxX or BOUNDARY.maxX
+            BOUNDARY.minY = cfg.boundary.minY or BOUNDARY.minY
+            BOUNDARY.maxY = cfg.boundary.maxY or BOUNDARY.maxY
+            BOUNDARY.minZ = cfg.boundary.minZ or BOUNDARY.minZ
+            BOUNDARY.maxZ = cfg.boundary.maxZ or BOUNDARY.maxZ
+          end
+          log("I", "NL", "Loaded bridge.json from " .. path)
+          return
+        end
+      end
+    end
+  end
 end
 
 local function nowMs()
@@ -104,34 +192,144 @@ local function toast(msg)
 end
 
 local function recoverLocal()
-  -- Recover active player vehicle when possible (API names vary by BeamNG version).
-  local ok, err = pcall(function()
-    if be and be.getPlayerVehicle then
-      local veh = be:getPlayerVehicle(0)
-      if veh and veh.queueLuaCommand then
-        veh:queueLuaCommand("recovery.startRecovering()")
-        return
+  -- Try several BeamNG recover entry points; APIs differ by version.
+  local attempts = {
+    function()
+      if be and be.getPlayerVehicle then
+        local veh = be:getPlayerVehicle(0)
+        if veh and veh.queueLuaCommand then
+          veh:queueLuaCommand("recovery.startRecovering()")
+          return "vehicle.recovery.startRecovering"
+        end
+      end
+    end,
+    function()
+      if be and be.getPlayerVehicle then
+        local veh = be:getPlayerVehicle(0)
+        if veh and veh.queueLuaCommand then
+          veh:queueLuaCommand("obj:requestReset(RESET_PHYSICS)")
+          return "vehicle.requestReset"
+        end
+      end
+    end,
+    function()
+      if recovery and recovery.startRecovering then
+        recovery.startRecovering()
+        return "recovery.startRecovering"
+      end
+    end,
+    function()
+      if core_recovery and core_recovery.recover then
+        core_recovery.recover()
+        return "core_recovery.recover"
+      end
+    end,
+  }
+
+  for _, attempt in ipairs(attempts) do
+    local ok, result = pcall(attempt)
+    if ok and type(result) == "string" then
+      log("I", "NL", "recover via " .. result)
+      return true
+    end
+  end
+  log("W", "NL", "recover failed — no known API succeeded")
+  return false
+end
+
+local function enqueueBeamMpKick(who, reason)
+  if not KICK_QUEUE_PATH then
+    KICK_QUEUE_PATH = resolveKickQueuePath()
+  end
+  local line = string.format(
+    '{"player":"%s","reason":"%s","ts":%d}\n',
+    jsonEscape(who or ""),
+    jsonEscape(reason or "NLEvents Block"),
+    nowMs()
+  )
+  local f = io.open(KICK_QUEUE_PATH, "a")
+  if f then
+    f:write(line)
+    f:close()
+    log("I", "NL", "Queued BeamMP kick for " .. tostring(who) .. " → " .. KICK_QUEUE_PATH)
+    return true
+  end
+  log("W", "NL", "Failed to write kick queue " .. tostring(KICK_QUEUE_PATH))
+  return false
+end
+
+local function resolveBeamMpPlayerId(who)
+  if not who or who == "" then
+    return nil
+  end
+  local key = string.lower(tostring(who))
+  if beammpPlayers[key] then
+    return beammpPlayers[key]
+  end
+  -- Client-side BeamMP helpers when present
+  if MPVehicleGE and MPVehicleGE.getPlayerByName then
+    local ok, player, id = pcall(function()
+      return MPVehicleGE.getPlayerByName(who)
+    end)
+    if ok and id then
+      return id
+    end
+  end
+  if MP and MP.GetPlayers then
+    local ok, players = pcall(function() return MP.GetPlayers() end)
+    if ok and type(players) == "table" then
+      for id, name in pairs(players) do
+        if type(name) == "string" and string.lower(name) == key then
+          return id
+        elseif type(name) == "table" and name.name and string.lower(tostring(name.name)) == key then
+          return id
+        end
       end
     end
-    if core_vehicle_manager and core_vehicle_manager.enterVehicle then
-      -- fallback no-op marker
-    end
-  end)
-  if not ok then
-    log("W", "NL", "recover failed: " .. tostring(err))
   end
+  return nil
+end
+
+local function tryBeamMpKick(who, reason)
+  local id = resolveBeamMpPlayerId(who)
+  local kicked = false
+
+  if id ~= nil then
+    if MP and MP.DropPlayer then
+      local ok = pcall(function() MP.DropPlayer(id, reason or "NLEvents Block") end)
+      if ok then
+        log("I", "NL", "MP.DropPlayer(" .. tostring(id) .. ")")
+        kicked = true
+      end
+    end
+    if not kicked and DropPlayer then
+      local ok = pcall(function() DropPlayer(id) end)
+      if ok then
+        log("I", "NL", "DropPlayer(" .. tostring(id) .. ")")
+        kicked = true
+      end
+    end
+  end
+
+  -- Always enqueue for the companion BeamMP server plugin (authoritative kick path).
+  local queued = enqueueBeamMpKick(who, reason)
+  return kicked or queued
 end
 
 local function despawnOrKick(kind, who, reason)
   toast(string.format("%s %s: %s", kind, who or "?", reason or ""))
-  -- Solo: recover. BeamMP host tools can replace this with MP-specific kick later.
+  if (kind == "kick" or kind == "despawn") and (beammpEnabled or next(beammpPlayers)) then
+    if tryBeamMpKick(who, reason) then
+      return
+    end
+    log("W", "NL", "kick fallback — BeamMP APIs unavailable; recovering local vehicle")
+  end
   if kind == "despawn" or kind == "kick" or kind == "recover" then
     recoverLocal()
   end
 end
 
 local function handleCommand(raw)
-  -- SCBN1\naction|player|message
   if type(raw) ~= "string" or #raw < 6 then
     return
   end
@@ -165,12 +363,23 @@ local function ensureUdp()
   local ok, socket = pcall(require, "socket")
   if not ok or not socket then
     log("W", "NL", "LuaSocket not available — command channel disabled (events still emit).")
+    toast("NL: LuaSocket missing — UDP commands disabled")
     return
   end
   local s = socket.udp()
-  s:setsockname("127.0.0.1", CMD_PORT)
+  local bindOk, bindErr = pcall(function()
+    s:setsockname("127.0.0.1", CMD_PORT)
+  end)
+  if not bindOk then
+    log("E", "NL", "UDP bind failed on 127.0.0.1:" .. tostring(CMD_PORT) .. " — " .. tostring(bindErr))
+    toast("NL: UDP port " .. tostring(CMD_PORT) .. " busy — set bridge.json cmdPort / Session Host BeamNG UDP")
+    pcall(function() s:close() end)
+    return
+  end
+  -- Some LuaSocket builds report bind errors via getpeername/getsockname only; probe receive.
   s:settimeout(0)
   udpSock = s
+  udpReady = true
   log("I", "NL", "Listening for NL commands on UDP 127.0.0.1:" .. tostring(CMD_PORT))
 end
 
@@ -179,8 +388,11 @@ local function pollCommands()
     return
   end
   while true do
-    local data = udpSock:receive()
+    local data, err = udpSock:receive()
     if not data then
+      if err and err ~= "timeout" and err ~= "closed" then
+        log("W", "NL", "UDP receive: " .. tostring(err))
+      end
       break
     end
     handleCommand(data)
@@ -188,7 +400,6 @@ local function pollCommands()
 end
 
 local function getVehiclePose()
-  -- Returns x,y,z,speed,inverted,airborne or nils
   if not be or not be.getPlayerVehicle then
     return nil
   end
@@ -210,7 +421,6 @@ local function getVehiclePose()
       local vx, vy, vz = vel.x or vel[1] or 0, vel.y or vel[2] or 0, vel.z or vel[3] or 0
       speed = math.sqrt(vx * vx + vy * vy + vz * vz)
     end
-    -- Rough inverted / airborne proxies — tune during dogfood.
     if veh.getDirectionVectorUp then
       local up = veh:getDirectionVectorUp()
       if up and (up.z or up[3] or 1) < 0.15 then
@@ -227,16 +437,22 @@ local function getVehiclePose()
 end
 
 local function detectBeamMP()
-  -- Soft detect: presence of common BeamMP globals/hooks.
   beammpEnabled = (MPVehicleGE ~= nil) or (MPGameNetwork ~= nil) or (type(MP) == "table")
 end
 
 function M.onExtensionLoaded()
+  loadBridgeJson()
   EVENT_PATH = resolveEventPath()
+  KICK_QUEUE_PATH = resolveKickQueuePath()
   playerName = (getPlayerServerName and getPlayerServerName()) or (Steam and Steam.playerName) or "Driver"
   ensureUdp()
   detectBeamMP()
-  log("I", "NL", "NL_BeamNGBridge loaded. Events → " .. tostring(EVENT_PATH) .. (beammpEnabled and " (BeamMP hints on)" or " (solo)"))
+  log("I", "NL", "NL_BeamNGBridge loaded. Events → " .. tostring(EVENT_PATH)
+    .. " crashDv=" .. tostring(CRASH_DV_THRESHOLD)
+    .. " air=" .. tostring(AIRTIME_THRESHOLD)
+    .. " roll=" .. tostring(ROLLOVER_THRESHOLD)
+    .. (beammpEnabled and " (BeamMP hints on)" or " (solo)")
+    .. (udpReady and "" or " [UDP offline]"))
 end
 
 function M.onExtensionUnloaded()
@@ -247,11 +463,11 @@ function M.onExtensionUnloaded()
   if udpSock then
     pcall(function() udpSock:close() end)
     udpSock = nil
+    udpReady = false
   end
 end
 
 function M.onWorldReadyState(state)
-  -- Fired when a level is ready in many BeamNG builds.
   if state == 2 or state == true or state == "ready" then
     if not sessionActive then
       sessionActive = true
@@ -280,11 +496,11 @@ function M.onClientEndMission()
   end
 end
 
--- BeamMP-oriented hooks (called only if the MP stack invokes matching extension hooks).
 function M.onPlayerConnected(playerId, name)
   if not name or name == "" then
     return
   end
+  beammpPlayers[string.lower(tostring(name))] = playerId
   local prev = playerName
   playerName = tostring(name)
   appendEvent("playerJoin", { ["player.alive"] = 1, ["beammp"] = 1 })
@@ -292,6 +508,9 @@ function M.onPlayerConnected(playerId, name)
 end
 
 function M.onPlayerDisconnected(playerId, name)
+  if name and name ~= "" then
+    beammpPlayers[string.lower(tostring(name))] = nil
+  end
   local prev = playerName
   if name and name ~= "" then
     playerName = tostring(name)
@@ -311,7 +530,6 @@ function M.onUpdate(dt)
     return
   end
 
-  -- Crash proxy: sudden speed loss.
   local dv = lastSpeed - speed
   if dv > CRASH_DV_THRESHOLD and lastSpeed > 5 then
     appendEvent("crash", {
@@ -366,7 +584,6 @@ function M.onUpdate(dt)
   end
 end
 
--- Manual recover detection helper (call from vehicle side via queueGameEngineLua if desired)
 function M.onSCRecover()
   appendEvent("recover", { ["player.alive"] = 1 })
   appendEvent("respawn", { ["player.alive"] = 1, ["player.health"] = 0 })

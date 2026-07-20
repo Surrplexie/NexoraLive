@@ -1,3 +1,4 @@
+using NL.AntiCheat.Core;
 using NL.Core;
 using NL.Core.Sp;
 
@@ -23,6 +24,8 @@ public sealed class NlSessionOptions
     public bool JoinGate { get; init; }
     public bool AnomalyAutoMod { get; init; }
     public JoinRequirements? JoinRequirements { get; init; }
+    /// <summary>Optional override; when null and <see cref="BeamngCommandEndpoint"/> is set, BeamNG freeroam thresholds apply.</summary>
+    public AnomalyThresholds? AnomalyThresholds { get; init; }
 }
 
 /// <summary>Persisted Session Host profile under <see cref="NlPaths.SessionProfile"/>.</summary>

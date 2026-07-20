@@ -206,6 +206,11 @@ internal sealed class SessionHostForm : Form
             File.WriteAllText(NlPaths.BeamngEvents, "# NL BeamNG events — appended by NL_BeamNGBridge\n");
         }
 
+        if (!File.Exists(NlPaths.BeamngKicks))
+        {
+            File.WriteAllText(NlPaths.BeamngKicks, "# NL BeamMP kick queue — appended by bridge; consumed by NL_Kick\n");
+        }
+
         var repoSample = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "samples", "configs", "beamng.nle"));
         if (!File.Exists(repoSample))
         {

@@ -23,6 +23,9 @@ public static class NlPaths
     /// <summary>NDJSON event stream written by the BeamNG.drive NL bridge Lua mod.</summary>
     public static string BeamngEvents => Path.Combine(Root, "beamng-events.ndjson");
 
+    /// <summary>Kick requests queued by the BeamNG bridge for the BeamMP <c>NL_Kick</c> server plugin.</summary>
+    public static string BeamngKicks => Path.Combine(Root, "beamng-kicks.ndjson");
+
     /// <summary>Default localhost UDP port the BeamNG bridge listens on for Block actions.</summary>
     public const int BeamngCommandPort = 27022;
 

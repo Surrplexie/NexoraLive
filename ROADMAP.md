@@ -231,7 +231,9 @@ Second-title path without a new C# `--game` adapter. See [docs/BEAMNG.md](docs/B
 - [x] Sample `beamng.nle` / `beamng-sample.ndjson` + Session Host “Load BeamNG freeroam defaults”
 - [x] `--beamng-cmd` / `BeamNgUdpActionSink` (SCBN1 warn/recover/kick)
 - [x] BeamMP join/leave hooks + docs (`beamng-mod/.../BEAMMP.md`); join gate off for solo
-- [ ] Live freeroam dogfood threshold tuning (streamer-filled [docs/DOGFOOD_BEAMNG.md](docs/DOGFOOD_BEAMNG.md))
+- [x] Live freeroam operator path: `bridge.json` thresholds, recover/UDP harden, BeamNgFreeroam
+      anomaly profile, `NL_Kick` BeamMP server plugin + kick queue, dogfood defaults in
+      [docs/DOGFOOD_BEAMNG.md](docs/DOGFOOD_BEAMNG.md) / [docs/BEAMNG.md](docs/BEAMNG.md)
 
 ## Phase 6+ — Long-term / high-risk ideas (documented only, not scheduled)
 
