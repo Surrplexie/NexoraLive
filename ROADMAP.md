@@ -259,6 +259,18 @@ Formal contract so **any game** integrates without new C# adapters. See
 - [x] **Smoke script** — `scripts/nl-session-bus-smoke.ps1`
 - [x] **Tests** — `SessionHostService`, bus helper, WebSocket token rejection
 
+## Phase C — Cross-platform operator tooling ✓
+
+Headless NL on Linux + web moderation console. See [docs/NL_HEADLESS_LINUX.md](docs/NL_HEADLESS_LINUX.md).
+
+- [x] **`NL_DATA_ROOT`** — override shared data directory (Docker / Linux hosts)
+- [x] **`NL.Moderation.Web`** — cross-platform moderation dashboard (HTTP 27030) + REST API
+- [x] **Headless `NL.Server`** — documented Linux CLI path + `scripts/run-headless-linux.sh`
+- [x] **Linux publish** — `scripts/publish-linux.sh` (`artifacts/publish-linux/`)
+- [x] **Docker** — `docker/Dockerfile` + `docker/docker-compose.yml` (session host + moderation)
+- [x] **Health endpoints** — `GET /health` on web operator apps
+- [x] **Tests** — `NlPaths` override, `ModerationHostState`
+
 ## Phase 6+ — Long-term / high-risk ideas (documented only, not scheduled)
 
 These involve real money, KYC/identity verification, blockchain, and gambling-adjacent

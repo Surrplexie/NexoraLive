@@ -56,6 +56,8 @@ app.MapPost("/api/v1/session/start", async (BusHostState b, HttpRequest req, Can
 
 app.MapPost("/api/v1/session/stop", (BusHostState b) => b.Stop());
 
+app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "session-host" }));
+
 Console.WriteLine($"NL Session Host (web) → http://{bindHost}:{httpPort}");
 Console.WriteLine($"Bridge WebSocket      → {bus.BusInfo.BridgeConnectUrl}");
 Console.WriteLine($"Bus token             → {busToken}");

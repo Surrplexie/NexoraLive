@@ -13,7 +13,8 @@ trail and a small admin/mod dashboard, per nl.txt's moderation section and
 |---|---|---|
 | `src/NL.Moderation.Core` | pure, cross-platform | `ModerationRecord`, `IModerationStore`, `ISpProfileRepository`, `ModerationService` — no file/network I/O, fully unit-testable |
 | `src/NL.Moderation` | I/O, cross-platform | `JsonlModerationStore` (append-only JSON-Lines log), `JsonFileSpProfileRepository` (JSON file of `SpProfile`s) |
-| `src/NL.ModerationConsole` | WinForms (`net8.0-windows`) | The actual admin/mod dashboard — recent actions, SP offense history, issue warning/ban/graylist/clear |
+| `src/NL.ModerationConsole` | WinForms (`net8.0-windows`) | Windows admin/mod dashboard |
+| `src/NL.Moderation.Web` | ASP.NET (`net8.0`) | Cross-platform web dashboard (Phase C) — see [NL_HEADLESS_LINUX.md](NL_HEADLESS_LINUX.md) |
 
 This mirrors the split already used for Phase 3 (`NL.Server.Core` pure / `NL.Server` I/O) and
 Phase 2 (`NL.Core/Sp` pure model / `JoinEligibilityEngine` pure evaluator): keep the decision

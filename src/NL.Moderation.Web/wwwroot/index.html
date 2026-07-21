@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NL Moderation Console</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>NL Moderation Console</h1>
+    <p class="sub">Cross-platform admin/mod dashboard (Phase C)</p>
+  </header>
+
+  <section class="card">
+    <div class="grid top-grid">
+      <label>Streamer <input id="streamer" value="default-streamer" /></label>
+      <label>Issued by (mod id) <input id="mod-id" value="mod-web" /></label>
+      <label class="wide">Player id <input id="player-id" placeholder="minecraft-uuid or display id" /></label>
+      <label class="wide">Reason <input id="reason" placeholder="Required for warn / ban / graylist" /></label>
+    </div>
+    <div class="actions">
+      <button type="button" id="lookup">Look up SP</button>
+      <button type="button" id="create-profile">Create profile</button>
+      <button type="button" id="warn">Issue warning</button>
+      <button type="button" id="ban" class="danger">Issue ban</button>
+      <button type="button" id="graylist">Graylist hold</button>
+      <button type="button" id="clear">Clear standing</button>
+      <button type="button" id="refresh" class="primary">Refresh</button>
+    </div>
+    <p id="status" class="status"></p>
+    <dl id="paths"></dl>
+  </section>
+
+  <section class="card split-card">
+    <div>
+      <h2>Recent actions <span id="recent-count"></span></h2>
+      <div class="table-wrap">
+        <table id="recent-table">
+          <thead>
+            <tr>
+              <th>Time (UTC)</th><th>Kind</th><th>Player</th><th>Event</th><th>Decision</th><th>By</th><th>Message</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div>
+      <h2>SP offense history</h2>
+      <p id="standing" class="standing"></p>
+      <div class="table-wrap">
+        <table id="offense-table">
+          <thead>
+            <tr><th>Issued (UTC)</th><th>By</th><th>Reason</th><th>Game</th><th>Active?</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>

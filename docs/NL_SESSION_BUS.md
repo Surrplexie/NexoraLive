@@ -72,4 +72,4 @@ Godot, Rust, and .NET starters. Pass the full `bridgeConnectUrl` from the dashbo
 ## Related docs
 
 - [NL Game Integration Spec v1](NL_INTEGRATION_SPEC.md) — event/action NDJSON contract
-- [ROADMAP.md](../ROADMAP.md) — Phase A (protocol) + Phase B (session bus)
+- [ROADMAP.md](../ROADMAP.md) — Phase A (protocol) + Phase B (session bus) + Phase C (headless Linux)

@@ -192,13 +192,23 @@ dotnet run --project src/NL.SessionHost.Web
 
 Open `http://127.0.0.1:27020` — REST API, bridge WebSocket on port 27021 with token auth. See [docs/NL_SESSION_BUS.md](docs/NL_SESSION_BUS.md).
 
+**Moderation (Phase C):** web console for Mac/Linux operators:
+
+```bash
+dotnet run --project src/NL.Moderation.Web
+```
+
+Open `http://127.0.0.1:27030`. See [docs/NL_HEADLESS_LINUX.md](docs/NL_HEADLESS_LINUX.md) for Docker and headless server paths.
+
 ### Portable publish layout
 
 ```powershell
 powershell -File scripts/publish.ps1
 ```
 
-Writes `artifacts/publish/{SessionHost,SessionHostWeb,ModerationConsole,ConfigEditor,HotkeyDaemon,Server}`. Zip that folder for a simple portable install.
+Writes `artifacts/publish/{SessionHost,SessionHostWeb,ModerationWeb,ModerationConsole,ConfigEditor,HotkeyDaemon,Server}`. Zip that folder for a simple portable install.
+
+Linux headless + web operators: `bash scripts/publish-linux.sh` → `artifacts/publish-linux/`. Docker: `docker compose -f docker/docker-compose.yml up --build`.
 
 ---
 
@@ -323,6 +333,7 @@ Detector vocabulary and wiring: [`docs/ANTICHEAT.md`](docs/ANTICHEAT.md).
 | `src/NL.AntiCheat.Core` | Early anti-cheat anomaly detectors (session-path signals) |
 | `src/NL.SessionHost` | Windows Start/Stop session shell |
 | `src/NL.SessionHost.Web` | Cross-platform session bus + web dashboard |
+| `src/NL.Moderation.Web` | Cross-platform moderation console (web) |
 | `tests/` | Unit tests |
 | `samples/` | Safe example configs, logs, NDJSON (no real secrets) |
 | `beamng-mod/` | BeamNG Lua bridge |

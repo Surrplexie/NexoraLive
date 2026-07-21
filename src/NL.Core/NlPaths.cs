@@ -1,14 +1,30 @@
 namespace NL.Core;
 
 /// <summary>
-/// Canonical on-disk locations under <c>%LOCALAPPDATA%\NL\</c> so the Hotkey Daemon,
-/// Config Editor, NLServer, Moderation Console, and Session Host all share one streamer
-/// identity store (SP profiles, moderation audit log, join requirements, session profiles).
+/// Canonical on-disk locations under <c>%LOCALAPPDATA%\NL\</c> (or <c>NL_DATA_ROOT</c>) so the
+/// Hotkey Daemon, Config Editor, NLServer, Moderation Console, and Session Host all share one
+/// streamer identity store (SP profiles, moderation audit log, join requirements, session profiles).
 /// </summary>
 public static class NlPaths
 {
-    public static string Root =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NL");
+    /// <summary>
+    /// Root data directory. Override with env <c>NL_DATA_ROOT</c> for Docker/Linux headless hosts.
+    /// </summary>
+    public static string Root
+    {
+        get
+        {
+            var overrideRoot = Environment.GetEnvironmentVariable("NL_DATA_ROOT");
+            if (!string.IsNullOrWhiteSpace(overrideRoot))
+            {
+                return Path.GetFullPath(overrideRoot);
+            }
+
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "NL");
+        }
+    }
 
     public static string ModerationLog => Path.Combine(Root, "moderation.jsonl");
 
