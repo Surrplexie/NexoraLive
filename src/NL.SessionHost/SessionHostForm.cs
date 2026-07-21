@@ -5,6 +5,7 @@ using NL.Core;
 using NL.Core.Sp;
 using NL.Moderation;
 using NL.Server;
+using NL.Server.Core.Integration;
 
 namespace NL.SessionHost;
 
@@ -21,6 +22,8 @@ internal sealed class SessionHostForm : Form
     private readonly TextBox _sourceBox;
     private readonly TextBox _rconBox;
     private readonly TextBox _beamngCmdBox;
+    private readonly TextBox _nlActionBox;
+    private readonly CheckBox _useSessionBusBox;
     private readonly CheckBox _antiCheatBox;
     private readonly CheckBox _joinGateBox;
     private readonly CheckBox _anomalyAutoModBox;
@@ -30,7 +33,7 @@ internal sealed class SessionHostForm : Form
     private readonly RichTextBox _logBox;
     private readonly ToolStripStatusLabel _statusLabel;
 
-    private CancellationTokenSource? _cts;
+    private readonly SessionHostService _sessions = new();
     private Task? _runTask;
 
     public SessionHostForm()
@@ -61,6 +64,7 @@ internal sealed class SessionHostForm : Form
             Process.Start(new ProcessStartInfo { FileName = NlPaths.Root, UseShellExecute = true });
         });
         toolsMenu.DropDownItems.Add("Load BeamNG freeroam defaults", null, (_, _) => LoadBeamngDefaults());
+        toolsMenu.DropDownItems.Add("Load session bus defaults", null, (_, _) => LoadBusDefaults());
         menu.Items.Add(toolsMenu);
         MainMenuStrip = menu;
         Controls.Add(menu);
@@ -101,6 +105,14 @@ internal sealed class SessionHostForm : Form
         {
             PlaceholderText = "127.0.0.1:27022 (NL_BeamNGBridge; optional)",
         });
+        _nlActionBox = AddRow(fields, 6, "NL action", new TextBox
+        {
+            PlaceholderText = "auto (ws) or tcp://host:port",
+        });
+        _useSessionBusBox = new CheckBox { Text = "Use session bus (ws://)", AutoSize = true, Dock = DockStyle.Fill };
+        fields.Controls.Add(new Label { Text = "Session bus", TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, 7);
+        fields.Controls.Add(_useSessionBusBox, 1, 7);
+        fields.SetColumnSpan(_useSessionBusBox, 2);
 
         layout.Controls.Add(fields, 0, 0);
 
@@ -132,10 +144,29 @@ internal sealed class SessionHostForm : Form
         };
         layout.Controls.Add(_logBox, 0, 2);
 
-        LoadDefaultProfile();
-        FormClosing += (_, e) =>
+        _sessions.LogAppended += line =>
         {
-            if (_runTask is { IsCompleted: false })
+            if (IsDisposed)
+            {
+                return;
+            }
+
+            BeginInvoke(() => AppendLog(line));
+        };
+        _sessions.StateChanged += () =>
+        {
+            if (IsDisposed)
+            {
+                return;
+            }
+
+            BeginInvoke(UpdateSessionButtons);
+        };
+
+        LoadDefaultProfile();
+        FormClosing += (_, _) =>
+        {
+            if (_sessions.IsRunning)
             {
                 StopSession();
             }
@@ -193,6 +224,8 @@ internal sealed class SessionHostForm : Form
         _sourceBox.Text = profile.SourcePath;
         _rconBox.Text = profile.RconEndpoint ?? "";
         _beamngCmdBox.Text = profile.BeamngCommandEndpoint ?? "";
+        _nlActionBox.Text = profile.NlActionEndpoint ?? "";
+        _useSessionBusBox.Checked = profile.UseSessionBus;
         _antiCheatBox.Checked = profile.AntiCheat;
         _joinGateBox.Checked = profile.JoinGate;
         _anomalyAutoModBox.Checked = profile.AnomalyAutoMod;
@@ -230,6 +263,33 @@ internal sealed class SessionHostForm : Form
         AppendLog($"BeamNG defaults: source={NlPaths.BeamngEvents}, cmd=127.0.0.1:{NlPaths.BeamngCommandPort}");
     }
 
+    private void LoadBusDefaults()
+    {
+        var repoSample = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "samples", "configs", "generic.nle"));
+        if (!File.Exists(repoSample))
+        {
+            repoSample = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "samples", "configs", "generic.nle"));
+        }
+
+        var bus = NlSessionBusHelper.CreateBusInfo(
+            NlSessionBusDefaults.DefaultBindHost,
+            NlSessionBusDefaults.HttpPort,
+            NlSessionBusDefaults.WebSocketPort,
+            Guid.NewGuid().ToString("N"),
+            Guid.NewGuid().ToString("N")[..12]);
+
+        var profile = CaptureProfile();
+        NlSessionBusHelper.ApplyBusSource(profile, bus);
+        if (File.Exists(repoSample))
+        {
+            profile.ConfigPath = repoSample;
+        }
+
+        ApplyProfile(profile);
+        _statusLabel.Text = $"Session bus defaults (bridge URL includes token).";
+        AppendLog($"Bus defaults: {bus.BridgeConnectUrl}");
+    }
+
     private SessionProfileFile CaptureProfile() => new()
     {
         StreamerId = string.IsNullOrWhiteSpace(_streamerBox.Text) ? NlPaths.DefaultStreamerId : _streamerBox.Text.Trim(),
@@ -238,6 +298,8 @@ internal sealed class SessionHostForm : Form
         SourcePath = _sourceBox.Text.Trim(),
         RconEndpoint = string.IsNullOrWhiteSpace(_rconBox.Text) ? null : _rconBox.Text.Trim(),
         BeamngCommandEndpoint = string.IsNullOrWhiteSpace(_beamngCmdBox.Text) ? null : _beamngCmdBox.Text.Trim(),
+        NlActionEndpoint = string.IsNullOrWhiteSpace(_nlActionBox.Text) ? null : _nlActionBox.Text.Trim(),
+        UseSessionBus = _useSessionBusBox.Checked,
         AntiCheat = _antiCheatBox.Checked,
         JoinGate = _joinGateBox.Checked,
         AnomalyAutoMod = _anomalyAutoModBox.Checked,
@@ -272,12 +334,27 @@ internal sealed class SessionHostForm : Form
 
     private async Task StartSessionAsync()
     {
-        if (_runTask is { IsCompleted: false })
+        if (_sessions.IsRunning || _runTask is { IsCompleted: false })
         {
             return;
         }
 
         var profile = CaptureProfile();
+        if (profile.UseSessionBus)
+        {
+            var token = profile.BusToken ?? Guid.NewGuid().ToString("N");
+            var bus = NlSessionBusHelper.CreateBusInfo(
+                NlSessionBusDefaults.DefaultBindHost,
+                NlSessionBusDefaults.HttpPort,
+                NlSessionBusDefaults.WebSocketPort,
+                token,
+                Guid.NewGuid().ToString("N")[..12]);
+            NlSessionBusHelper.ApplyBusSource(profile, bus);
+        }
+        else if (string.IsNullOrWhiteSpace(profile.BusToken))
+        {
+            profile.BusToken = null;
+        }
         if (string.IsNullOrWhiteSpace(profile.ConfigPath) || !File.Exists(profile.ConfigPath))
         {
             MessageBox.Show(this, "Choose a valid .nle config path.", "NL Session Host", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -286,17 +363,18 @@ internal sealed class SessionHostForm : Form
 
         if (string.IsNullOrWhiteSpace(profile.SourcePath))
         {
-            MessageBox.Show(this, "Choose a source log / NDJSON path.", "NL Session Host", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, "Choose a source log / NDJSON path, or use tcp:// / ws://.", "NL Session Host", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
-        if (_replayBox.Checked && !File.Exists(profile.SourcePath))
+        var networkSource = NlSessionBusHelper.IsNetworkSource(profile.SourcePath);
+        if (_replayBox.Checked && !networkSource && !File.Exists(profile.SourcePath))
         {
             MessageBox.Show(this, "Replay requires an existing source file.", "NL Session Host", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
-        if (!_replayBox.Checked && !File.Exists(profile.SourcePath))
+        if (!_replayBox.Checked && !networkSource && !File.Exists(profile.SourcePath))
         {
             // Live follow waits for the file (BeamNG bridge creates/appends it).
             try
@@ -321,43 +399,18 @@ internal sealed class SessionHostForm : Form
         var options = profile.ToSessionOptions(replay: _replayBox.Checked);
         _logBox.Clear();
         AppendLog("Starting session…");
-        _startBtn.Enabled = false;
-        _stopBtn.Enabled = true;
+        UpdateSessionButtons();
         _statusLabel.Text = "Session running…";
-
-        _cts = new CancellationTokenSource();
-        var runner = new NlSessionRunner
-        {
-            Options = options,
-            Log = line =>
-            {
-                if (IsDisposed)
-                {
-                    return;
-                }
-
-                BeginInvoke(() => AppendLog(line));
-            },
-        };
 
         _runTask = Task.Run(async () =>
         {
             try
             {
-                await runner.RunAsync(_cts.Token);
+                await _sessions.StartAsync(options, CancellationToken.None);
             }
             catch (Exception ex)
             {
                 BeginInvoke(() => AppendLog($"ERROR: {ex.Message}"));
-            }
-            finally
-            {
-                BeginInvoke(() =>
-                {
-                    _startBtn.Enabled = true;
-                    _stopBtn.Enabled = false;
-                    _statusLabel.Text = "Session stopped.";
-                });
             }
         }, CancellationToken.None);
 
@@ -366,8 +419,17 @@ internal sealed class SessionHostForm : Form
 
     private void StopSession()
     {
-        _cts?.Cancel();
-        AppendLog("Stop requested…");
+        _sessions.Stop();
+    }
+
+    private void UpdateSessionButtons()
+    {
+        _startBtn.Enabled = !_sessions.IsRunning;
+        _stopBtn.Enabled = _sessions.IsRunning;
+        if (!_sessions.IsRunning)
+        {
+            _statusLabel.Text = "Session stopped.";
+        }
     }
 
     private void AppendLog(string line)

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using NL.Core;
+using NL.Server.Core.Integration;
 
 namespace NL.Server.Core.Generic;
 
@@ -10,7 +11,8 @@ namespace NL.Server.Core.Generic;
 /// <c>{"event":"shoot","player":"Alice","props":{"weapon.damage":12}}</c> and NLServer can
 /// enforce a <c>.nle</c> config against it with no C# adapter for that specific title.
 ///
-/// Required JSON fields: <c>event</c> (string). Optional: <c>player</c> (string),
+/// Required JSON fields: <c>event</c> (string). Optional: <c>nl</c> (protocol version, must be 1 if present),
+/// <c>player</c> (string),
 /// <c>props</c> (object of number values), <c>ts</c> (Unix milliseconds number — used by
 /// Phase 5 anti-cheat for deterministic rate/teleport windows in replay). Empty/whitespace
 /// lines and <c>{"event":null}</c> return null (skip). Malformed JSON throws
@@ -33,6 +35,16 @@ public static class GenericJsonLineParser
 
         using var doc = JsonDocument.Parse(rawLine);
         var root = doc.RootElement;
+
+        if (root.TryGetProperty("nl", out var nlProp) && nlProp.ValueKind == JsonValueKind.Number)
+        {
+            var nlVersion = nlProp.GetInt32();
+            if (nlVersion != NlIntegrationProtocol.Version)
+            {
+                throw new FormatException(
+                    $"Unsupported nl protocol version {nlVersion} (expected {NlIntegrationProtocol.Version}).");
+            }
+        }
 
         if (!root.TryGetProperty("event", out var eventProp) || eventProp.ValueKind != JsonValueKind.String)
         {

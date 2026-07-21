@@ -235,6 +235,30 @@ Second-title path without a new C# `--game` adapter. See [docs/BEAMNG.md](docs/B
       anomaly profile, `NL_Kick` BeamMP server plugin + kick queue, dogfood defaults in
       [docs/DOGFOOD_BEAMNG.md](docs/DOGFOOD_BEAMNG.md) / [docs/BEAMNG.md](docs/BEAMNG.md)
 
+## Phase A — Universal game integration spec ✓
+
+Formal contract so **any game** integrates without new C# adapters. See
+[docs/NL_INTEGRATION_SPEC.md](docs/NL_INTEGRATION_SPEC.md).
+
+- [x] **NL Integration Protocol v1** — event + action NDJSON envelopes, `"nl": 1`, standard verbs
+      (`warn`, `kick`, `recover`, `tell`, `mute`, `despawn`, `custom`)
+- [x] **Transports in NL.Server** — file (existing), `tcp://` event listen, `ws://…/nl/v1`
+      bidirectional (events in + actions out with `--nl-action auto`), `--nl-action tcp://` split channel
+- [x] **Core types** — `NlActionEnvelope`, `NlStandardActions`, `NlSourceUri`, `GenericJsonLineParser`
+      nl-version validation
+- [x] **Reference bridges** — `integrations/` (Python, Node, Lua, Unity, Unreal, Paper stub, log tail)
+- [x] **CLI** — `--source tcp://|ws://`, `--nl-action auto|tcp://`
+- [x] **Smoke script** — `scripts/nl-integration-smoke.ps1`
+- [x] **Tests** — protocol parsing, TCP round-trip, action envelope serialization
+- [x] **Phase B — Session bus** — see [docs/NL_SESSION_BUS.md](docs/NL_SESSION_BUS.md)
+- [x] **`NL.SessionHost.Web`** — cross-platform ASP.NET dashboard + REST API (HTTP 27020, WS 27021)
+- [x] **`SessionHostService`** — shared session runner + log buffer (WinForms + web)
+- [x] **Bus token auth** — WebSocket `?token=` validation when `useSessionBus` / `BusToken` set
+- [x] **WinForms bus fields** — `nlActionEndpoint`, `useSessionBus`, network source paths
+- [x] **Bridge templates** — Godot, Rust, .NET (`integrations/`)
+- [x] **Smoke script** — `scripts/nl-session-bus-smoke.ps1`
+- [x] **Tests** — `SessionHostService`, bus helper, WebSocket token rejection
+
 ## Phase 6+ — Long-term / high-risk ideas (documented only, not scheduled)
 
 These involve real money, KYC/identity verification, blockchain, and gambling-adjacent

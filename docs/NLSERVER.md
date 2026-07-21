@@ -5,8 +5,8 @@ recorded) game server, evaluated by the same Phase 0 `RuleEngine`, with optional
 actions on `Block`.
 
 This is **not** Minecraft-only. The host is game-agnostic: Minecraft is one built-in
-adapter; any other game can plug in by emitting a tiny NDJSON event stream (or by
-implementing `IGameEventSource` / `IGameActionSink`).
+adapter; any other game integrates via [**NL Integration Spec v1**](NL_INTEGRATION_SPEC.md)
+(NDJSON over file, TCP, or WebSocket — no C# adapter required).
 
 ## Architecture
 
@@ -46,23 +46,34 @@ dotnet run --project src/NL.Server -- --game minecraft --config samples/configs/
 Event vocabulary: `playerJoin`, `playerLeave`, `playerChat`, `playerDeath`, `playerAdvancement`
 (see older [NLSERVER_MINECRAFT.md](NLSERVER_MINECRAFT.md) table; death templates expanded).
 
-### `generic` — any game
+### `generic` — any game (NL Integration Spec v1)
 
-Any engine/mod/plugin writes **NDJSON** lines:
+Any engine/mod/plugin sends **NDJSON event lines** and receives **NDJSON action lines**.
+Full spec: [NL_INTEGRATION_SPEC.md](NL_INTEGRATION_SPEC.md).
+
+**File (legacy):**
 
 ```json
-{"event":"shoot","player":"Alice","props":{"weapon.damage":12}}
+{"nl":1,"event":"shoot","player":"Alice","ts":1700001000000,"props":{"weapon.damage":12}}
 ```
-
-Required: `event` (string). Optional: `player` (string), `props` (object of numbers/bools).
-Lines starting with `#` are comments.
 
 ```bash
 dotnet run --project src/NL.Server -- --game generic --config samples/configs/generic.nle --source samples/events/generic-sample.ndjson --replay
 ```
 
-This is the intended path for **any title** without shipping a C# adapter: emit NDJSON, write
-a `.nle` file whose event names match, run NLServer.
+**TCP listen** (bridge connects to NL):
+
+```bash
+dotnet run --project src/NL.Server -- --game generic --config samples/configs/generic.nle --source tcp://127.0.0.1:27021 --nl-action tcp://127.0.0.1:27023
+```
+
+**WebSocket bidirectional** (recommended):
+
+```bash
+dotnet run --project src/NL.Server -- --game generic --config samples/configs/generic.nle --source ws://127.0.0.1:27021/nl/v1 --nl-action auto --anti-cheat
+```
+
+Reference bridges: [`integrations/`](../integrations/README.md).
 
 ## Actions on Block
 
@@ -71,6 +82,8 @@ a `.nle` file whose event names match, run NLServer.
 | *(none)* | Dry-run: print what would be applied |
 | `--rcon host:port:password` | Source RCON (Minecraft defaults: join→`kick`, else→`tell`) |
 | `--rcon-cmd "say blocked {player}"` | Custom RCON template (`{player}` `{event}` `{decision}` `{message}`) |
+| `--nl-action auto` | Bidirectional WebSocket actions (with `ws://` source) — NL Integration Spec v1 |
+| `--nl-action tcp://host:port` | TCP action lines to bridge listener (split channel) |
 | `--action-cmd "..."` | Shell process for non-RCON games (same placeholders) |
 
 ## CLI

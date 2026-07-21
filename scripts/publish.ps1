@@ -7,6 +7,7 @@ New-Item -ItemType Directory -Force -Path $out | Out-Null
 
 $apps = @(
     @{ Project = "src\NL.SessionHost\NL.SessionHost.csproj"; Name = "SessionHost" },
+    @{ Project = "src\NL.SessionHost.Web\NL.SessionHost.Web.csproj"; Name = "SessionHostWeb" },
     @{ Project = "src\NL.ModerationConsole\NL.ModerationConsole.csproj"; Name = "ModerationConsole" },
     @{ Project = "src\NL.ConfigEditor\NL.ConfigEditor.csproj"; Name = "ConfigEditor" },
     @{ Project = "src\NL.HotkeyDaemon\NL.HotkeyDaemon.csproj"; Name = "HotkeyDaemon" },
@@ -25,6 +26,7 @@ try {
     Write-Host ""
     Write-Host "Publish complete: $out"
     Write-Host "Run Session Host: $hostDir\NL.SessionHost.exe"
+    Write-Host "Run Session Host (web): dotnet $((Join-Path $out 'SessionHostWeb\NL.SessionHost.Web.dll'))"
     Write-Host "Tools menu resolves ../ModerationConsole and ../ConfigEditor in this layout."
     Write-Host "Tip: zip the artifacts\publish directory for a simple portable install."
 }

@@ -5,6 +5,8 @@ using NL.Core.Sp;
 using NL.Moderation;
 using NL.Moderation.Core;
 using NL.Server.Core;
+using NL.Server.Core.Integration;
+using NL.Server.Integration;
 
 namespace NL.Server;
 
@@ -52,7 +54,7 @@ public sealed class NlSessionRunner
         var o = Options;
         Write($"Game:   {o.Game}");
         Write($"Config: {o.ConfigPath}");
-        Write($"Source: {o.SourcePath} ({(o.Replay ? "replay" : "live follow")})");
+        Write($"Source: {o.SourcePath} ({DescribeSourceMode(o)})");
         Write($"Streamer: {o.StreamerId}");
 
         RuleEngine engine;
@@ -76,17 +78,15 @@ public sealed class NlSessionRunner
             Write($"[load warning] {warning}");
         }
 
-        IGameEventSource source = o.Game.ToLowerInvariant() switch
-        {
-            "minecraft" => LineFileEventSource.Minecraft(o.SourcePath, o.Replay),
-            "generic" => LineFileEventSource.GenericJson(o.SourcePath, o.Replay),
-            _ => throw new InvalidOperationException($"Unknown game '{o.Game}'."),
-        };
+        await using var bootstrap = EventSourceFactory.Create(o, Write);
+        IGameEventSource source = bootstrap.EventSource;
 
         if (o.AntiCheat)
         {
             var thresholds = o.AnomalyThresholds
-                ?? (o.BeamngCommandEndpoint is not null ? AnomalyThresholds.BeamNgFreeroam : null);
+                ?? (UsesNetworkIntegration(o) || o.BeamngCommandEndpoint is not null
+                    ? AnomalyThresholds.BeamNgFreeroam
+                    : null);
             var pipeline = thresholds is null
                 ? AnomalyPipeline.CreateDefault()
                 : AnomalyPipeline.CreateDefault(thresholds);
@@ -96,7 +96,7 @@ public sealed class NlSessionRunner
                 : $"Anti-cheat: ON (teleport≤{thresholds.TeleportMaxDistance}, rate≤{thresholds.RateSpikeMaxEvents}/{thresholds.RateSpikeWindowMs}ms)");
         }
 
-        var sink = await CreateSinkAsync(o, cancellationToken);
+        var sink = await CreateSinkAsync(o, bootstrap, cancellationToken);
 
         ModerationService? moderation = null;
         ISpProfileRepository? profiles = null;
@@ -139,7 +139,7 @@ public sealed class NlSessionRunner
             Write("Anomaly auto-mod: ON (severity≥2 Block → graylist hold)");
         }
 
-        Write(o.Replay ? "Replaying source..." : "Listening for events... (stop to cancel)");
+        Write(o.Replay && !UsesNetworkIntegration(o) ? "Replaying source..." : "Listening for events... (stop to cancel)");
         Write("");
 
         await using (sink)
@@ -189,7 +189,25 @@ public sealed class NlSessionRunner
         return 0;
     }
 
-    private async Task<IGameActionSink> CreateSinkAsync(NlSessionOptions o, CancellationToken cancellationToken)
+    private static string DescribeSourceMode(NlSessionOptions o)
+    {
+        if (UsesNetworkIntegration(o))
+        {
+            return "live network listen";
+        }
+
+        return o.Replay ? "replay" : "live follow";
+    }
+
+    private static bool UsesNetworkIntegration(NlSessionOptions o) =>
+        NlSourceUri.TryParse(o.SourcePath, out var uri)
+        && uri is not null
+        && uri.Kind is NlSourceKind.TcpListen or NlSourceKind.WebSocketListen;
+
+    private async Task<IGameActionSink> CreateSinkAsync(
+        NlSessionOptions o,
+        IntegrationBootstrap bootstrap,
+        CancellationToken cancellationToken)
     {
         if (o.RconEndpoint is { } endpoint)
         {
@@ -221,11 +239,38 @@ public sealed class NlSessionRunner
         {
             if (BeamNgUdpActionSink.TryParseEndpoint(beamngEp, out var host, out var port))
             {
-                Write($"Actions: BeamNG UDP {host}:{port} (SCBN1 warn/recover/kick)");
+                Write($"Actions: BeamNG UDP {host}:{port} (SCBN1 warn/recover/kick — legacy)");
                 return new BeamNgUdpActionSink(host, port, Log);
             }
 
-            Write("Invalid --beamng-cmd endpoint (expected host:port); dry-run.");
+            Write("Invalid --beamng-cmd endpoint (expected host:port); trying NL action channel.");
+        }
+
+        var nlAction = ResolveNlActionEndpoint(o, bootstrap);
+        if (nlAction is not null)
+        {
+            if (string.Equals(nlAction, "auto", StringComparison.OrdinalIgnoreCase)
+                && bootstrap.ActionChannelProvider is not null)
+            {
+                Write("Actions: NL integration (bidirectional WebSocket, protocol v1)");
+                return new NlIntegrationActionSink(
+                    () => bootstrap.ActionChannelProvider.GetActiveActionChannel(),
+                    Log);
+            }
+
+            try
+            {
+                var actionUri = NlSourceUri.ParseActionEndpoint(
+                    nlAction,
+                    defaultPort: NlIntegrationProtocol.DefaultActionPort);
+                Write($"Actions: NL integration TCP → {actionUri.Host}:{actionUri.Port} (protocol v1)");
+                return await NlTcpClientActionSink.ConnectAsync(
+                    actionUri.Host, actionUri.Port, Log, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                Write($"NL action channel failed ({ex.Message}); trying fallbacks.");
+            }
         }
 
         if (o.ActionCommand is not null)
@@ -234,8 +279,29 @@ public sealed class NlSessionRunner
             return new ProcessActionSink(o.ActionCommand);
         }
 
-        Write("Actions: dry-run (no RCON / --beamng-cmd / --action-cmd configured)");
+        Write("Actions: dry-run (no RCON / NL action / --beamng-cmd / --action-cmd configured)");
         return new ConsoleActionSink(Log);
+    }
+
+    private static string? ResolveNlActionEndpoint(NlSessionOptions o, IntegrationBootstrap bootstrap)
+    {
+        if (!string.IsNullOrWhiteSpace(o.NlActionEndpoint))
+        {
+            return o.NlActionEndpoint;
+        }
+
+        if (bootstrap.ActionChannelProvider is not null)
+        {
+            return "auto";
+        }
+
+        if (UsesNetworkIntegration(o) && NlSourceUri.TryParse(o.SourcePath, out var uri)
+            && uri?.Kind == NlSourceKind.TcpListen)
+        {
+            return $"tcp://127.0.0.1:{NlIntegrationProtocol.DefaultActionPort}";
+        }
+
+        return null;
     }
 
     /// <summary>High-severity anomaly Blocks get a graylist hold so join gate catches them next time.</summary>

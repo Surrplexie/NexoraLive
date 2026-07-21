@@ -7,8 +7,9 @@ static int PrintUsage()
         NL.Server — game-agnostic NLServer host
 
         Usage:
-          NL.Server --game <minecraft|generic> --config <file.nle> --source <path>
+          NL.Server --game <minecraft|generic> --config <file.nle> --source <path|tcp://|ws://>
                     [--replay] [--rcon host:port:password] [--beamng-cmd host:port]
+                    [--nl-action auto|tcp://host:port]
                     [--action-cmd "shell template"]
                     [--rcon-cmd "rcon template with {player} {event} {message}"]
                     [--streamer id] [--moderation-log path] [--sp-store path]
@@ -17,15 +18,22 @@ static int PrintUsage()
 
         Games:
           minecraft  — tails / replays a Minecraft Java server log (latest.log)
-          generic    — NDJSON from any game/mod (BeamNG NL_BeamNGBridge, etc.)
+          generic    — NDJSON from any game/mod (file, tcp://, or ws://)
+
+        Source (--source):
+          <file path>              tail/replay a log or NDJSON file (default live follow)
+          tcp://127.0.0.1:27021    NL listens; bridge connects and sends event lines
+          ws://127.0.0.1:27021/nl/v1   bidirectional WebSocket (events in, actions out)
 
         Modes:
-          (default)  live: follow the source file from the current end
-          --replay   read the whole source once from the start, then exit (CI / demos)
+          (default)  live: follow file from EOF, or listen on tcp/ws
+          --replay   read whole file once from start (--replay ignored for tcp/ws)
 
         Actions on Block (first match wins):
           --rcon host:port:password   Source RCON (Minecraft + any RCON game)
-          --beamng-cmd host:port      BeamNG NL_BeamNGBridge UDP (default 127.0.0.1:27022)
+          --beamng-cmd host:port      BeamNG legacy UDP SCBN1 (default 127.0.0.1:27022)
+          --nl-action auto            paired WebSocket action channel (with ws:// source)
+          --nl-action tcp://host:port NL protocol v1 action lines (bridge listens)
           --action-cmd "..."          shell command with {player}{event}{decision}{message}
           (none)                      dry-run: print what would be applied
 
@@ -43,7 +51,8 @@ static int PrintUsage()
         Examples:
           dotnet run --project src/NL.Server -- --game minecraft --config samples/configs/minecraft.nle --source samples/logs/minecraft-sample.log --replay
           dotnet run --project src/NL.Server -- --game generic --config samples/configs/beamng.nle --source samples/events/beamng-sample.ndjson --replay --anti-cheat
-          dotnet run --project src/NL.Server -- --game generic --config samples/configs/beamng.nle --source %LOCALAPPDATA%\\NL\\beamng-events.ndjson --anti-cheat --beamng-cmd 127.0.0.1:27022
+          dotnet run --project src/NL.Server -- --game generic --config samples/configs/generic.nle --source ws://127.0.0.1:27021/nl/v1 --anti-cheat
+          dotnet run --project src/NL.Server -- --game generic --config samples/configs/beamng.nle --source tcp://127.0.0.1:27021 --nl-action tcp://127.0.0.1:27023 --anti-cheat
         """);
     return 1;
 }
@@ -98,6 +107,7 @@ internal static class CliOptions
         string? rconCmd = null;
         string? actionCmd = null;
         string? beamngCmd = null;
+        string? nlAction = null;
         var streamerId = NlPaths.DefaultStreamerId;
         string? moderationLog = null;
         string? spStore = null;
@@ -130,6 +140,9 @@ internal static class CliOptions
                     break;
                 case "--beamng-cmd" when i + 1 < args.Length:
                     beamngCmd = args[++i];
+                    break;
+                case "--nl-action" when i + 1 < args.Length:
+                    nlAction = args[++i];
                     break;
                 case "--action-cmd" when i + 1 < args.Length:
                     actionCmd = args[++i];
@@ -184,6 +197,7 @@ internal static class CliOptions
             RconCommandTemplate = rconCmd,
             ActionCommand = actionCmd,
             BeamngCommandEndpoint = beamngCmd,
+            NlActionEndpoint = nlAction,
             StreamerId = streamerId,
             ModerationLogPath = moderationLog,
             SpStorePath = spStore,

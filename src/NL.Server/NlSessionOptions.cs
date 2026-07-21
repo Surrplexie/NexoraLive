@@ -16,6 +16,10 @@ public sealed class NlSessionOptions
     public string? ActionCommand { get; init; }
     /// <summary>BeamNG bridge command UDP endpoint (<c>host:port</c>), default <c>127.0.0.1:27022</c>.</summary>
     public string? BeamngCommandEndpoint { get; init; }
+    /// <summary>NL integration action channel: <c>auto</c> (paired ws), or <c>tcp://host:port</c>.</summary>
+    public string? NlActionEndpoint { get; init; }
+    /// <summary>When set, WebSocket bridge connections must pass matching <c>?token=</c> query param.</summary>
+    public string? BusToken { get; init; }
     public string StreamerId { get; init; } = NlPaths.DefaultStreamerId;
     public string? ModerationLogPath { get; init; }
     public string? SpStorePath { get; init; }
@@ -37,6 +41,9 @@ public sealed class SessionProfileFile
     public string SourcePath { get; set; } = "";
     public string? RconEndpoint { get; set; }
     public string? BeamngCommandEndpoint { get; set; }
+    public string? NlActionEndpoint { get; set; }
+    public bool UseSessionBus { get; set; }
+    public string? BusToken { get; set; }
     public bool AntiCheat { get; set; } = true;
     public bool JoinGate { get; set; } = true;
     public bool AnomalyAutoMod { get; set; }
@@ -50,6 +57,8 @@ public sealed class SessionProfileFile
         Replay = replay,
         RconEndpoint = RconEndpoint,
         BeamngCommandEndpoint = BeamngCommandEndpoint,
+        NlActionEndpoint = NlActionEndpoint,
+        BusToken = UseSessionBus ? BusToken : null,
         StreamerId = string.IsNullOrWhiteSpace(StreamerId) ? NlPaths.DefaultStreamerId : StreamerId,
         ModerationLogPath = UseDefaultDataPaths ? NlPaths.ModerationLog : null,
         SpStorePath = UseDefaultDataPaths ? NlPaths.SpProfiles : null,

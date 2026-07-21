@@ -18,7 +18,7 @@ For the long-form NLE walkthrough, see [`NLE_GUIDE.md`](NLE_GUIDE.md). For build
 | **Hotkey Daemon (Windows)** | Real global hotkeys, mic mute, OBS clip, tray UX | Daily-use hardening |
 | **Config Editor (Windows)** | Visual `.nle` authoring + live rule preview | Usable |
 | **SP join eligibility** | Standing / roles / offenses → Allow / Deny / Hold | Model + simulators |
-| **NLServer** | Minecraft log or generic NDJSON → rules → optional RCON / process / UDP actions | Live-capable, still early |
+| **NLServer** | Minecraft log or generic NDJSON → rules → optional RCON / process / UDP / **NL v1 TCP/WS** actions | Live-capable, still early |
 | **Moderation Console (Windows)** | Audit log + warn / ban / graylist / clear | Basic admin UI |
 | **Anti-cheat (early)** | Session-path anomaly signals (`anomaly*`) evaluated by the same `.nle` engine — see [Anti-cheat direction](#anti-cheat-direction) | Signal prototype; full packet path WIP |
 | **Session Host (Windows)** | One Start/Stop shell for a full session profile | Recommended entry for live |
@@ -184,13 +184,21 @@ dotnet run --project src/NL.SessionHost
 
 One Start/Stop UI for a session profile: game adapter, `.nle` path, event source, optional RCON / BeamNG UDP, join gate, early anti-cheat signals, anomaly auto-mod. Tools menu opens Moderation Console and Config Editor when published side-by-side.
 
+**Cross-platform (Phase B):** web dashboard + session bus:
+
+```bash
+dotnet run --project src/NL.SessionHost.Web
+```
+
+Open `http://127.0.0.1:27020` — REST API, bridge WebSocket on port 27021 with token auth. See [docs/NL_SESSION_BUS.md](docs/NL_SESSION_BUS.md).
+
 ### Portable publish layout
 
 ```powershell
 powershell -File scripts/publish.ps1
 ```
 
-Writes `artifacts/publish/{SessionHost,ModerationConsole,ConfigEditor,HotkeyDaemon,Server}`. Zip that folder for a simple portable install.
+Writes `artifacts/publish/{SessionHost,SessionHostWeb,ModerationConsole,ConfigEditor,HotkeyDaemon,Server}`. Zip that folder for a simple portable install.
 
 ---
 
@@ -314,9 +322,12 @@ Detector vocabulary and wiring: [`docs/ANTICHEAT.md`](docs/ANTICHEAT.md).
 | `src/NL.Moderation` (+ `.Core`, Console) | Audit store + admin UI |
 | `src/NL.AntiCheat.Core` | Early anti-cheat anomaly detectors (session-path signals) |
 | `src/NL.SessionHost` | Windows Start/Stop session shell |
+| `src/NL.SessionHost.Web` | Cross-platform session bus + web dashboard |
 | `tests/` | Unit tests |
 | `samples/` | Safe example configs, logs, NDJSON (no real secrets) |
 | `beamng-mod/` | BeamNG Lua bridge |
+| `integrations/` | NL Integration Spec v1 reference bridges (Python, Node, Lua, …) |
+| `docs/NL_INTEGRATION_SPEC.md` | Universal game integration contract |
 | `scripts/` | Publish, bridge install, join-gate seed |
 | `docs/` | Specs and operator notes |
 

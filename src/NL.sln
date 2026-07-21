@@ -1,4 +1,4 @@
-
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -42,6 +42,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NL.SessionHost", "NL.SessionHost\NL.SessionHost.csproj", "{99E97E67-ACEE-4B6A-9923-E9D6C54E6AC2}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NL.Server.Tests", "..\tests\NL.Server.Tests\NL.Server.Tests.csproj", "{F16E8088-5B7C-4EAF-9D7B-98E0E97620E5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NL.SessionHost.Web", "NL.SessionHost.Web\NL.SessionHost.Web.csproj", "{C670F28D-108E-4F9F-97AF-98A26617C0B9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -129,6 +131,10 @@ Global
 		{F16E8088-5B7C-4EAF-9D7B-98E0E97620E5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F16E8088-5B7C-4EAF-9D7B-98E0E97620E5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F16E8088-5B7C-4EAF-9D7B-98E0E97620E5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C670F28D-108E-4F9F-97AF-98A26617C0B9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C670F28D-108E-4F9F-97AF-98A26617C0B9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C670F28D-108E-4F9F-97AF-98A26617C0B9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C670F28D-108E-4F9F-97AF-98A26617C0B9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
