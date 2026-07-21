@@ -1,7 +1,7 @@
 {
   "name": "NL_BeamNGBridge",
   "description": "NexoraLive (NL) bridge — NDJSON session events + localhost UDP warn/recover/kick for NL Session Host.",
-  "version": "0.2.2",
+  "version": "0.2.5",
   "author": "NL",
   "tags": ["Gameplay", "Utility"]
 }

@@ -1,13 +1,15 @@
 @echo off
 set LOG=%LOCALAPPDATA%\BeamNG\BeamNG.drive\current\beamng.log
 set EVENTS=%LOCALAPPDATA%\NL\beamng-events.ndjson
+set EVENTS_REAL=%LOCALAPPDATA%\BeamNG\BeamNG.drive\current\NL\beamng-events.ndjson
 echo === NL bridge check ===
 echo.
 echo Log file: %LOG%
-findstr /i "NL_BeamNGBridge loaded Unable to load extension NL_bridge expect userdata Failed to append" "%LOG%" 2>nul
+findstr /i "NL_BeamNGBridge Events path writable Failed append Ignoring external" "%LOG%" 2>nul
 if errorlevel 1 echo (no NL lines found in log yet)
 echo.
-echo Events file: %EVENTS%
+echo Events link (Session Host): %EVENTS%
+echo Events real (BeamNG writes): %EVENTS_REAL%
 if exist "%EVENTS%" (type "%EVENTS%") else echo (events file missing)
 echo.
 echo Zip modScript path check:

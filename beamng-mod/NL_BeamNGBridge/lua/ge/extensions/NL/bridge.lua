@@ -4,7 +4,8 @@
 --
 -- Install: copy/symlink NL_BeamNGBridge into <BeamNG user folder>/mods/unpacked/
 -- then enable the mod and load a map. Events append to:
---   %LOCALAPPDATA%/NL/beamng-events.ndjson  (Windows)
+--   <BeamNG user folder>/NL/beamng-events.ndjson  (writable inside sandbox)
+-- Session Host reads the same file via junction at %LOCALAPPDATA%/NL/ (install script).
 -- Commands arrive on UDP 127.0.0.1:<cmdPort> with magic header "SCBN1".
 -- Optional overrides: bridge.json next to this mod (cmdPort + emit thresholds).
 
@@ -38,22 +39,133 @@ local beammpPlayers = {} -- name(lower) -> playerId
 local udpSock = nil
 local udpReady = false
 
+local CONFIGURED_EVENTS_PATH = nil
+local CONFIGURED_KICKS_PATH = nil
+
+local NL_REL_EVENTS = "NL/beamng-events.ndjson"
+local NL_REL_KICKS = "NL/beamng-kicks.ndjson"
+
+local function normalizePath(p)
+  if not p or p == "" then
+    return nil
+  end
+  return tostring(p):gsub("\\", "/")
+end
+
+local function deriveLocalAppDataFromUserFolder(userPath)
+  if not userPath or userPath == "" then
+    return nil
+  end
+  local norm = normalizePath(userPath)
+  local localRoot = norm:match("^(.-/Local)/BeamNG/")
+  if localRoot then
+    return localRoot:gsub("/", package.config:sub(1, 1))
+  end
+  localRoot = norm:match("^(.-/Local)/BeamNG%.drive/")
+  if localRoot then
+    return localRoot:gsub("/", package.config:sub(1, 1))
+  end
+  return nil
+end
+
+local function resolveLocalAppData()
+  local env = os.getenv("LOCALAPPDATA")
+  if env and env ~= "" then
+    return env
+  end
+  if type(beamng) == "table" and beamng.userpath then
+    local derived = deriveLocalAppDataFromUserFolder(beamng.userpath)
+    if derived then
+      return derived
+    end
+  end
+  if Engine and Engine.getUserPath then
+    local ok, userPath = pcall(function() return Engine.getUserPath() end)
+    if ok and userPath then
+      local derived = deriveLocalAppDataFromUserFolder(userPath)
+      if derived then
+        return derived
+      end
+    end
+  end
+  return nil
+end
+
+local function getBeamNgUserPath()
+  if type(beamng) == "table" and beamng.userpath and beamng.userpath ~= "" then
+    return normalizePath(beamng.userpath)
+  end
+  if Engine and Engine.getUserPath then
+    local ok, userPath = pcall(function() return Engine.getUserPath() end)
+    if ok and userPath and userPath ~= "" then
+      return normalizePath(userPath)
+    end
+  end
+  return nil
+end
+
+local function isAbsolutePath(p)
+  if not p or p == "" then
+    return false
+  end
+  return p:match("^%a:") ~= nil or p:match("^/") ~= nil
+end
+
+-- BeamNG Lua io.open is sandboxed: only paths under the user folder work.
+local function sanitizeConfiguredPath(p, relativeFallback)
+  if not p or p == "" then
+    return relativeFallback
+  end
+  p = normalizePath(p)
+  if isAbsolutePath(p) then
+    log("W", "NL", "Ignoring external path (sandbox): " .. p .. " → " .. relativeFallback)
+    return relativeFallback
+  end
+  return p
+end
+
 local function nlDir()
-  local localApp = os.getenv("LOCALAPPDATA") or os.getenv("HOME") or "."
   local sep = package.config:sub(1, 1)
+  local localApp = resolveLocalAppData()
+  if not localApp then
+    log("W", "NL", "Could not resolve LOCALAPPDATA; set eventsPath in bridge.json via install-beamng-bridge.ps1")
+    return "." .. sep .. "NL", sep
+  end
   return localApp .. sep .. "NL", sep
 end
 
 local function resolveEventPath()
-  local dir, sep = nlDir()
-  return dir .. sep .. "beamng-events.ndjson"
+  if CONFIGURED_EVENTS_PATH then
+    return CONFIGURED_EVENTS_PATH
+  end
+  return NL_REL_EVENTS
 end
 
 local function resolveKickQueuePath()
-  local dir, sep = nlDir()
-  return dir .. sep .. "beamng-kicks.ndjson"
+  if CONFIGURED_KICKS_PATH then
+    return CONFIGURED_KICKS_PATH
+  end
+  return NL_REL_KICKS
 end
 
+local function applyInstalledPaths()
+  if type(_G.NL_BRIDGE_EVENTS_PATH) == "string" and _G.NL_BRIDGE_EVENTS_PATH ~= "" then
+    CONFIGURED_EVENTS_PATH = sanitizeConfiguredPath(_G.NL_BRIDGE_EVENTS_PATH, NL_REL_EVENTS)
+  end
+  if type(_G.NL_BRIDGE_KICKS_PATH) == "string" and _G.NL_BRIDGE_KICKS_PATH ~= "" then
+    CONFIGURED_KICKS_PATH = sanitizeConfiguredPath(_G.NL_BRIDGE_KICKS_PATH, NL_REL_KICKS)
+  end
+end
+
+local function stripBom(raw)
+  if not raw or raw == "" then
+    return raw
+  end
+  if raw:byte(1) == 0xEF and raw:byte(2) == 0xBB and raw:byte(3) == 0xBF then
+    return raw:sub(4)
+  end
+  return raw
+end
 local function modRoot()
   -- BeamNG often exposes this extension path; fall back to relative unpack layout.
   if M.__extensionPath then
@@ -90,6 +202,7 @@ local function loadBridgeJson()
       local raw = f:read("*a")
       f:close()
       if raw and #raw > 0 then
+        raw = stripBom(raw)
         local ok, cfg = pcall(function()
           if json and json.decode then
             return json.decode(raw)
@@ -100,6 +213,12 @@ local function loadBridgeJson()
           return nil
         end)
         if ok and type(cfg) == "table" then
+          if type(cfg.eventsPath) == "string" and cfg.eventsPath ~= "" then
+            CONFIGURED_EVENTS_PATH = sanitizeConfiguredPath(cfg.eventsPath, NL_REL_EVENTS)
+          end
+          if type(cfg.kicksPath) == "string" and cfg.kicksPath ~= "" then
+            CONFIGURED_KICKS_PATH = sanitizeConfiguredPath(cfg.kicksPath, NL_REL_KICKS)
+          end
           if type(cfg.cmdPort) == "number" then
             CMD_PORT = math.floor(cfg.cmdPort)
           end
@@ -125,6 +244,8 @@ local function loadBridgeJson()
           end
           log("I", "NL", "Loaded bridge.json from " .. path)
           return
+        else
+          log("W", "NL", "bridge.json unreadable at " .. path .. " (decode=" .. tostring(ok) .. ")")
         end
       end
     end
@@ -139,6 +260,20 @@ local function jsonEscape(s)
   s = tostring(s or "")
   s = s:gsub("\\", "\\\\"):gsub('"', '\\"'):gsub("\n", "\\n"):gsub("\r", "\\r")
   return s
+end
+
+local function openForAppend(path)
+  local tries = { path }
+  if path:find("/") then
+    table.insert(tries, path:gsub("/", package.config:sub(1, 1)))
+  end
+  for _, p in ipairs(tries) do
+    local f = io.open(p, "a")
+    if f then
+      return f, p
+    end
+  end
+  return nil, path
 end
 
 local function appendEvent(eventName, props)
@@ -162,10 +297,13 @@ local function appendEvent(eventName, props)
     table.insert(parts, '"props":{' .. table.concat(propParts, ",") .. "}")
   end
   local line = "{" .. table.concat(parts, ",") .. "}\n"
-  local f = io.open(EVENT_PATH, "a")
+  local f, usedPath = openForAppend(EVENT_PATH)
   if f then
     f:write(line)
     f:close()
+    if usedPath ~= EVENT_PATH then
+      EVENT_PATH = usedPath
+    end
   else
     log("W", "NL", "Failed to append NDJSON to " .. tostring(EVENT_PATH))
   end
@@ -234,10 +372,13 @@ local function enqueueBeamMpKick(who, reason)
     jsonEscape(reason or "NLEvents Block"),
     nowMs()
   )
-  local f = io.open(KICK_QUEUE_PATH, "a")
+  local f, usedPath = openForAppend(KICK_QUEUE_PATH)
   if f then
     f:write(line)
     f:close()
+    if usedPath ~= KICK_QUEUE_PATH then
+      KICK_QUEUE_PATH = usedPath
+    end
     log("I", "NL", "Queued BeamMP kick for " .. tostring(who) .. " → " .. KICK_QUEUE_PATH)
     return true
   end
@@ -428,6 +569,7 @@ local function detectBeamMP()
 end
 
 function M.onExtensionLoaded()
+  applyInstalledPaths()
   loadBridgeJson()
   EVENT_PATH = resolveEventPath()
   KICK_QUEUE_PATH = resolveKickQueuePath()
@@ -435,11 +577,22 @@ function M.onExtensionLoaded()
   ensureUdp()
   detectBeamMP()
   log("I", "NL", "NL_BeamNGBridge loaded. Events → " .. tostring(EVENT_PATH)
+    .. " (user " .. tostring(getBeamNgUserPath() or "?") .. ")"
     .. " crashDv=" .. tostring(CRASH_DV_THRESHOLD)
     .. " air=" .. tostring(AIRTIME_THRESHOLD)
     .. " roll=" .. tostring(ROLLOVER_THRESHOLD)
     .. (beammpEnabled and " (BeamMP hints on)" or " (solo)")
     .. (udpReady and "" or " [UDP offline]"))
+  local probe, probePath = openForAppend(EVENT_PATH)
+  if probe then
+    probe:close()
+    if probePath ~= EVENT_PATH then
+      EVENT_PATH = probePath
+    end
+    log("I", "NL", "Events path writable")
+  else
+    log("W", "NL", "Events path NOT writable: " .. tostring(EVENT_PATH))
+  end
 end
 
 function M.onExtensionUnloaded()
