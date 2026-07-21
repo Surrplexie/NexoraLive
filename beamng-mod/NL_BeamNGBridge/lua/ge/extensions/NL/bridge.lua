@@ -38,25 +38,10 @@ local beammpPlayers = {} -- name(lower) -> playerId
 local udpSock = nil
 local udpReady = false
 
-local function ensureDir(path)
-  local sep = package.config:sub(1, 1)
-  local acc = ""
-  for part in string.gmatch(path, "[^/\\" .. sep .. "]+") do
-    if acc == "" and part:match("^%a:$") then
-      acc = part
-    else
-      acc = (acc == "" and part) or (acc .. sep .. part)
-      FS and FS.directoryCreate and FS.directoryCreate(acc)
-    end
-  end
-end
-
 local function nlDir()
   local localApp = os.getenv("LOCALAPPDATA") or os.getenv("HOME") or "."
   local sep = package.config:sub(1, 1)
-  local dir = localApp .. sep .. "NL"
-  ensureDir(dir)
-  return dir, sep
+  return localApp .. sep .. "NL", sep
 end
 
 local function resolveEventPath()

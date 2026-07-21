@@ -1,4 +1,4 @@
-# Installs NL_BeamNGBridge into the BeamNG.drive user mods/unpacked folder.
+# Installs NL_BeamNGBridge as a zipped mod (like BeamMP.zip), not unpacked/.
 # Prefers BEAMNG_USER_FOLDER, else discovers the modern or legacy user-data layouts.
 $ErrorActionPreference = "Stop"
 $repo = Split-Path $PSScriptRoot -Parent
@@ -9,7 +9,6 @@ function Resolve-BeamNgUserFolder {
         return (Resolve-Path $env:BEAMNG_USER_FOLDER).Path
     }
 
-    # BeamNG 0.38+ (Steam): %LOCALAPPDATA%\BeamNG\BeamNG.drive\current
     $modernCurrent = Join-Path $env:LOCALAPPDATA "BeamNG\BeamNG.drive\current"
     if (Test-Path (Join-Path $modernCurrent "mods")) {
         return (Resolve-Path $modernCurrent).Path
@@ -26,7 +25,6 @@ function Resolve-BeamNgUserFolder {
         }
     }
 
-    # Legacy: %LOCALAPPDATA%\BeamNG.drive\<version>
     $root = Join-Path $env:LOCALAPPDATA "BeamNG.drive"
     if (-not (Test-Path $root)) {
         return $null
@@ -55,18 +53,28 @@ if (-not $user) {
     Write-Host "Could not find BeamNG user folder. Set BEAMNG_USER_FOLDER to your BeamNG user directory"
     Write-Host "(the folder that contains mods\, usually under %LOCALAPPDATA%\BeamNG\BeamNG.drive\current)."
     Write-Host "Steam game folder is NOT the user folder: C:\Program Files (x86)\Steam\steamapps\common\BeamNG.drive"
-    Write-Host "Manual install: copy $src to <BeamNG user>\mods\unpacked\NL_BeamNGBridge"
     exit 1
 }
 
-$destRoot = Join-Path $user "mods\unpacked\NL_BeamNGBridge"
-New-Item -ItemType Directory -Force -Path (Split-Path $destRoot) | Out-Null
-if (Test-Path $destRoot) {
-    Remove-Item -Recurse -Force $destRoot
-}
-Copy-Item -Recurse -Force $src $destRoot
+$modsDir = Join-Path $user "mods"
+$zipPath = Join-Path $modsDir "NL_BeamNGBridge.zip"
+$unpackedPath = Join-Path $modsDir "unpacked\NL_BeamNGBridge"
+$staging = Join-Path $env:TEMP "NL_BeamNGBridge_pack"
 
-# Ensure NL data dir exists for NDJSON output + kick queue
+New-Item -ItemType Directory -Force -Path $modsDir | Out-Null
+if (Test-Path $staging) {
+    Remove-Item -Recurse -Force $staging
+}
+Copy-Item -Recurse -Force $src $staging
+if (Test-Path $zipPath) {
+    Remove-Item -Force $zipPath
+}
+if (Test-Path $unpackedPath) {
+    Remove-Item -Recurse -Force $unpackedPath
+}
+Compress-Archive -Path (Join-Path $staging '*') -DestinationPath $zipPath -Force
+Remove-Item -Recurse -Force $staging
+
 $nl = Join-Path $env:LOCALAPPDATA "NL"
 New-Item -ItemType Directory -Force -Path $nl | Out-Null
 $events = Join-Path $nl "beamng-events.ndjson"
@@ -78,9 +86,9 @@ if (-not (Test-Path $kicks)) {
     Set-Content -Path $kicks -Value "# NL BeamMP kick queue (appended by bridge; consumed by NL_Kick server plugin)`n" -Encoding UTF8
 }
 
-Write-Host "Installed bridge -> $destRoot"
-Write-Host "Events file      -> $events"
-Write-Host "Kick queue       -> $kicks"
-Write-Host "Enable the mod in BeamNG (Escape -> Mods), load a map, then start NL Session Host with Tools -> Load BeamNG freeroam defaults."
-Write-Host "If nothing happens: open beamng.log and search for 'NL_BeamNGBridge loaded' (mod needs scripts/NL_BeamNGBridge/modScript.lua)."
-Write-Host "BeamMP note: Launcher Resources is client vehicle packs. NL_Kick goes on a BeamMP Server (Resources/Server/NL_Kick), not BeamMP-Launcher."
+Write-Host "Installed bridge zip -> $zipPath"
+Write-Host "Removed old unpacked -> $unpackedPath (if it existed)"
+Write-Host "Events file          -> $events"
+Write-Host "Kick queue           -> $kicks"
+Write-Host "In BeamNG: Escape -> Mods -> enable NL_BeamNGBridge (zip), load a map, then NL Session Host -> Load BeamNG freeroam defaults."
+Write-Host "Verify in beamng.log: 'NL_BeamNGBridge loaded'"
