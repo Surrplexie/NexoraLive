@@ -37,112 +37,21 @@ local beammpPlayers = {} -- name(lower) -> playerId
 
 local udpSock = nil
 local udpReady = false
-local NL_DATA_DIR = nil
-local EVENTS_OVERRIDE = nil
 
-local function pathSep()
-  return package.config:sub(1, 1)
-end
-
-local function joinPath(a, b)
-  local sep = pathSep()
-  if a:sub(-1) == sep or a:sub(-1) == "/" or a:sub(-1) == "\\" then
-    return a .. b
-  end
-  return a .. sep .. b
-end
-
-local function normalizePath(p)
-  if not p then
-    return nil
-  end
-  return p:gsub("/", pathSep())
-end
-
--- BeamNG's Lua VM often hides LOCALAPPDATA; derive it reliably on Windows.
-local function resolveLocalAppData()
-  local la = os.getenv("LOCALAPPDATA")
-  if la and #la > 0 then
-    return normalizePath(la)
-  end
-
-  local user = os.getenv("USERPROFILE")
-  if user and #user > 0 then
-    return normalizePath(joinPath(user, "AppData\\Local"))
-  end
-
-  local userPath = nil
-  if type(core_paths) == "table" and type(core_paths.getPath) == "function" then
-    local ok, p = pcall(core_paths.getPath)
-    if ok and p and #p > 0 then
-      userPath = p
-    end
-  end
-  if not userPath and type(FS) == "table" and type(FS.getUserPath) == "function" then
-    local ok, p = pcall(FS.getUserPath)
-    if ok and p and #p > 0 then
-      userPath = p
-    end
-  end
-  if userPath then
-    userPath = userPath:gsub("\\", "/")
-    local fromModern = userPath:match("^(.-)/BeamNG/BeamNG%.drive/current$")
-    if fromModern then
-      return normalizePath(fromModern:gsub("/", pathSep()))
-    end
-    local fromLegacy = userPath:match("^(.-)/BeamNG%.drive/[%d%.]+$")
-    if fromLegacy then
-      return normalizePath(fromLegacy:gsub("/", pathSep()))
-    end
-    -- Fallback: keep data beside the active BeamNG user folder.
-    return normalizePath(joinPath(userPath:gsub("/", pathSep()), "NL"))
-  end
-
-  return nil
-end
-
-local function resolveNlDataDir()
-  if NL_DATA_DIR then
-    return NL_DATA_DIR
-  end
-  if EVENTS_OVERRIDE then
-    local dir, file = EVENTS_OVERRIDE:match("^(.+)[/\\]([^/\\]+)$")
-    if dir and file then
-      NL_DATA_DIR = dir
-      return NL_DATA_DIR
-    end
-  end
-  local localApp = resolveLocalAppData()
-  if not localApp then
-    log("E", "NL", "Could not resolve LOCALAPPDATA for NL data files")
-    return nil
-  end
-  -- If resolveLocalAppData already returned .../NL (user-folder fallback), keep it.
-  if localApp:match("[/\\]NL$") then
-    NL_DATA_DIR = localApp
-  else
-    NL_DATA_DIR = joinPath(localApp, "NL")
-  end
-  return NL_DATA_DIR
+local function nlDir()
+  local localApp = os.getenv("LOCALAPPDATA") or os.getenv("HOME") or "."
+  local sep = package.config:sub(1, 1)
+  return localApp .. sep .. "NL", sep
 end
 
 local function resolveEventPath()
-  if EVENTS_OVERRIDE then
-    return EVENTS_OVERRIDE
-  end
-  local dir = resolveNlDataDir()
-  if not dir then
-    return nil
-  end
-  return joinPath(dir, "beamng-events.ndjson")
+  local dir, sep = nlDir()
+  return dir .. sep .. "beamng-events.ndjson"
 end
 
 local function resolveKickQueuePath()
-  local dir = resolveNlDataDir()
-  if not dir then
-    return nil
-  end
-  return joinPath(dir, "beamng-kicks.ndjson")
+  local dir, sep = nlDir()
+  return dir .. sep .. "beamng-kicks.ndjson"
 end
 
 local function modRoot()
@@ -214,10 +123,6 @@ local function loadBridgeJson()
             BOUNDARY.minZ = cfg.boundary.minZ or BOUNDARY.minZ
             BOUNDARY.maxZ = cfg.boundary.maxZ or BOUNDARY.maxZ
           end
-          if type(cfg.eventsPath) == "string" and cfg.eventsPath ~= "" then
-            EVENTS_OVERRIDE = normalizePath(cfg.eventsPath)
-            NL_DATA_DIR = nil
-          end
           log("I", "NL", "Loaded bridge.json from " .. path)
           return
         end
@@ -239,10 +144,6 @@ end
 local function appendEvent(eventName, props)
   if not EVENT_PATH then
     EVENT_PATH = resolveEventPath()
-  end
-  if not EVENT_PATH then
-    log("W", "NL", "No event path configured")
-    return
   end
   local parts = {
     string.format('"event":"%s"', jsonEscape(eventName)),
