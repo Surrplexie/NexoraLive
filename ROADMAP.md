@@ -271,6 +271,35 @@ Headless NL on Linux + web moderation console. See [docs/NL_HEADLESS_LINUX.md](d
 - [x] **Health endpoints** — `GET /health` on web operator apps
 - [x] **Tests** — `NlPaths` override, `ModerationHostState`
 
+## Phase D — Networked NL Session Server ✓
+
+Hosted session product shape: remote bridges, connect-time join gate, server-side rules. See
+[docs/NL_SESSION_SERVER.md](docs/NL_SESSION_SERVER.md).
+
+- [x] **`NlJoinAdmissionService`** — pre-connect join eligibility (`POST /api/v1/session/admit`)
+- [x] **Session manifest** — `GET /api/v1/session/manifest` (bridge URL, admit URL, moderation URL)
+- [x] **`NL_PUBLIC_*` env** — public URL overrides for Docker/cloud manifests
+- [x] **Unified session server** — `NL.SessionHost.Web` exposes session + moderation APIs
+- [x] **Operator UI** — remote manifest panel + `/moderation.html` on session server
+- [x] **Bridge admit flow** — Python `--admit-url`; sample checks before `playerJoin`
+- [x] **Docker** — `docker/docker-compose.session-server.yml`
+- [x] **Smoke script** — `scripts/nl-session-server-smoke.ps1`
+- [x] **Tests** — join admission, manifest URL builder
+
+## Phase E — Demo security & secrets ✓
+
+Make the session server safe to expose as a public demo. See
+[docs/NL_DEMO_SECURITY.md](docs/NL_DEMO_SECURITY.md) and [`.env.example`](.env.example).
+
+- [x] **`NL_PUBLIC_MODE`** — requires fixed `NL_BUS_TOKEN` + `NL_OPERATOR_KEY` at startup
+- [x] **Operator auth middleware** — protects session control + moderation write endpoints
+- [x] **Public read endpoints** — `/health`, manifest, admit, audit reads stay open
+- [x] **Secret redaction** — bridge token hidden from manifest/bus/status unless operator-authenticated
+- [x] **CORS tightening** — `NL_CORS_ORIGINS` / `NL_PUBLIC_HTTP` in public mode; permissive local dev
+- [x] **`.env.example`** — documents all demo deployment secrets and URL overrides
+- [x] **Web UI operator key** — dashboard stores `X-NL-Operator-Key` in browser session for writes
+- [x] **Tests** — settings validation, auth, path guards, manifest redaction
+
 ## Phase 6+ — Long-term / high-risk ideas (documented only, not scheduled)
 
 These involve real money, KYC/identity verification, blockchain, and gambling-adjacent

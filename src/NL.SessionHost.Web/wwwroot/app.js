@@ -1,6 +1,10 @@
 async function api(path, options = {}) {
   const res = await fetch(path, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    headers: {
+      "Content-Type": "application/json",
+      ...window.NlAuth.authHeaders(),
+      ...(options.headers || {}),
+    },
     ...options,
   });
   if (!res.ok) {
@@ -50,12 +54,26 @@ function renderBus(bus) {
     <dt>Session</dt><dd>${bus.sessionId}</dd>`;
 }
 
+function renderManifest(m) {
+  if (!m) return;
+  window._lastManifest = m;
+  const el = document.getElementById("manifest-info");
+  el.innerHTML = `
+    <dt>Streamer</dt><dd>${m.streamerId}</dd>
+    <dt>Bridge URL</dt><dd id="bridge-url">${m.bridgeConnectUrl}</dd>
+    <dt>Admit URL</dt><dd>${m.admitUrl}</dd>
+    <dt>Join gate</dt><dd>${m.joinGateEnabled ? "ON" : "off"}</dd>
+    <dt>Session running</dt><dd>${m.sessionRunning ? "yes" : "no"}</dd>
+    <dt>Moderation</dt><dd>${m.moderationUrl}</dd>`;
+}
+
 function renderStatus(data) {
   document.getElementById("status").textContent = `State: ${data.state} · Decisions: ${data.decisions}`;
   document.getElementById("decisions").textContent = `(decisions: ${data.decisions})`;
   document.getElementById("log").textContent = (data.log || []).join("\n");
   applyProfile(data.profile);
   if (data.bus) renderBus(data.bus);
+  if (data.manifest) renderManifest(data.manifest);
 }
 
 async function refresh() {
@@ -68,8 +86,15 @@ async function refresh() {
 }
 
 document.getElementById("copy-bridge-url").onclick = () => {
-  const url = document.getElementById("bridge-url")?.textContent;
+  const url = document.getElementById("bridge-url")?.textContent
+    || window._lastManifest?.bridgeConnectUrl;
   if (url) navigator.clipboard.writeText(url);
+};
+
+document.getElementById("copy-manifest").onclick = () => {
+  if (window._lastManifest) {
+    navigator.clipboard.writeText(JSON.stringify(window._lastManifest, null, 2));
+  }
 };
 
 document.getElementById("save-profile").onclick = async () => {
@@ -99,3 +124,4 @@ document.getElementById("stop").onclick = async () => {
 
 refresh();
 setInterval(refresh, 2000);
+window.NlAuth.initOperatorAuthUi();

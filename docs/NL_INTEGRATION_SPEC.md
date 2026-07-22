@@ -185,6 +185,31 @@ NL.Server --game generic --config game.nle --source ws://127.0.0.1:27021/nl/v1 -
 
 **Framing:** UTF-8 text WebSocket messages; one or more NDJSON lines per message (split on `\n`).
 
+### 4. Networked session server (Phase D)
+
+For hosted NL Session Servers, bridges on remote game hosts connect **outbound** to the
+session server's WebSocket. Before emitting `playerJoin`, call the join admission API:
+
+```http
+POST /api/v1/session/admit
+Content-Type: application/json
+
+{"playerId":"alice","displayName":"Alice","streamerId":"default-streamer"}
+```
+
+Response includes `"admit": true|false`. Reject the player in your game server when `admit` is false.
+
+Fetch connection URLs from `GET /api/v1/session/manifest`. See [NL_SESSION_SERVER.md](NL_SESSION_SERVER.md).
+
+Python reference bridge:
+
+```bash
+python integrations/python/nl_bridge.py \
+  --url "ws://HOST:27021/nl/v1?token=TOKEN" \
+  --admit-url "http://HOST:27020/api/v1/session/admit" \
+  --sample
+```
+
 ---
 
 ## Quick start
@@ -253,6 +278,7 @@ New integrations should implement **NL Integration Spec v1** (this document).
 - [ ] `ts` present for anti-cheat-sensitive titles
 - [ ] Bridge connects to NL before gameplay events fire
 - [ ] Bridge reads action lines and applies `warn` / `kick` / `recover`
+- [ ] Hosted sessions: call `admitUrl` before `playerJoin` (Phase D)
 - [ ] `.nle` event names match bridge event names exactly
 - [ ] Smoke test: `scripts/nl-integration-smoke.ps1`
 

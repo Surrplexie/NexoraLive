@@ -1,10 +1,9 @@
 using NL.Core;
-using NL.Moderation;
 using NL.Moderation.Core;
 
-namespace NL.Moderation.Web;
+namespace NL.Moderation;
 
-/// <summary>Shared moderation service + data paths for the cross-platform web console.</summary>
+/// <summary>Shared moderation service + data paths for web consoles (Phase C/D).</summary>
 public sealed class ModerationHostState
 {
     public ModerationHostState(string? moderationLogPath = null, string? spStorePath = null)

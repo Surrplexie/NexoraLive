@@ -1,6 +1,7 @@
 using NL.Core;
 using NL.Server;
 using NL.Server.Core.Integration;
+using NL.Server.Core.Security;
 
 namespace NL.SessionHost.Web;
 
@@ -10,11 +11,12 @@ public sealed class BusHostState
     private SessionProfileFile _profile = new();
     private Task? _backgroundRun;
 
-    public BusHostState(string bindHost, int httpPort, int wsPort, string busToken)
+    public BusHostState(string bindHost, int httpPort, int wsPort, string busToken, int modPort = NlSessionServerDefaults.ModerationPort)
     {
         BindHost = bindHost;
         HttpPort = httpPort;
         WsPort = wsPort;
+        ModPort = modPort;
         BusToken = busToken;
         SessionId = Guid.NewGuid().ToString("N")[..12];
         BusInfo = NlSessionBusHelper.CreateBusInfo(bindHost, httpPort, wsPort, busToken, SessionId);
@@ -25,6 +27,7 @@ public sealed class BusHostState
     public string BindHost { get; }
     public int HttpPort { get; }
     public int WsPort { get; }
+    public int ModPort { get; }
     public string BusToken { get; }
     public string SessionId { get; }
     public NlSessionBusInfo BusInfo { get; }
@@ -126,14 +129,32 @@ public sealed class BusHostState
         return Results.Ok(new { state = Sessions.State.ToString() });
     }
 
-    public object GetStatus() => new
+    public object GetStatus(bool includeSecrets = true) => new
     {
         state = Sessions.State.ToString(),
         decisions = Sessions.DecisionCount,
-        bus = BusInfo,
+        bus = includeSecrets ? BusInfo : NlSecurityRedaction.RedactStatusBus(BusInfo, includeSecrets: false),
+        manifest = NlSecurityRedaction.RedactManifest(GetManifest(), includeSecrets),
         profile = GetProfile(),
         log = Sessions.GetLogSnapshot(),
     };
+
+    public NlSessionManifest GetManifest()
+    {
+        var profile = GetProfile();
+        return NlSessionServerHelper.CreateManifest(
+            BusInfo, profile, BindHost, HttpPort, WsPort, ModPort, Sessions.IsRunning);
+    }
+
+    public NlJoinAdmissionResult Admit(NlAdmitPlayerRequest request)
+    {
+        var profile = GetProfile();
+        var streamerId = string.IsNullOrWhiteSpace(request.StreamerId)
+            ? profile.StreamerId
+            : request.StreamerId.Trim();
+        var admission = NlJoinAdmissionService.CreateDefault(streamerId);
+        return admission.Evaluate(request.PlayerId, request.DisplayName);
+    }
 
     private static SessionProfileFile CloneProfile(SessionProfileFile p) => new()
     {

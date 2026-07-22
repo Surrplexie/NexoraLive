@@ -8,9 +8,37 @@
 </head>
 <body>
   <header>
-    <h1>NL Session Host</h1>
-    <p class="sub">Cross-platform session bus + rule engine (Phase B)</p>
+    <h1>NL Session Server</h1>
+    <p class="sub">Networked session bus + join admission + rule engine (Phase D)</p>
+    <nav class="nav">
+      <a href="/">Session</a>
+      <a href="/moderation.html">Moderation</a>
+    </nav>
   </header>
+
+  <section class="card" id="operator-auth" hidden>
+    <h2>Operator authentication</h2>
+    <p class="hint">Session control and moderation writes require an operator key in public/demo mode.</p>
+    <div class="grid">
+      <label class="wide">Operator key
+        <input id="operator-key" type="password" autocomplete="off" placeholder="NL_OPERATOR_KEY value" />
+      </label>
+    </div>
+    <div class="actions">
+      <button type="button" id="save-operator-key">Save key (this browser)</button>
+    </div>
+    <p id="operator-auth-status" class="status muted"></p>
+  </section>
+
+  <section class="card" id="manifest-card">
+    <h2>Remote bridge manifest</h2>
+    <p class="hint">Game bridges on another host connect outbound using these URLs.</p>
+    <dl id="manifest-info"></dl>
+    <div class="actions">
+      <button type="button" id="copy-bridge-url">Copy bridge URL</button>
+      <button type="button" id="copy-manifest">Copy manifest JSON</button>
+    </div>
+  </section>
 
   <section class="card" id="bus-card">
     <h2>Session bus</h2>
@@ -51,6 +79,7 @@
     <pre id="log"></pre>
   </section>
 
+  <script src="nl-auth.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

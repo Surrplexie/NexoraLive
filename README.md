@@ -184,21 +184,15 @@ dotnet run --project src/NL.SessionHost
 
 One Start/Stop UI for a session profile: game adapter, `.nle` path, event source, optional RCON / BeamNG UDP, join gate, early anti-cheat signals, anomaly auto-mod. Tools menu opens Moderation Console and Config Editor when published side-by-side.
 
-**Cross-platform (Phase B):** web dashboard + session bus:
+**Cross-platform (Phase B–D):** web session server + session bus:
 
 ```bash
 dotnet run --project src/NL.SessionHost.Web
 ```
 
-Open `http://127.0.0.1:27020` — REST API, bridge WebSocket on port 27021 with token auth. See [docs/NL_SESSION_BUS.md](docs/NL_SESSION_BUS.md).
+Open `http://127.0.0.1:27020` — remote bridge manifest, join admission API, moderation at `/moderation.html`. See [docs/NL_SESSION_SERVER.md](docs/NL_SESSION_SERVER.md).
 
-**Moderation (Phase C):** web console for Mac/Linux operators:
-
-```bash
-dotnet run --project src/NL.Moderation.Web
-```
-
-Open `http://127.0.0.1:27030`. See [docs/NL_HEADLESS_LINUX.md](docs/NL_HEADLESS_LINUX.md) for Docker and headless server paths.
+**Public demo (Phase E):** set `NL_PUBLIC_MODE=true` plus `NL_BUS_TOKEN` and `NL_OPERATOR_KEY` before exposing the server. Copy [`.env.example`](.env.example) and see [docs/NL_DEMO_SECURITY.md](docs/NL_DEMO_SECURITY.md).
 
 ### Portable publish layout
 
@@ -208,7 +202,9 @@ powershell -File scripts/publish.ps1
 
 Writes `artifacts/publish/{SessionHost,SessionHostWeb,ModerationWeb,ModerationConsole,ConfigEditor,HotkeyDaemon,Server}`. Zip that folder for a simple portable install.
 
-Linux headless + web operators: `bash scripts/publish-linux.sh` → `artifacts/publish-linux/`. Docker: `docker compose -f docker/docker-compose.yml up --build`.
+Linux headless + web operators: `bash scripts/publish-linux.sh` → `artifacts/publish-linux/`.
+
+Docker session server: `docker compose -f docker/docker-compose.session-server.yml up --build`.
 
 ---
 

@@ -53,6 +53,23 @@ dotnet run --project src/NL.SessionHost.Web
 Open `http://127.0.0.1:27020`, copy the **bridge URL** (includes `?token=`), and point your mod at it.
 See [docs/NL_SESSION_BUS.md](../docs/NL_SESSION_BUS.md) and `scripts/nl-session-bus-smoke.ps1`.
 
+## Networked session server (Phase D)
+
+Remote game hosts connect **outbound** to a hosted NL Session Server. Call the admit API
+before allowing `playerJoin`:
+
+```bash
+dotnet run --project src/NL.SessionHost.Web
+# manifest → bridgeConnectUrl + admitUrl
+
+python integrations/python/nl_bridge.py \
+  --url "ws://127.0.0.1:27021/nl/v1?token=TOKEN" \
+  --admit-url "http://127.0.0.1:27020/api/v1/session/admit" \
+  --sample
+```
+
+See [docs/NL_SESSION_SERVER.md](../docs/NL_SESSION_SERVER.md) and `scripts/nl-session-server-smoke.ps1`.
+
 ## TCP split-channel example
 
 Terminal 1:

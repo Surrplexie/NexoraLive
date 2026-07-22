@@ -9,4 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="..\NL.Moderation\NL.Moderation.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\NL.Web.Shared\NlWebSecurityExtensions.cs" Link="Shared\NlWebSecurityExtensions.cs" />
+  </ItemGroup>
 </Project>

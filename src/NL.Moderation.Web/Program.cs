@@ -1,8 +1,11 @@
 using NL.Core;
+using NL.Core.Security;
+using NL.Moderation;
 using NL.Moderation.Core;
-using NL.Moderation.Web;
+using NL.Web.Shared;
 
-var bindHost = Environment.GetEnvironmentVariable("NL_BIND") ?? "127.0.0.1";
+var security = NlSecuritySettings.LoadFromEnvironment();
+var bindHost = security.BindHost;
 var httpPort = int.Parse(Environment.GetEnvironmentVariable("NL_MOD_HTTP_PORT") ?? "27030");
 var moderationLog = Environment.GetEnvironmentVariable("NL_MODERATION_LOG");
 var spStore = Environment.GetEnvironmentVariable("NL_SP_STORE");
@@ -14,13 +17,15 @@ builder.WebHost.UseUrls($"http://{bindHost}:{httpPort}");
 
 var host = new ModerationHostState(moderationLog, spStore);
 builder.Services.AddSingleton(host);
-builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
+builder.Services.AddNlWebSecurity(security);
 
 var app = builder.Build();
 app.UseCors();
+app.UseNlOperatorAuth();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
+app.MapGet("/api/v1/security", (NlSecuritySettings s) => Results.Json(s.ToPublicInfo()));
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "moderation" }));
 app.MapGet("/api/v1/moderation", (ModerationHostState h) => Results.Json(h.GetStatus()));
 
@@ -67,6 +72,8 @@ app.MapPost("/api/v1/moderation/clear", async (ModerationHostState h, Moderation
 
 Console.WriteLine($"NL Moderation Console (web) → http://{bindHost}:{httpPort}");
 Console.WriteLine($"Data root                  → {NlPaths.Root}");
+Console.WriteLine($"Public mode                → {security.PublicMode}");
+Console.WriteLine($"Operator auth              → {(security.RequireOperatorAuth ? "required" : "off (local dev)")}");
 
 app.Run();
 

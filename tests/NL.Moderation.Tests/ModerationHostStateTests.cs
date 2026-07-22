@@ -1,6 +1,6 @@
 using NL.Core;
+using NL.Moderation;
 using NL.Moderation.Core;
-using NL.Moderation.Web;
 using Xunit;
 
 namespace NL.Moderation.Tests;
