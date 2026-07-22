@@ -206,6 +206,8 @@ Linux headless + web operators: `bash scripts/publish-linux.sh` → `artifacts/p
 
 Docker session server: `docker compose -f docker/docker-compose.session-server.yml up --build`.
 
+**Public demo deploy (Phase F):** Caddy TLS + persistent volume — see [docs/NL_DEPLOY.md](docs/NL_DEPLOY.md). Quick start: copy `docker/.env.demo.example` → `docker/.env`, set domain + secrets, run `bash scripts/deploy-demo.sh`.
+
 ---
 
 ## 5. Live paths (early / careful)

@@ -119,5 +119,6 @@ Writes return `401` until you pass the header. Reads still work.
 
 ## Related docs
 
+- [NL Deploy — CI/CD & public demo (Phase F)](NL_DEPLOY.md)
 - [NL Session Server (Phase D)](NL_SESSION_SERVER.md)
 - [Headless Linux / Docker](NL_HEADLESS_LINUX.md)

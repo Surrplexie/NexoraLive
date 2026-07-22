@@ -67,6 +67,8 @@ From the repo root:
 docker compose -f docker/docker-compose.yml up --build
 ```
 
+**Public demo with TLS (Phase F):** see [NL_DEPLOY.md](NL_DEPLOY.md) — `docker/docker-compose.demo.yml` + Caddy.
+
 | URL | Service |
 |-----|---------|
 | http://localhost:27020 | Session Host dashboard + REST |
@@ -113,6 +115,7 @@ Moderation Console.
 
 ## Related docs
 
+- [NL Deploy — CI/CD & public demo (Phase F)](NL_DEPLOY.md)
 - [NL Session Bus (Phase B)](NL_SESSION_BUS.md)
 - [NL Integration Spec v1](NL_INTEGRATION_SPEC.md)
 - [Moderation tooling](MODERATION.md)

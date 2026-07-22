@@ -300,6 +300,21 @@ Make the session server safe to expose as a public demo. See
 - [x] **Web UI operator key** — dashboard stores `X-NL-Operator-Key` in browser session for writes
 - [x] **Tests** — settings validation, auth, path guards, manifest redaction
 
+## Phase F — CI/CD & container deploy ✓
+
+Automated build/test, container publishing, and a one-command public demo stack. See
+[docs/NL_DEPLOY.md](docs/NL_DEPLOY.md).
+
+- [x] **GitHub Actions CI** — cross-platform build, full test suite, Docker smoke on PR/push
+- [x] **GHCR publish** — `session-server` image on push to `main` + version tags
+- [x] **Demo compose stack** — Caddy TLS + session server + persistent `nl-demo-data` volume
+- [x] **Reverse proxy** — HTTP dashboard on `/`, WebSocket bridge on `/nl/v1`
+- [x] **`NL_PUBLIC_*` wiring** — demo compose sets HTTPS/WSS manifest URLs automatically
+- [x] **Docker healthchecks** — `/health` in Dockerfile + compose
+- [x] **Deploy scripts** — `scripts/deploy-demo.sh` / `deploy-demo.ps1`
+- [x] **Sample configs in image** — `.nle` fixtures bundled for container defaults
+- [x] **Docs** — `docs/NL_DEPLOY.md`, `docker/.env.demo.example`
+
 ## Phase 6+ — Long-term / high-risk ideas (documented only, not scheduled)
 
 These involve real money, KYC/identity verification, blockchain, and gambling-adjacent
