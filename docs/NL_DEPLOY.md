@@ -73,7 +73,7 @@ curl -fsS https://demo.yourdomain.com/health
 curl -fsS https://demo.yourdomain.com/api/v1/security
 ```
 
-Open `https://demo.yourdomain.com/` — the **Phase G demo loop** auto-starts a session and feeds sample events. Enter your operator key to control sessions or view bridge secrets.
+Open `https://demo.yourdomain.com/` — the **Phase H spectator page** shows live Allow/Block/Warn decisions. The **Phase G demo loop** feeds events automatically. Operators use `/operator.html` with `NL_OPERATOR_KEY` for session control.
 
 Verify the live loop:
 

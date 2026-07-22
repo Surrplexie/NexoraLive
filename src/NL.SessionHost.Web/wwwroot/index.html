@@ -3,87 +3,77 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>NL Session Host</title>
+  <title>NexoraLive — Live Demo</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
-  <section class="demo-banner" id="demo-banner" hidden>
-    <strong>Live public demo</strong> — sample game events loop automatically. Decisions and moderation audit update in real time.
-    <span id="demo-banner-meta" class="demo-meta"></span>
-  </section>
-  <header>
-    <h1>NL Session Server</h1>
-    <p class="sub">Networked session bus + join admission + rule engine (Phase D)</p>
+<body class="spectator-page">
+  <header class="hero">
+    <p class="eyebrow">NexoraLive public demo</p>
+    <h1>Streamer rules, enforced live</h1>
+    <p class="lead">
+      NexoraLive evaluates game events against plain-text <code>.nle</code> rules and returns
+      <strong>Allow</strong>, <strong>Block</strong>, or <strong>Warn</strong>. This demo runs a live session
+      with sample events — no install required.
+    </p>
     <nav class="nav">
-      <a href="/">Session</a>
-      <a href="/moderation.html">Moderation</a>
+      <a href="/" aria-current="page">Watch demo</a>
+      <a href="/operator.html">Operator</a>
+      <a href="/moderation.html">Moderation audit</a>
     </nav>
   </header>
 
-  <section class="card" id="operator-auth" hidden>
-    <h2>Operator authentication</h2>
-    <p class="hint">Session control and moderation writes require an operator key in public/demo mode.</p>
-    <div class="grid">
-      <label class="wide">Operator key
-        <input id="operator-key" type="password" autocomplete="off" placeholder="NL_OPERATOR_KEY value" />
-      </label>
-    </div>
-    <div class="actions">
-      <button type="button" id="save-operator-key">Save key (this browser)</button>
-    </div>
-    <p id="operator-auth-status" class="status muted"></p>
-  </section>
-
-  <section class="card" id="manifest-card">
-    <h2>Remote bridge manifest</h2>
-    <p class="hint">Game bridges on another host connect outbound using these URLs.</p>
-    <dl id="manifest-info"></dl>
-    <div class="actions">
-      <button type="button" id="copy-bridge-url">Copy bridge URL</button>
-      <button type="button" id="copy-manifest">Copy manifest JSON</button>
-    </div>
-  </section>
-
-  <section class="card" id="bus-card">
-    <h2>Session bus</h2>
-    <dl id="bus-info"></dl>
-    <button type="button" id="copy-bridge-url">Copy bridge URL</button>
+  <section class="stats-row" id="stats-row">
+    <div class="stat"><span class="stat-label">Session</span><span class="stat-value" id="stat-session">…</span></div>
+    <div class="stat"><span class="stat-label">Decisions</span><span class="stat-value" id="stat-decisions">…</span></div>
+    <div class="stat"><span class="stat-label">Demo loop</span><span class="stat-value" id="stat-demo">…</span></div>
   </section>
 
   <section class="card">
-    <h2>Profile</h2>
-    <div class="grid">
-      <label>Streamer <input id="streamer" /></label>
-      <label>Game
-        <select id="game"><option>generic</option><option>minecraft</option></select>
-      </label>
-      <label class="wide">Config (.nle) <input id="config" /></label>
-      <label class="wide">Source <input id="source" placeholder="ws://… or file path" /></label>
-      <label class="wide">RCON <input id="rcon" placeholder="host:port:password" /></label>
-      <label class="wide">NL action <input id="nl-action" placeholder="auto or tcp://…" /></label>
-    </div>
-    <div class="flags">
-      <label><input type="checkbox" id="use-bus" checked /> Use session bus (WebSocket)</label>
-      <label><input type="checkbox" id="anti-cheat" checked /> Anti-cheat</label>
-      <label><input type="checkbox" id="join-gate" /> Join gate</label>
-      <label><input type="checkbox" id="anomaly-auto-mod" /> Anomaly auto-mod</label>
-      <label><input type="checkbox" id="replay-once" /> Replay once</label>
-    </div>
-    <div class="actions">
-      <button type="button" id="bus-defaults">Load bus defaults</button>
-      <button type="button" id="save-profile">Save profile</button>
-      <button type="button" id="start" class="primary">Start session</button>
-      <button type="button" id="stop">Stop</button>
-    </div>
-    <p id="status" class="status"></p>
+    <h2>How it works</h2>
+    <ol class="how-list">
+      <li>A game bridge (or this page) sends events like <code>shoot</code> or <code>playerJoin</code>.</li>
+      <li>The shared rule engine loads the streamer's <code>.nle</code> config.</li>
+      <li>Each event becomes Allow, Block, or Warn — logged to the audit trail below.</li>
+    </ol>
   </section>
 
-  <section class="card log-card">
-    <h2>Log <span id="decisions"></span></h2>
-    <pre id="log"></pre>
+  <section class="card" id="trigger-card">
+    <h2>Try a rule</h2>
+    <p class="hint">Fire a sample event into the live session. Rate-limited for public demo safety.</p>
+    <div class="scenario-grid" id="scenario-grid"></div>
+    <p id="trigger-status" class="status muted"></p>
   </section>
 
-  <script src="nl-auth.js"></script>
-  <script src="app.js"></script>
+  <section class="card">
+    <h2>Live decisions <span id="feed-count" class="muted-inline"></span></h2>
+    <p class="hint">Automatic Allow / Block / Warn results from the rule engine (newest first).</p>
+    <div class="table-wrap feed-wrap">
+      <table id="decision-feed">
+        <thead>
+          <tr>
+            <th>Time (UTC)</th>
+            <th>Player</th>
+            <th>Event</th>
+            <th>Decision</th>
+            <th>Message</th>
+          </tr>
+        </thead>
+        <tbody id="decision-feed-body">
+          <tr><td colspan="5" class="empty-row">Waiting for decisions…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>For operators</h2>
+    <p class="hint">
+      Session control, bridge secrets, and moderation writes require an operator key on the
+      <a href="/operator.html">operator console</a> or
+      <a href="/moderation.html">moderation page</a>.
+    </p>
+  </section>
+
+  <script src="spectator-app.js"></script>
 </body>
 </html>

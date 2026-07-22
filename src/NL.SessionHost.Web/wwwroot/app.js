@@ -46,6 +46,7 @@ function applyProfile(p) {
 
 function renderBus(bus) {
   const el = document.getElementById("bus-info");
+  if (!el) return;
   el.innerHTML = `
     <dt>HTTP</dt><dd>${bus.httpBaseUrl}</dd>
     <dt>WebSocket</dt><dd>${bus.webSocketUrl}</dd>
@@ -58,6 +59,7 @@ function renderManifest(m) {
   if (!m) return;
   window._lastManifest = m;
   const el = document.getElementById("manifest-info");
+  if (!el) return;
   el.innerHTML = `
     <dt>Streamer</dt><dd>${m.streamerId}</dd>
     <dt>Bridge URL</dt><dd id="bridge-url">${m.bridgeConnectUrl}</dd>
@@ -67,79 +69,81 @@ function renderManifest(m) {
     <dt>Moderation</dt><dd>${m.moderationUrl}</dd>`;
 }
 
+function updateOperatorPanels(isAuthorized, authRequired) {
+  const locked = document.getElementById("operator-locked");
+  const panels = document.querySelectorAll(".operator-panel");
+  const showPanels = !authRequired || isAuthorized;
+  if (locked) locked.hidden = showPanels;
+  panels.forEach((p) => { p.hidden = !showPanels; });
+}
+
 function renderStatus(data) {
   document.getElementById("status").textContent = `State: ${data.state} · Decisions: ${data.decisions}`;
   document.getElementById("decisions").textContent = `(decisions: ${data.decisions})`;
   document.getElementById("log").textContent = (data.log || []).join("\n");
-  applyProfile(data.profile);
+  if (data.profile?.configPath !== undefined) {
+    applyProfile(data.profile);
+  } else if (data.profile) {
+    document.getElementById("streamer").value = data.profile.streamerId || "";
+    document.getElementById("game").value = data.profile.game || "generic";
+    document.getElementById("join-gate").checked = !!data.profile.joinGate;
+    document.getElementById("anti-cheat").checked = data.profile.antiCheat !== false;
+    document.getElementById("anomaly-auto-mod").checked = !!data.profile.anomalyAutoMod;
+    document.getElementById("use-bus").checked = data.profile.useSessionBus !== false;
+  }
   if (data.bus) renderBus(data.bus);
   if (data.manifest) renderManifest(data.manifest);
-}
-
-async function refreshDemoBanner() {
-  try {
-    const demo = await fetch("/api/v1/demo/status").then((r) => r.json());
-    const banner = document.getElementById("demo-banner");
-    const meta = document.getElementById("demo-banner-meta");
-    if (!demo.enabled) {
-      banner.hidden = true;
-      return;
-    }
-    banner.hidden = false;
-    meta.textContent = ` · Session ${demo.sessionRunning ? "running" : "starting"} · Decisions: ${demo.decisions ?? 0}`;
-  } catch {
-    document.getElementById("demo-banner").hidden = true;
-  }
 }
 
 async function refresh() {
   try {
     const data = await api("/api/v1/session");
     renderStatus(data);
+    const info = await window.NlAuth.fetchSecurityInfo().catch(() => ({ operatorAuthRequired: false }));
+    const isAuthorized = !info.operatorAuthRequired || !!window.NlAuth.getOperatorKey();
+    updateOperatorPanels(isAuthorized, info.operatorAuthRequired);
   } catch (e) {
     document.getElementById("status").textContent = e.message;
   }
 }
 
-document.getElementById("copy-bridge-url").onclick = () => {
+document.getElementById("copy-bridge-url")?.addEventListener("click", () => {
   const url = document.getElementById("bridge-url")?.textContent
     || window._lastManifest?.bridgeConnectUrl;
   if (url) navigator.clipboard.writeText(url);
-};
+});
 
-document.getElementById("copy-manifest").onclick = () => {
+document.getElementById("copy-manifest")?.addEventListener("click", () => {
   if (window._lastManifest) {
     navigator.clipboard.writeText(JSON.stringify(window._lastManifest, null, 2));
   }
-};
+});
 
-document.getElementById("save-profile").onclick = async () => {
+document.getElementById("save-profile")?.addEventListener("click", async () => {
   const data = await api("/api/v1/session/profile", {
     method: "PUT",
     body: JSON.stringify(profileFromForm()),
   });
   renderStatus(data);
-};
+});
 
-document.getElementById("bus-defaults").onclick = async () => {
+document.getElementById("bus-defaults")?.addEventListener("click", async () => {
   const data = await api("/api/v1/session/bus-defaults", { method: "POST" });
   renderStatus(data);
-};
+});
 
-document.getElementById("start").onclick = async () => {
+document.getElementById("start")?.addEventListener("click", async () => {
   await api("/api/v1/session/profile", { method: "PUT", body: JSON.stringify(profileFromForm()) });
   const replay = document.getElementById("replay-once").checked;
   await api("/api/v1/session/start", { method: "POST", body: JSON.stringify({ replayOnce: replay }) });
   await refresh();
-};
+});
 
-document.getElementById("stop").onclick = async () => {
+document.getElementById("stop")?.addEventListener("click", async () => {
   await api("/api/v1/session/stop", { method: "POST" });
   await refresh();
-};
+});
 
 refresh();
-refreshDemoBanner();
 setInterval(refresh, 2000);
-setInterval(refreshDemoBanner, 5000);
-window.NlAuth.initOperatorAuthUi();
+window.NlAuth.initOperatorAuthUi().then(refresh);

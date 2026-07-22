@@ -64,6 +64,17 @@ The web dashboards show an **Operator key** panel when auth is required. The key
 - `POST /api/v1/session/admit` — join gate probe (game bridges; intentionally open)
 - `GET /api/v1/moderation/recent` — audit tail (read-only)
 - `GET /api/v1/moderation/players/{id}/history` — offense history (read-only)
+- `GET /api/v1/demo/status` — Phase G demo loop status
+- `GET /api/v1/spectator/status` — Phase H public session summary
+- `GET /api/v1/spectator/decisions` — live Allow/Block/Warn feed (automatic decisions only)
+- `GET /api/v1/spectator/scenarios` — preset try-a-rule scenarios
+- `POST /api/v1/spectator/trigger` — inject one preset event (rate-limited; session must be running)
+
+### Spectator read vs operator session status
+
+`GET /api/v1/session` remains public but **redacts** profile file paths, RCON, bus token, and the session log unless the request includes a valid operator key. Use `/api/v1/spectator/*` for the public demo UI.
+
+See [NL Spectator UX (Phase H)](NL_SPECTATOR.md).
 
 ## Public mode startup
 

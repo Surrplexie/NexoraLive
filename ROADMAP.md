@@ -332,6 +332,21 @@ data reset. See [docs/NL_DEMO.md](docs/NL_DEMO.md).
 - [x] **Tests** — demo settings, reset, listen-host bind helpers
 - [x] **CI** — Phase G smoke job in GitHub Actions
 
+## Phase H — Spectator vs operator UX ✓
+
+Split public demo viewing from operator control. See [docs/NL_SPECTATOR.md](docs/NL_SPECTATOR.md).
+
+- [x] **Spectator landing** — `/` read-only page with live stats and decision feed
+- [x] **Operator console** — `/operator.html` for session control + secrets (gated by operator key)
+- [x] **Spectator API** — `/api/v1/spectator/status`, `/decisions`, `/scenarios`, `/trigger`
+- [x] **Live decision feed** — polls automatic moderation records (Allow/Block/Warn)
+- [x] **Try-a-rule panel** — rate-limited preset triggers for visitors
+- [x] **Public session redaction** — unauthenticated `/api/v1/session` omits paths, log, secrets
+- [x] **Internal event injection** — spectator triggers via loopback WebSocket to session bus
+- [x] **Nav + styling** — shared nav across watch / operator / moderation pages
+- [x] **Tests** — rate limiter, scenarios, spectator service, settings
+- [x] **Docs** — `docs/NL_SPECTATOR.md`, security index updated
+
 ## Phase 6+ — Long-term / high-risk ideas (documented only, not scheduled)
 
 These involve real money, KYC/identity verification, blockchain, and gambling-adjacent

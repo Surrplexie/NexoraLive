@@ -161,8 +161,18 @@ public sealed class BusHostState
         decisions = Sessions.DecisionCount,
         bus = includeSecrets ? BusInfo : NlSecurityRedaction.RedactStatusBus(BusInfo, includeSecrets: false),
         manifest = NlSecurityRedaction.RedactManifest(GetManifest(), includeSecrets),
-        profile = GetProfile(),
-        log = Sessions.GetLogSnapshot(),
+        profile = includeSecrets ? GetProfile() : RedactProfileForPublic(GetProfile()),
+        log = includeSecrets ? Sessions.GetLogSnapshot() : Array.Empty<string>(),
+    };
+
+    private static object RedactProfileForPublic(SessionProfileFile p) => new
+    {
+        streamerId = p.StreamerId,
+        game = p.Game,
+        joinGate = p.JoinGate,
+        antiCheat = p.AntiCheat,
+        anomalyAutoMod = p.AnomalyAutoMod,
+        useSessionBus = p.UseSessionBus,
     };
 
     public NlSessionManifest GetManifest()

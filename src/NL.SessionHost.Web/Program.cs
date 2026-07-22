@@ -10,6 +10,7 @@ using NL.Web.Shared;
 
 var security = NlSecuritySettings.LoadFromEnvironment();
 var demoSettings = NlDemoSettings.LoadFromEnvironment();
+var spectatorSettings = NlSpectatorSettings.LoadFromEnvironment();
 var bindHost = security.BindHost;
 var httpPort = int.Parse(Environment.GetEnvironmentVariable("NL_HTTP_PORT") ?? NlSessionBusDefaults.HttpPort.ToString());
 var wsPort = int.Parse(Environment.GetEnvironmentVariable("NL_WS_PORT") ?? NlSessionBusDefaults.WebSocketPort.ToString());
@@ -33,6 +34,8 @@ if (File.Exists(NlPaths.SessionProfile))
 builder.Services.AddSingleton(bus);
 builder.Services.AddSingleton(moderation);
 builder.Services.AddSingleton(demoSettings);
+builder.Services.AddSingleton(spectatorSettings);
+builder.Services.AddSingleton(new NlSpectatorService(spectatorSettings));
 builder.Services.AddNlWebSecurity(security);
 if (demoSettings.Enabled)
 {
@@ -150,6 +153,57 @@ app.MapGet("/api/v1/demo/status", (NlDemoSettings demo, BusHostState b) =>
         b.Sessions.DecisionCount,
         b.GetProfile().ConfigPath)));
 
+app.MapGet("/api/v1/spectator/status", (NlSpectatorService spectator, BusHostState b, NlDemoSettings demo) =>
+    Results.Json(spectator.BuildStatus(
+        b.Sessions.State,
+        b.Sessions.IsRunning,
+        b.Sessions.DecisionCount,
+        demo.Enabled,
+        b.GetProfile())));
+
+app.MapGet("/api/v1/spectator/scenarios", (NlSpectatorService spectator) =>
+    Results.Json(spectator.ListScenarios()));
+
+app.MapGet("/api/v1/spectator/decisions", async (
+    NlSpectatorService spectator,
+    ModerationHostState moderation,
+    BusHostState bus,
+    string? streamer,
+    string? since,
+    int? count,
+    CancellationToken ct) =>
+{
+    var streamerId = string.IsNullOrWhiteSpace(streamer) ? bus.GetProfile().StreamerId : streamer.Trim();
+    DateTimeOffset? sinceUtc = DateTimeOffset.TryParse(since, out var parsed) ? parsed : null;
+    var decisions = await spectator.GetDecisionsAsync(moderation, streamerId, sinceUtc, count, ct);
+    return Results.Json(new { decisions });
+});
+
+app.MapPost("/api/v1/spectator/trigger", async (
+    NlSpectatorService spectator,
+    BusHostState bus,
+    SpectatorTriggerRequest body,
+    HttpContext ctx,
+    CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(body.ScenarioId))
+    {
+        return Results.BadRequest(new { error = "scenarioId required." });
+    }
+
+    var clientKey = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    var result = await spectator.TriggerScenarioAsync(
+        body.ScenarioId.Trim(),
+        clientKey,
+        bus.Sessions.IsRunning,
+        bus.BindHost,
+        bus.WsPort,
+        bus.BusToken,
+        ct);
+
+    return Results.Json(result.Body, statusCode: result.StatusCode);
+});
+
 var manifest = bus.GetManifest();
 Console.WriteLine($"NL Session Server      → {manifest.HttpBaseUrl}");
 Console.WriteLine($"Bridge (remote)        → {manifest.BridgeConnectUrl}");
@@ -157,6 +211,7 @@ Console.WriteLine($"Join admission         → {manifest.AdmitUrl}");
 Console.WriteLine($"Moderation console     → {manifest.ModerationUrl}");
 Console.WriteLine($"Public mode            → {security.PublicMode}");
 Console.WriteLine($"Demo loop (Phase G)    → {demoSettings.Enabled}");
+Console.WriteLine($"Spectator UX (Phase H) → triggers={spectatorSettings.TriggersEnabled}, rate={spectatorSettings.TriggerRatePerMinute}/min");
 if (demoSettings.Enabled)
 {
     Console.WriteLine($"Demo config            → {demoSettings.ConfigFileName}");

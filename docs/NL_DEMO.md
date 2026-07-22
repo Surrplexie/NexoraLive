@@ -98,6 +98,5 @@ The demo-bridge sidecar reconnects automatically if the session restarts.
 
 ## Related docs
 
-- [NL Deploy — CI/CD & public demo (Phase F)](NL_DEPLOY.md)
-- [NL Demo Security (Phase E)](NL_DEMO_SECURITY.md)
-- [NL Integration Spec v1](NL_INTEGRATION_SPEC.md)
+- [NL Spectator UX (Phase H)](NL_SPECTATOR.md)
+- [NL Hosted Demo Loop (Phase G)](NL_DEMO.md)

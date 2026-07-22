@@ -9,16 +9,17 @@
 <body>
   <header>
     <h1>NL Moderation Console</h1>
-    <p class="sub">Session server moderation (Phase D)</p>
+    <p class="sub">Audit trail and mod actions (writes require operator key)</p>
     <nav class="nav">
-      <a href="/">Session</a>
-      <a href="/moderation.html">Moderation</a>
+      <a href="/">Watch demo</a>
+      <a href="/operator.html">Operator</a>
+      <a href="/moderation.html" aria-current="page">Moderation</a>
     </nav>
   </header>
 
   <section class="card" id="operator-auth" hidden>
     <h2>Operator authentication</h2>
-    <p class="hint">Moderation writes require an operator key in public/demo mode.</p>
+    <p class="hint">Moderation writes require an operator key. Anyone can <a href="/">watch live decisions</a> read-only.</p>
     <div class="grid">
       <label class="wide">Operator key
         <input id="operator-key" type="password" autocomplete="off" placeholder="NL_OPERATOR_KEY value" />

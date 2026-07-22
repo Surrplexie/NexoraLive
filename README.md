@@ -210,6 +210,8 @@ Docker session server: `docker compose -f docker/docker-compose.session-server.y
 
 **Hosted demo loop (Phase G):** the demo compose stack auto-starts a live session and loops sample game events — see [docs/NL_DEMO.md](docs/NL_DEMO.md). No manual bridge wiring required.
 
+**Spectator landing (Phase H):** `/` is a public read-only demo page with live decisions and try-a-rule buttons; operators use `/operator.html` — see [docs/NL_SPECTATOR.md](docs/NL_SPECTATOR.md).
+
 ---
 
 ## 5. Live paths (early / careful)
@@ -373,6 +375,7 @@ Detector vocabulary and wiring: [`docs/ANTICHEAT.md`](docs/ANTICHEAT.md).
 | [`docs/BEAMNG.md`](docs/BEAMNG.md) | BeamNG bridge |
 | [`docs/NL_DEPLOY.md`](docs/NL_DEPLOY.md) | CI/CD + public demo deploy (Phase F) |
 | [`docs/NL_DEMO.md`](docs/NL_DEMO.md) | Hosted demo loop — auto session + bridge (Phase G) |
+| [`docs/NL_SPECTATOR.md`](docs/NL_SPECTATOR.md) | Spectator vs operator UX (Phase H) |
 
 ---
 

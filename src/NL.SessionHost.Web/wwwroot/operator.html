@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NL Operator — Session Host</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="operator-page">
+  <header>
+    <h1>NL Operator Console</h1>
+    <p class="sub">Session control, bridge manifest, and live log (operator access)</p>
+    <nav class="nav">
+      <a href="/">Watch demo</a>
+      <a href="/operator.html" aria-current="page">Operator</a>
+      <a href="/moderation.html">Moderation</a>
+    </nav>
+  </header>
+
+  <section class="card" id="operator-auth" hidden>
+    <h2>Operator authentication</h2>
+    <p class="hint">Session control and bridge secrets require an operator key in public/demo mode.</p>
+    <div class="grid">
+      <label class="wide">Operator key
+        <input id="operator-key" type="password" autocomplete="off" placeholder="NL_OPERATOR_KEY value" />
+      </label>
+    </div>
+    <div class="actions">
+      <button type="button" id="save-operator-key">Save key (this browser)</button>
+    </div>
+    <p id="operator-auth-status" class="status muted"></p>
+  </section>
+
+  <section class="card operator-gated" id="operator-locked" hidden>
+    <h2>Operator access required</h2>
+    <p class="hint">Enter your operator key above to view bridge URLs, edit profiles, and start or stop sessions. Visitors can watch live decisions on the <a href="/">demo page</a> without a key.</p>
+  </section>
+
+  <section class="card operator-panel" id="manifest-card">
+    <h2>Remote bridge manifest</h2>
+    <p class="hint">Game bridges on another host connect outbound using these URLs.</p>
+    <dl id="manifest-info"></dl>
+    <div class="actions">
+      <button type="button" id="copy-bridge-url">Copy bridge URL</button>
+      <button type="button" id="copy-manifest">Copy manifest JSON</button>
+    </div>
+  </section>
+
+  <section class="card operator-panel" id="bus-card">
+    <h2>Session bus</h2>
+    <dl id="bus-info"></dl>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Profile</h2>
+    <div class="grid">
+      <label>Streamer <input id="streamer" /></label>
+      <label>Game
+        <select id="game"><option>generic</option><option>minecraft</option></select>
+      </label>
+      <label class="wide">Config (.nle) <input id="config" /></label>
+      <label class="wide">Source <input id="source" placeholder="ws://… or file path" /></label>
+      <label class="wide">RCON <input id="rcon" placeholder="host:port:password" /></label>
+      <label class="wide">NL action <input id="nl-action" placeholder="auto or tcp://…" /></label>
+    </div>
+    <div class="flags">
+      <label><input type="checkbox" id="use-bus" checked /> Use session bus (WebSocket)</label>
+      <label><input type="checkbox" id="anti-cheat" checked /> Anti-cheat</label>
+      <label><input type="checkbox" id="join-gate" /> Join gate</label>
+      <label><input type="checkbox" id="anomaly-auto-mod" /> Anomaly auto-mod</label>
+      <label><input type="checkbox" id="replay-once" /> Replay once</label>
+    </div>
+    <div class="actions">
+      <button type="button" id="bus-defaults">Load bus defaults</button>
+      <button type="button" id="save-profile">Save profile</button>
+      <button type="button" id="start" class="primary">Start session</button>
+      <button type="button" id="stop">Stop</button>
+    </div>
+    <p id="status" class="status"></p>
+  </section>
+
+  <section class="card log-card operator-panel">
+    <h2>Log <span id="decisions"></span></h2>
+    <pre id="log"></pre>
+  </section>
+
+  <script src="nl-auth.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

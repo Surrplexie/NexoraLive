@@ -46,6 +46,10 @@ for i in $(seq 1 40); do
     echo ""
     curl -fsS "$demo_url"
     echo ""
+    curl -fsS "http://127.0.0.1:27020/api/v1/spectator/status"
+    echo ""
+    curl -fsS "http://127.0.0.1:27020/api/v1/spectator/scenarios" | head -c 200
+    echo ""
     exit 0
   fi
   sleep 2
