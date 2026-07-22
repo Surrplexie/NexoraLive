@@ -37,6 +37,14 @@ public static class NlPublicRateLimitMiddleware
                     return;
                 }
             }
+            else if (method == "POST" && path.Equals("/api/v1/editor/evaluate", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!limits.TryEditorEvaluate(clientKey))
+                {
+                    await WriteRateLimitedAsync(context);
+                    return;
+                }
+            }
 
             await next();
         });
@@ -63,7 +71,8 @@ public static class NlPublicRateLimitMiddleware
         }
 
         return path.Equals("/api/v1/demo/status", StringComparison.OrdinalIgnoreCase)
-            || path.Equals("/api/v1/ops/status", StringComparison.OrdinalIgnoreCase);
+            || path.Equals("/api/v1/ops/status", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith("/api/v1/editor/", StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task WriteRateLimitedAsync(HttpContext context)

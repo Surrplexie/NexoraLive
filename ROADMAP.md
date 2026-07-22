@@ -363,6 +363,21 @@ Keep the public demo safe under abuse and observable in production. See
 - [x] **CI smoke** — `scripts/nl-hardening-smoke.sh` verifies 429 on admit flood
 - [x] **Tests** — hardening settings, rate limit service, WS guard, sliding window
 
+## Phase I — Web rule authoring ✓
+
+Browser `.nle` editor for demo visitors — no WinForms required. See [docs/NL_EDITOR.md](docs/NL_EDITOR.md).
+
+- [x] **`NL.NleEditor.Core`** — shared model, `NleLoader`, `NleWriter`, `NleEditorEvaluate` (used by WinForms + web)
+- [x] **Web UI** — `/editor.html` with event/statement editor, NLE preview, evaluate panel
+- [x] **Editor API** — `/api/v1/editor/config`, `/evaluate`, `/apply`, `/reset`, `/vocabulary`
+- [x] **Sandbox config** — `web-editor-sandbox.nle` under `NL_DATA_ROOT`; operator-only writes
+- [x] **Apply to session** — updates profile + restarts session so live bridge uses new rules
+- [x] **Demo reset integration** — sandbox restored from demo template on loop reset
+- [x] **Rate limits** — evaluate endpoint bucket when hardening enabled
+- [x] **Nav** — editor link on watch / operator / moderation pages
+- [x] **Tests** — round-trip, evaluate, sandbox save/load, security paths, demo reset
+- [x] **CI smoke** — editor evaluate check in demo smoke script
+
 ## Phase 6+ — Long-term / high-risk ideas (documented only, not scheduled)
 
 These involve real money, KYC/identity verification, blockchain, and gambling-adjacent

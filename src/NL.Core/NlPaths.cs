@@ -36,6 +36,9 @@ public static class NlPaths
 
     public static string SessionProfile => Path.Combine(Root, "session-profile.json");
 
+    /// <summary>Phase I web editor sandbox — resets on demo loop reset.</summary>
+    public static string WebEditorSandbox => Path.Combine(Root, "web-editor-sandbox.nle");
+
     /// <summary>NDJSON event stream written by the BeamNG.drive NL bridge Lua mod.</summary>
     public static string BeamngEvents => Path.Combine(Root, "beamng-events.ndjson");
 

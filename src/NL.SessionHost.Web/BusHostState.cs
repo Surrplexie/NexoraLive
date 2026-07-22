@@ -209,14 +209,5 @@ public sealed class BusHostState
         UseDefaultDataPaths = p.UseDefaultDataPaths,
     };
 
-    private static string ResolveSampleConfig(string name)
-    {
-        var candidates = new[]
-        {
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "samples", "configs", name)),
-            Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "samples", "configs", name)),
-        };
-
-        return candidates.FirstOrDefault(File.Exists) ?? name;
-    }
+    private static string ResolveSampleConfig(string name) => NlSampleConfigPaths.Resolve(name);
 }

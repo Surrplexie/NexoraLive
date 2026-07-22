@@ -7,6 +7,7 @@ Phase H separates **watching** the public demo from **operating** it. Visitors g
 | URL | Audience | Purpose |
 |-----|----------|---------|
 | `/` | Public | Spectator landing — live stats, decision feed, try-a-rule buttons |
+| `/editor.html` | Public (evaluate) / Operator (save) | Browser `.nle` rule editor — see [NL_EDITOR.md](NL_EDITOR.md) |
 | `/operator.html` | Operator | Session control, bridge manifest, secrets, live log |
 | `/moderation.html` | Both | Audit trail (read); mod writes require operator key |
 

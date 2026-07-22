@@ -1,18 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
-    <UseWindowsForms>true</UseWindowsForms>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>NL.ConfigEditor</RootNamespace>
+    <RootNamespace>NL.NleEditor</RootNamespace>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\NL.Core\NL.Core.csproj" />
-    <ProjectReference Include="..\NL.NleEditor.Core\NL.NleEditor.Core.csproj" />
   </ItemGroup>
 
 </Project>

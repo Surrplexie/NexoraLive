@@ -50,6 +50,12 @@ for i in $(seq 1 40); do
     echo ""
     curl -fsS "http://127.0.0.1:27020/api/v1/spectator/scenarios" | head -c 200
     echo ""
+    echo "Phase I editor evaluate …"
+    curl -fsS -X POST "http://127.0.0.1:27020/api/v1/editor/evaluate" \
+      -H "Content-Type: application/json" \
+      -d '{"eventName":"shoot","properties":{}}' | grep -q '"decision":"Block"'
+    curl -fsS "http://127.0.0.1:27020/api/v1/editor/vocabulary" | head -c 120
+    echo ""
     exit 0
   fi
   sleep 2

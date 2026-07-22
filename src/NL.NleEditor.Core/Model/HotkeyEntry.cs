@@ -1,4 +1,4 @@
-namespace NL.ConfigEditor.Model;
+namespace NL.NleEditor.Model;
 
 public class HotkeyEntry
 {

@@ -33,4 +33,24 @@ public static class NlDemoReset
         ResetDataFiles(moderation.ModerationLogPath, moderation.SpStorePath);
         moderation.ReloadStores();
     }
+
+    /// <summary>Phase I — restore web editor sandbox from the demo template.</summary>
+    public static void ResetWebEditorSandbox(string templateFileName = "demo.nle")
+    {
+        NlPaths.EnsureRoot();
+        var templatePath = NlSampleConfigPaths.Resolve(templateFileName);
+        var sandbox = NlPaths.WebEditorSandbox;
+
+        if (!File.Exists(templatePath))
+        {
+            if (File.Exists(sandbox))
+            {
+                File.Delete(sandbox);
+            }
+
+            return;
+        }
+
+        File.Copy(templatePath, sandbox, overwrite: true);
+    }
 }

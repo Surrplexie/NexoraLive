@@ -14,6 +14,9 @@ public static class NlSecurityPaths
         ("POST", "/api/v1/moderation/ban"),
         ("POST", "/api/v1/moderation/graylist"),
         ("POST", "/api/v1/moderation/clear"),
+        ("PUT", "/api/v1/editor/config"),
+        ("POST", "/api/v1/editor/apply"),
+        ("POST", "/api/v1/editor/reset"),
     };
 
     public static bool RequiresOperatorAuth(string method, string? path)

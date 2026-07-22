@@ -1,5 +1,5 @@
 using System.Windows.Forms;
-using NL.ConfigEditor.Model;
+using NL.NleEditor.Model;
 
 namespace NL.ConfigEditor;
 

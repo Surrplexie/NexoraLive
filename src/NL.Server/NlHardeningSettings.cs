@@ -10,12 +10,15 @@ public sealed class NlHardeningSettings
     public const string WsMaxPerIpVariable = "NL_WS_MAX_CONNECTIONS_PER_IP";
     public const string WsConnectRateVariable = "NL_WS_CONNECT_RATE_PER_MIN";
     public const string DemoSessionMaxHoursVariable = "NL_DEMO_SESSION_MAX_HOURS";
+    public const string EditorEvaluateRateVariable = "NL_EDITOR_EVALUATE_RATE_PER_MIN";
 
     public bool Enabled { get; init; }
 
     public int AdmitRatePerMinute { get; init; } = 120;
 
     public int PublicReadRatePerMinute { get; init; } = 300;
+
+    public int EditorEvaluateRatePerMinute { get; init; } = 120;
 
     public int WebSocketMaxConnections { get; init; } = 16;
 
@@ -39,12 +42,14 @@ public sealed class NlHardeningSettings
         var wsPerIp = ParseInt(Environment.GetEnvironmentVariable(WsMaxPerIpVariable), 4);
         var wsRate = ParseInt(Environment.GetEnvironmentVariable(WsConnectRateVariable), 30);
         var maxHours = ParseInt(Environment.GetEnvironmentVariable(DemoSessionMaxHoursVariable), 12);
+        var editorEval = ParseInt(Environment.GetEnvironmentVariable(EditorEvaluateRateVariable), 120);
 
         return new NlHardeningSettings
         {
             Enabled = enabled,
             AdmitRatePerMinute = Math.Max(1, admit),
             PublicReadRatePerMinute = Math.Max(10, read),
+            EditorEvaluateRatePerMinute = Math.Max(10, editorEval),
             WebSocketMaxConnections = Math.Max(1, wsMax),
             WebSocketMaxConnectionsPerIp = Math.Max(1, wsPerIp),
             WebSocketConnectRatePerMinute = Math.Max(1, wsRate),
@@ -57,6 +62,7 @@ public sealed class NlHardeningSettings
         enabled = Enabled,
         admitRatePerMinute = AdmitRatePerMinute,
         publicReadRatePerMinute = PublicReadRatePerMinute,
+        editorEvaluateRatePerMinute = EditorEvaluateRatePerMinute,
         webSocketMaxConnections = WebSocketMaxConnections,
         webSocketMaxConnectionsPerIp = WebSocketMaxConnectionsPerIp,
         webSocketConnectRatePerMinute = WebSocketConnectRatePerMinute,

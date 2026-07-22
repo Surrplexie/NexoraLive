@@ -1,8 +1,8 @@
-using NL.ConfigEditor.Model;
 using NL.Core;
 using NL.Core.Ast;
+using NL.NleEditor.Model;
 
-namespace NL.ConfigEditor;
+namespace NL.NleEditor;
 
 /// <summary>
 /// Reads an existing <c>.nle</c> file via <c>NL.Core.Parser</c> and converts the resulting
@@ -11,7 +11,6 @@ namespace NL.ConfigEditor;
 /// </summary>
 public static class NleLoader
 {
-    /// <summary>Parses <paramref name="source"/> text and converts to a <see cref="ConfigModel"/>.</summary>
     public static ConfigModel Load(string source)
     {
         var ast = Parser.Parse(source);
@@ -83,7 +82,7 @@ public static class NleLoader
 
             case CompoundCondition compound:
                 FlattenInto(compound.Left, into);
-                into.Joins.Add(compound.Op);   // "and" | "or"
+                into.Joins.Add(compound.Op);
                 FlattenInto(compound.Right, into);
                 break;
         }

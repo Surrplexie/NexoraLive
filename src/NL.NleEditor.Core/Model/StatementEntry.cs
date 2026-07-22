@@ -1,4 +1,4 @@
-namespace NL.ConfigEditor.Model;
+namespace NL.NleEditor.Model;
 
 public enum StatementType { Allow, Block, Deny, Warn, If }
 
@@ -6,10 +6,8 @@ public class StatementEntry
 {
     public StatementType Type { get; set; } = StatementType.Allow;
 
-    // Warn
     public string? WarnMessage { get; set; }
 
-    // If
     public ConditionEntry? Condition { get; set; }
     public List<StatementEntry> ThenBody { get; set; } = [];
     public List<StatementEntry>? ElseBody { get; set; }

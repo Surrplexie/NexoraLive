@@ -1,7 +1,7 @@
 using System.Text;
-using NL.ConfigEditor.Model;
+using NL.NleEditor.Model;
 
-namespace NL.ConfigEditor;
+namespace NL.NleEditor;
 
 /// <summary>
 /// Converts the in-memory <see cref="ConfigModel"/> to a valid <c>.nle</c> source string.
@@ -35,7 +35,6 @@ public static class NleWriter
             }
         }
 
-        // Trim trailing blank lines but keep a single trailing newline.
         var text = sb.ToString().TrimEnd('\r', '\n');
         return text.Length > 0 ? text + Environment.NewLine : string.Empty;
     }

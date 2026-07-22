@@ -20,7 +20,8 @@ Enabled when `NL_HARDENING=true` (default **on** if `NL_PUBLIC_MODE=true`).
 | Endpoint group | Default limit | Paths |
 |----------------|---------------|-------|
 | Admit | 120/min/IP | `POST /api/v1/session/admit` |
-| Public read | 300/min/IP | `/api/v1/spectator/*`, `/api/v1/demo/status`, `/api/v1/ops/status`, moderation read APIs |
+| Public read | 300/min/IP | `/api/v1/spectator/*`, `/api/v1/demo/status`, `/api/v1/ops/status`, `/api/v1/editor/*` (GET), moderation read APIs |
+| Editor evaluate | 120/min/IP | `POST /api/v1/editor/evaluate` |
 
 Exceeded limits return **429** with `Retry-After: 60`.
 
@@ -81,6 +82,7 @@ Set `NL_DEMO_SESSION_MAX_HOURS=0` to disable.
 NL_HARDENING=true
 NL_ADMIT_RATE_PER_MIN=120
 NL_PUBLIC_READ_RATE_PER_MIN=300
+NL_EDITOR_EVALUATE_RATE_PER_MIN=120
 NL_WS_MAX_CONNECTIONS=16
 NL_WS_MAX_CONNECTIONS_PER_IP=4
 NL_WS_CONNECT_RATE_PER_MIN=30

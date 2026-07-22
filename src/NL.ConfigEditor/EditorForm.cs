@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Windows.Forms;
-using NL.ConfigEditor.Model;
+using NL.NleEditor;
+using NL.NleEditor.Model;
 using NL.Core;
 
 namespace NL.ConfigEditor;

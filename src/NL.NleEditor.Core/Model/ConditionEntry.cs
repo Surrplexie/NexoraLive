@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace NL.ConfigEditor.Model;
+namespace NL.NleEditor.Model;
 
 /// <summary>
 /// One or more simple comparisons joined by "and"/"or".

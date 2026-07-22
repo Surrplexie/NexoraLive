@@ -2,6 +2,8 @@ using NL.Core;
 using NL.Core.Security;
 using NL.Moderation;
 using NL.Moderation.Core;
+using NL.NleEditor;
+using NL.NleEditor.Model;
 using NL.Server;
 using NL.Server.Core.Integration;
 using NL.Server.Core.Security;
@@ -40,6 +42,7 @@ builder.Services.AddSingleton(spectatorSettings);
 builder.Services.AddSingleton(hardeningSettings);
 builder.Services.AddSingleton(new NlPublicRateLimitService(hardeningSettings));
 builder.Services.AddSingleton(new NlSpectatorService(spectatorSettings));
+builder.Services.AddSingleton(new NlWebEditorStore());
 builder.Services.AddNlWebSecurity(security);
 if (demoSettings.Enabled)
 {
@@ -239,6 +242,119 @@ app.MapPost("/api/v1/spectator/trigger", async (
     return Results.Json(result.Body, statusCode: result.StatusCode);
 });
 
+app.MapGet("/api/v1/editor/vocabulary", () => Results.Json(NlEditorVocabulary.ToPublicInfo()));
+
+app.MapGet("/api/v1/editor/config", (NlWebEditorStore store, BusHostState bus) =>
+{
+    var profile = bus.GetProfile();
+    var snap = store.Load(profile.ConfigPath);
+    return Results.Json(new
+    {
+        model = snap.Model,
+        nleText = snap.NleText,
+        sourcePath = snap.SourcePath,
+        isSandbox = snap.IsSandbox,
+        sessionUsesSandbox = store.IsSandboxPath(profile.ConfigPath),
+        sessionRunning = bus.Sessions.IsRunning,
+    });
+});
+
+app.MapPut("/api/v1/editor/config", async (NlWebEditorStore store, HttpRequest req) =>
+{
+    var model = await req.ReadFromJsonAsync<ConfigModel>();
+    if (model is null)
+    {
+        return Results.BadRequest(new { error = "Invalid config model JSON." });
+    }
+
+    try
+    {
+        var saved = store.Save(model);
+        return Results.Ok(new { ok = true, nleText = saved.NleText, sourcePath = saved.SourcePath });
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/v1/editor/evaluate", async (HttpRequest req) =>
+{
+    var body = await req.ReadFromJsonAsync<EditorEvaluateRequest>();
+    if (body is null || string.IsNullOrWhiteSpace(body.EventName))
+    {
+        return Results.BadRequest(new { error = "eventName required." });
+    }
+
+    var result = NleEditorEvaluate.Evaluate(new NleEvaluateRequest(
+        body.EventName,
+        body.Properties,
+        body.Model,
+        body.NleText));
+
+    if (!result.ParseOk)
+    {
+        return Results.BadRequest(new { error = result.Error, decision = result.Decision });
+    }
+
+    return Results.Json(new
+    {
+        decision = result.Decision,
+        message = result.Message,
+        allow = result.Decision.Equals("Allow", StringComparison.OrdinalIgnoreCase),
+    });
+});
+
+app.MapPost("/api/v1/editor/apply", async (
+    NlWebEditorStore store,
+    BusHostState bus,
+    EditorApplyRequest? body,
+    CancellationToken ct) =>
+{
+    if (!store.SandboxExists())
+    {
+        return Results.BadRequest(new { error = "Save rules to the sandbox first." });
+    }
+
+    var profile = bus.GetProfile();
+    profile.ConfigPath = store.SandboxPath;
+    bus.SaveProfile(profile);
+
+    if (body?.RestartSession == false)
+    {
+        return Results.Ok(new
+        {
+            ok = true,
+            configPath = store.SandboxPath,
+            sessionRunning = bus.Sessions.IsRunning,
+            restarted = false,
+        });
+    }
+
+    if (bus.Sessions.IsRunning)
+    {
+        bus.Stop();
+        await bus.WaitForIdleAsync(ct);
+    }
+
+    var start = await bus.StartAsync(replayOnce: false, ct);
+    return start;
+});
+
+app.MapPost("/api/v1/editor/reset", (NlWebEditorStore store, NlDemoSettings demo) =>
+{
+    var template = demo.Enabled ? demo.ConfigFileName : "demo.nle";
+    store.ResetFromTemplate(template);
+    var snap = store.Load(null);
+    return Results.Ok(new
+    {
+        ok = true,
+        template,
+        model = snap.Model,
+        nleText = snap.NleText,
+    });
+});
+
 var manifest = bus.GetManifest();
 Console.WriteLine($"NL Session Server      → {manifest.HttpBaseUrl}");
 Console.WriteLine($"Bridge (remote)        → {manifest.BridgeConnectUrl}");
@@ -248,6 +364,7 @@ Console.WriteLine($"Public mode            → {security.PublicMode}");
 Console.WriteLine($"Demo loop (Phase G)    → {demoSettings.Enabled}");
 Console.WriteLine($"Spectator UX (Phase H) → triggers={spectatorSettings.TriggersEnabled}, rate={spectatorSettings.TriggerRatePerMinute}/min");
 Console.WriteLine($"Hardening (Phase K)    → {hardeningSettings.Enabled} (admit={hardeningSettings.AdmitRatePerMinute}/min, ws max={hardeningSettings.WebSocketMaxConnections})");
+Console.WriteLine($"Web editor (Phase I)   → /editor.html + /api/v1/editor/*");
 if (demoSettings.Enabled)
 {
     Console.WriteLine($"Demo config            → {demoSettings.ConfigFileName}");
@@ -299,4 +416,17 @@ static async Task<IResult> IssueModerationAsync(
 internal sealed class StartSessionRequest
 {
     public bool ReplayOnce { get; set; }
+}
+
+internal sealed class EditorEvaluateRequest
+{
+    public string? EventName { get; set; }
+    public Dictionary<string, double>? Properties { get; set; }
+    public ConfigModel? Model { get; set; }
+    public string? NleText { get; set; }
+}
+
+internal sealed class EditorApplyRequest
+{
+    public bool RestartSession { get; set; } = true;
 }

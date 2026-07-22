@@ -109,6 +109,7 @@ public sealed class NlDemoHostedService : BackgroundService
 
             _log.LogInformation("NL demo reset: clearing moderation + SP data …");
             NlDemoReset.ResetAndReload(_moderation);
+            NlDemoReset.ResetWebEditorSandbox(_settings.ConfigFileName);
 
             _bus.ApplyDemoProfile(_settings.ConfigFileName);
 
