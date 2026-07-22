@@ -315,6 +315,23 @@ Automated build/test, container publishing, and a one-command public demo stack.
 - [x] **Sample configs in image** — `.nle` fixtures bundled for container defaults
 - [x] **Docs** — `docs/NL_DEPLOY.md`, `docker/.env.demo.example`
 
+## Phase G — Hosted demo loop ✓
+
+Turnkey live demo for public visitors: auto-started session, looping sample events, periodic
+data reset. See [docs/NL_DEMO.md](docs/NL_DEMO.md).
+
+- [x] **`NL_DEMO_MODE`** — `NlDemoHostedService` auto-applies demo profile and starts session
+- [x] **Demo profile** — `samples/configs/demo.nle` + session bus defaults (join gate off)
+- [x] **Demo reset** — `NlDemoReset` clears moderation + SP stores; configurable interval
+- [x] **Demo bridge sidecar** — `docker/demo-bridge/` runs `nl_bridge.py --loop` in compose
+- [x] **`--loop` bridge mode** — Python reference bridge repeats sample events with reconnect
+- [x] **All-interface listeners** — WS/TCP bind fix for Docker bridge networking
+- [x] **Demo status API** — `GET /api/v1/demo/status` (public read)
+- [x] **Dashboard banner** — live demo indicator on session server UI
+- [x] **Local/CI compose** — `docker/docker-compose.demo-local.yml` + `scripts/nl-demo-smoke.sh`
+- [x] **Tests** — demo settings, reset, listen-host bind helpers
+- [x] **CI** — Phase G smoke job in GitHub Actions
+
 ## Phase 6+ — Long-term / high-risk ideas (documented only, not scheduled)
 
 These involve real money, KYC/identity verification, blockchain, and gambling-adjacent

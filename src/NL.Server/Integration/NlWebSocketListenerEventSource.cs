@@ -63,12 +63,13 @@ public sealed class NlWebSocketListenerEventSource : IGameEventSource, IAsyncDis
             SingleWriter = false,
         });
 
-        var bindHost = host is "localhost" or "*" or "+" or "0.0.0.0" ? "127.0.0.1" : host;
+        var bindHost = NlListenHost.ResolveHttpListenerHost(host);
         _listener = new HttpListener();
         _listener.Prefixes.Add($"http://{bindHost}:{port}/");
         _listener.Start();
         Port = port;
-        _log?.Invoke($"[nl ws] listening on ws://{bindHost}:{port}{NlIntegrationProtocol.WebSocketPath}");
+        var displayHost = NlListenHost.IsAllInterfaces(host) ? "0.0.0.0" : bindHost;
+        _log?.Invoke($"[nl ws] listening on ws://{displayHost}:{port}{NlIntegrationProtocol.WebSocketPath}");
         _acceptLoop = AcceptLoopAsync(_loopCts.Token);
     }
 

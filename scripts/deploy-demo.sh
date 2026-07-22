@@ -50,6 +50,12 @@ for i in $(seq 1 45); do
     echo "Demo is up: $health_url"
     curl -kfsS "$health_url"
     echo ""
+    demo_url="${NL_PUBLIC_HTTP}/api/v1/demo/status"
+    if curl -kfsS "$demo_url" 2>/dev/null | grep -q '"sessionRunning":true'; then
+      echo "Demo loop: session running ($(curl -kfsS "$demo_url"))"
+    else
+      echo "Demo loop: waiting for auto-start (check $demo_url in ~30s)"
+    fi
     echo "Dashboard: ${NL_PUBLIC_HTTP}/"
     echo "Moderation: ${NL_PUBLIC_MOD_HTTP}/moderation.html"
     exit 0

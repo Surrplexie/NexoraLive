@@ -11,12 +11,10 @@ public sealed class ModerationHostState
         NlPaths.EnsureRoot();
         ModerationLogPath = moderationLogPath ?? NlPaths.ModerationLog;
         SpStorePath = spStorePath ?? NlPaths.SpProfiles;
-        Moderation = new ModerationService(
-            new JsonlModerationStore(ModerationLogPath),
-            new JsonFileSpProfileRepository(SpStorePath));
+        Moderation = CreateService();
     }
 
-    public ModerationService Moderation { get; }
+    public ModerationService Moderation { get; private set; }
     public string ModerationLogPath { get; }
     public string SpStorePath { get; }
 
@@ -26,6 +24,14 @@ public sealed class ModerationHostState
         moderationLog = ModerationLogPath,
         spStore = SpStorePath,
     };
+
+    /// <summary>Re-open JSON stores after a demo reset (Phase G).</summary>
+    public void ReloadStores() => Moderation = CreateService();
+
+    private ModerationService CreateService() =>
+        new(
+            new JsonlModerationStore(ModerationLogPath),
+            new JsonFileSpProfileRepository(SpStorePath));
 }
 
 public sealed class ModerationActionRequest

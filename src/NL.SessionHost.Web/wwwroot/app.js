@@ -76,6 +76,22 @@ function renderStatus(data) {
   if (data.manifest) renderManifest(data.manifest);
 }
 
+async function refreshDemoBanner() {
+  try {
+    const demo = await fetch("/api/v1/demo/status").then((r) => r.json());
+    const banner = document.getElementById("demo-banner");
+    const meta = document.getElementById("demo-banner-meta");
+    if (!demo.enabled) {
+      banner.hidden = true;
+      return;
+    }
+    banner.hidden = false;
+    meta.textContent = ` · Session ${demo.sessionRunning ? "running" : "starting"} · Decisions: ${demo.decisions ?? 0}`;
+  } catch {
+    document.getElementById("demo-banner").hidden = true;
+  }
+}
+
 async function refresh() {
   try {
     const data = await api("/api/v1/session");
@@ -123,5 +139,7 @@ document.getElementById("stop").onclick = async () => {
 };
 
 refresh();
+refreshDemoBanner();
 setInterval(refresh, 2000);
+setInterval(refreshDemoBanner, 5000);
 window.NlAuth.initOperatorAuthUi();

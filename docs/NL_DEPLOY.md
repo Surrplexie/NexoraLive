@@ -73,7 +73,14 @@ curl -fsS https://demo.yourdomain.com/health
 curl -fsS https://demo.yourdomain.com/api/v1/security
 ```
 
-Open `https://demo.yourdomain.com/` — enter your operator key in the dashboard to start sessions.
+Open `https://demo.yourdomain.com/` — the **Phase G demo loop** auto-starts a session and feeds sample events. Enter your operator key to control sessions or view bridge secrets.
+
+Verify the live loop:
+
+```bash
+curl -fsS https://demo.yourdomain.com/api/v1/demo/status
+# expect sessionRunning:true and decisions > 0 after ~30s
+```
 
 **DNS:** point `A`/`AAAA` record for `NL_DEMO_DOMAIN` to the VPS IP. Open ports **80** and **443**.
 
@@ -97,6 +104,9 @@ Caddy :443 / :80  ── TLS termination
    │
    ├── /nl/v1*  ──► session-server:27021  (WebSocket bridge)
    └── /*       ──► session-server:27020  (HTTP dashboard + REST)
+                         ▲
+                         │ ws://session-server:27021 (internal)
+                   demo-bridge (Phase G — loops sample NDJSON events)
                          │
                          └── volume nl-demo-data → /data
 ```
@@ -128,6 +138,7 @@ Demo compose mounts **`nl-demo-data`** at `/data` (`NL_DATA_ROOT`):
 |----------|----------|
 | `GET /health` | `{"status":"ok","service":"nl-session-server"}` |
 | `GET /api/v1/security` | `operatorAuthRequired: true` in public mode |
+| `GET /api/v1/demo/status` | Phase G: `enabled`, `sessionRunning`, `decisions` |
 
 Docker images and compose services include built-in healthchecks on `/health`.
 
@@ -150,6 +161,7 @@ powershell -File scripts\deploy-demo.ps1
 
 ## Related docs
 
+- [NL Hosted Demo Loop (Phase G)](NL_DEMO.md)
 - [NL Demo Security (Phase E)](NL_DEMO_SECURITY.md)
 - [NL Session Server (Phase D)](NL_SESSION_SERVER.md)
 - [Headless Linux / Docker](NL_HEADLESS_LINUX.md)

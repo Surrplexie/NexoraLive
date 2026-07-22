@@ -74,13 +74,12 @@ public sealed class NlTcpListenerEventSource : IGameEventSource, IAsyncDisposabl
             SingleWriter = false,
         });
 
-        var address = host is "localhost" or "*" or "+" or "0.0.0.0"
-            ? IPAddress.Loopback
-            : IPAddress.Parse(host);
+        var address = NlListenHost.ResolveTcpAddress(host);
         _listener = new TcpListener(address, port);
         _listener.Start();
         Port = ((IPEndPoint)_listener.LocalEndpoint).Port;
-        _log?.Invoke($"[nl tcp] listening on {address}:{Port}");
+        var displayHost = NlListenHost.IsAllInterfaces(host) ? "0.0.0.0" : address.ToString();
+        _log?.Invoke($"[nl tcp] listening on {displayHost}:{Port}");
         _acceptLoop = AcceptLoopAsync(_acceptLoopCts.Token);
     }
 

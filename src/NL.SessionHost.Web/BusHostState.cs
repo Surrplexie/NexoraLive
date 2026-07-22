@@ -68,6 +68,32 @@ public sealed class BusHostState
         SaveProfile(profile);
     }
 
+    /// <summary>Phase G — preloaded profile for the public demo loop.</summary>
+    public void ApplyDemoProfile(string configFileName = "demo.nle")
+    {
+        var profile = new SessionProfileFile
+        {
+            StreamerId = NlPaths.DefaultStreamerId,
+            Game = "generic",
+            ConfigPath = ResolveSampleConfig(configFileName),
+            AntiCheat = false,
+            JoinGate = false,
+            AnomalyAutoMod = false,
+            UseDefaultDataPaths = true,
+            UseSessionBus = true,
+        };
+        NlSessionBusHelper.ApplyBusSource(profile, BusInfo);
+        SaveProfile(profile);
+    }
+
+    public async Task WaitForIdleAsync(CancellationToken cancellationToken = default)
+    {
+        while (Sessions.IsRunning)
+        {
+            await Task.Delay(100, cancellationToken);
+        }
+    }
+
     public async Task<IResult> StartAsync(bool replayOnce, CancellationToken cancellationToken)
     {
         if (Sessions.IsRunning)

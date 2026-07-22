@@ -9,6 +9,7 @@ using NL.SessionHost.Web;
 using NL.Web.Shared;
 
 var security = NlSecuritySettings.LoadFromEnvironment();
+var demoSettings = NlDemoSettings.LoadFromEnvironment();
 var bindHost = security.BindHost;
 var httpPort = int.Parse(Environment.GetEnvironmentVariable("NL_HTTP_PORT") ?? NlSessionBusDefaults.HttpPort.ToString());
 var wsPort = int.Parse(Environment.GetEnvironmentVariable("NL_WS_PORT") ?? NlSessionBusDefaults.WebSocketPort.ToString());
@@ -31,7 +32,12 @@ if (File.Exists(NlPaths.SessionProfile))
 
 builder.Services.AddSingleton(bus);
 builder.Services.AddSingleton(moderation);
+builder.Services.AddSingleton(demoSettings);
 builder.Services.AddNlWebSecurity(security);
+if (demoSettings.Enabled)
+{
+    builder.Services.AddHostedService<NlDemoHostedService>();
+}
 
 var app = builder.Build();
 app.UseCors();
@@ -138,12 +144,24 @@ app.MapPost("/api/v1/moderation/clear", async (ModerationHostState m, Moderation
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "nl-session-server" }));
 
+app.MapGet("/api/v1/demo/status", (NlDemoSettings demo, BusHostState b) =>
+    Results.Json(demo.ToPublicInfo(
+        b.Sessions.IsRunning,
+        b.Sessions.DecisionCount,
+        b.GetProfile().ConfigPath)));
+
 var manifest = bus.GetManifest();
 Console.WriteLine($"NL Session Server      → {manifest.HttpBaseUrl}");
 Console.WriteLine($"Bridge (remote)        → {manifest.BridgeConnectUrl}");
 Console.WriteLine($"Join admission         → {manifest.AdmitUrl}");
 Console.WriteLine($"Moderation console     → {manifest.ModerationUrl}");
 Console.WriteLine($"Public mode            → {security.PublicMode}");
+Console.WriteLine($"Demo loop (Phase G)    → {demoSettings.Enabled}");
+if (demoSettings.Enabled)
+{
+    Console.WriteLine($"Demo config            → {demoSettings.ConfigFileName}");
+    Console.WriteLine($"Demo reset interval    → {(demoSettings.ResetInterval.TotalMinutes > 0 ? $"{demoSettings.ResetInterval.TotalMinutes} min" : "startup only")}");
+}
 Console.WriteLine($"Operator auth          → {(security.RequireOperatorAuth ? "required" : "off (local dev)")}");
 if (security.RequireOperatorAuth)
 {

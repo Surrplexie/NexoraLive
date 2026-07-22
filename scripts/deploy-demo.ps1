@@ -49,6 +49,12 @@ for ($i = 0; $i -lt 45; $i++) {
         $resp = Invoke-RestMethod -Uri $healthUrl -SkipCertificateCheck -ErrorAction Stop
         Write-Host "Demo is up: $healthUrl"
         $resp | ConvertTo-Json -Compress
+        try {
+            $demo = Invoke-RestMethod -Uri "$($env:NL_PUBLIC_HTTP)/api/v1/demo/status" -SkipCertificateCheck -ErrorAction Stop
+            Write-Host "Demo loop: sessionRunning=$($demo.sessionRunning) decisions=$($demo.decisions)"
+        } catch {
+            Write-Host "Demo loop: check /api/v1/demo/status in ~30s"
+        }
         Write-Host "Dashboard: $($env:NL_PUBLIC_HTTP)/"
         exit 0
     } catch {

@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\NL.Core\NL.Core.csproj" />
     <ProjectReference Include="..\..\src\NL.Server\NL.Server.csproj" />
+    <ProjectReference Include="..\..\src\NL.Moderation\NL.Moderation.csproj" />
     <ProjectReference Include="..\..\src\NL.Moderation.Core\NL.Moderation.Core.csproj" />
     <ProjectReference Include="..\..\src\NL.Server.Core\NL.Server.Core.csproj" />
   </ItemGroup>

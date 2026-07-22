@@ -208,6 +208,8 @@ Docker session server: `docker compose -f docker/docker-compose.session-server.y
 
 **Public demo deploy (Phase F):** Caddy TLS + persistent volume — see [docs/NL_DEPLOY.md](docs/NL_DEPLOY.md). Quick start: copy `docker/.env.demo.example` → `docker/.env`, set domain + secrets, run `bash scripts/deploy-demo.sh`.
 
+**Hosted demo loop (Phase G):** the demo compose stack auto-starts a live session and loops sample game events — see [docs/NL_DEMO.md](docs/NL_DEMO.md). No manual bridge wiring required.
+
 ---
 
 ## 5. Live paths (early / careful)
@@ -369,6 +371,8 @@ Detector vocabulary and wiring: [`docs/ANTICHEAT.md`](docs/ANTICHEAT.md).
 | [`docs/ANTICHEAT.md`](docs/ANTICHEAT.md) | Early anti-cheat signals (`anomaly*`); see also [Anti-cheat direction](#anti-cheat-direction) |
 | [`docs/MINECRAFT_LIVE.md`](docs/MINECRAFT_LIVE.md) | Live Minecraft checklist |
 | [`docs/BEAMNG.md`](docs/BEAMNG.md) | BeamNG bridge |
+| [`docs/NL_DEPLOY.md`](docs/NL_DEPLOY.md) | CI/CD + public demo deploy (Phase F) |
+| [`docs/NL_DEMO.md`](docs/NL_DEMO.md) | Hosted demo loop — auto session + bridge (Phase G) |
 
 ---
 
