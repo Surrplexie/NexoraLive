@@ -363,6 +363,7 @@ Detector vocabulary and wiring: [`docs/ANTICHEAT.md`](docs/ANTICHEAT.md).
 
 | Doc | Topic |
 |-----|--------|
+| [`docs/NL_COMPLETE_GUIDE.md`](docs/NL_COMPLETE_GUIDE.md) | **Full install & run guide** — download, prerequisites, every path (simulator → public demo) |
 | [`NLE_GUIDE.md`](NLE_GUIDE.md) | Formal NLE guide (install → author → run → troubleshoot) |
 | [`ROADMAP.md`](ROADMAP.md) | Phases built vs. planned |
 | [`docs/NLEVENT_LANGUAGE_SPEC_v0.1.md`](docs/NLEVENT_LANGUAGE_SPEC_v0.1.md) | `.nle` grammar |
