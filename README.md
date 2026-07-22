@@ -212,6 +212,8 @@ Docker session server: `docker compose -f docker/docker-compose.session-server.y
 
 **Spectator landing (Phase H):** `/` is a public read-only demo page with live decisions and try-a-rule buttons; operators use `/operator.html` — see [docs/NL_SPECTATOR.md](docs/NL_SPECTATOR.md).
 
+**Demo hardening (Phase K):** rate limits, WebSocket caps, ops probes, and operator runbook — see [docs/NL_HARDENING.md](docs/NL_HARDENING.md) and [docs/NL_DEMO_RUNBOOK.md](docs/NL_DEMO_RUNBOOK.md).
+
 ---
 
 ## 5. Live paths (early / careful)
@@ -376,6 +378,8 @@ Detector vocabulary and wiring: [`docs/ANTICHEAT.md`](docs/ANTICHEAT.md).
 | [`docs/NL_DEPLOY.md`](docs/NL_DEPLOY.md) | CI/CD + public demo deploy (Phase F) |
 | [`docs/NL_DEMO.md`](docs/NL_DEMO.md) | Hosted demo loop — auto session + bridge (Phase G) |
 | [`docs/NL_SPECTATOR.md`](docs/NL_SPECTATOR.md) | Spectator vs operator UX (Phase H) |
+| [`docs/NL_HARDENING.md`](docs/NL_HARDENING.md) | Demo hardening & ops (Phase K) |
+| [`docs/NL_DEMO_RUNBOOK.md`](docs/NL_DEMO_RUNBOOK.md) | Operator runbook (deploy, reset, monitor) |
 
 ---
 

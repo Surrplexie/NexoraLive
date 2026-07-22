@@ -347,6 +347,22 @@ Split public demo viewing from operator control. See [docs/NL_SPECTATOR.md](docs
 - [x] **Tests** — rate limiter, scenarios, spectator service, settings
 - [x] **Docs** — `docs/NL_SPECTATOR.md`, security index updated
 
+## Phase K — Demo hardening & ops ✓
+
+Keep the public demo safe under abuse and observable in production. See
+[docs/NL_HARDENING.md](docs/NL_HARDENING.md) and [docs/NL_DEMO_RUNBOOK.md](docs/NL_DEMO_RUNBOOK.md).
+
+- [x] **`NL_HARDENING`** — auto-on in public mode; master switch for limits
+- [x] **Admit rate limit** — `POST /api/v1/session/admit` per-IP sliding window
+- [x] **Public read rate limit** — spectator, demo, ops, moderation read APIs
+- [x] **WebSocket guard** — global/per-IP connection caps + connect rate limit
+- [x] **Ops probes** — enriched `/health` + `GET /api/v1/ops/status`
+- [x] **Demo session max duration** — auto-restart after `NL_DEMO_SESSION_MAX_HOURS`
+- [x] **Caddy edge headers** — nosniff, DENY frame, referrer-policy
+- [x] **Runbook** — `docs/NL_DEMO_RUNBOOK.md` (deploy, secrets, reset, bridge)
+- [x] **CI smoke** — `scripts/nl-hardening-smoke.sh` verifies 429 on admit flood
+- [x] **Tests** — hardening settings, rate limit service, WS guard, sliding window
+
 ## Phase 6+ — Long-term / high-risk ideas (documented only, not scheduled)
 
 These involve real money, KYC/identity verification, blockchain, and gambling-adjacent

@@ -11,5 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\NL.Web.Shared\NlWebSecurityExtensions.cs" Link="Shared\NlWebSecurityExtensions.cs" />
+    <Compile Include="..\NL.Web.Shared\NlPublicRateLimitMiddleware.cs" Link="Shared\NlPublicRateLimitMiddleware.cs" />
   </ItemGroup>
 </Project>

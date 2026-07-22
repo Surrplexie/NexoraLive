@@ -69,12 +69,19 @@ The web dashboards show an **Operator key** panel when auth is required. The key
 - `GET /api/v1/spectator/decisions` — live Allow/Block/Warn feed (automatic decisions only)
 - `GET /api/v1/spectator/scenarios` — preset try-a-rule scenarios
 - `POST /api/v1/spectator/trigger` — inject one preset event (rate-limited; session must be running)
+- `GET /api/v1/ops/status` — Phase K ops metrics (uptime, rate limits, WS connections)
 
-### Spectator read vs operator session status
+### Rate limiting (Phase K)
 
-`GET /api/v1/session` remains public but **redacts** profile file paths, RCON, bus token, and the session log unless the request includes a valid operator key. Use `/api/v1/spectator/*` for the public demo UI.
+When `NL_HARDENING=true` (default in public mode):
 
-See [NL Spectator UX (Phase H)](NL_SPECTATOR.md).
+- `POST /api/v1/session/admit` — per-IP limit (`NL_ADMIT_RATE_PER_MIN`, default 120)
+- Public read endpoints — per-IP limit (`NL_PUBLIC_READ_RATE_PER_MIN`, default 300)
+- WebSocket `/nl/v1` — connection caps + connect rate (see [NL Hardening](NL_HARDENING.md))
+
+All return **429** with `Retry-After: 60` when exceeded.
+
+See [NL Spectator UX (Phase H)](NL_SPECTATOR.md) and [NL Demo Runbook](NL_DEMO_RUNBOOK.md).
 
 ## Public mode startup
 

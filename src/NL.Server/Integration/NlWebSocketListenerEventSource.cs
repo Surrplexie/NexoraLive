@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Channels;
+using NL.Server;
 using NL.Server.Core;
 using NL.Server.Core.Integration;
 
@@ -112,80 +113,101 @@ public sealed class NlWebSocketListenerEventSource : IGameEventSource, IAsyncDis
                 }
             }
 
-            _ = HandleWebSocketAsync(context, cancellationToken);
+            var remoteIp = context.Request.RemoteEndPoint?.Address?.ToString() ?? "unknown";
+            var guard = NlWebSocketConnectionGuard.Current;
+            if (guard is not null && !guard.TryAccept(remoteIp, out var rejectReason))
+            {
+                _log?.Invoke($"[nl ws] rejected bridge ({rejectReason}) from {remoteIp}");
+                context.Response.StatusCode = 429;
+                context.Response.Close();
+                continue;
+            }
+
+            _ = HandleWebSocketAsync(context, remoteIp, guard, cancellationToken);
         }
     }
 
-    private async Task HandleWebSocketAsync(HttpListenerContext context, CancellationToken cancellationToken)
+    private async Task HandleWebSocketAsync(
+        HttpListenerContext context,
+        string remoteIp,
+        NlWebSocketConnectionGuard? guard,
+        CancellationToken cancellationToken)
     {
         WebSocketContext? wsContext = null;
         try
         {
-            wsContext = await context.AcceptWebSocketAsync(subProtocol: null);
-        }
-        catch (Exception ex)
-        {
-            _log?.Invoke($"[nl ws] upgrade failed: {ex.Message}");
-            context.Response.StatusCode = 500;
-            context.Response.Close();
-            return;
-        }
-
-        var socket = wsContext.WebSocket;
-        var session = new NlWebSocketSession(socket);
-        ActiveSession = session;
-        _log?.Invoke("[nl ws] bridge connected");
-
-        var buffer = new byte[8192];
-        var pending = new StringBuilder();
-        try
-        {
-            while (socket.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
+            try
             {
-                var result = await socket.ReceiveAsync(buffer, cancellationToken);
-                if (result.MessageType == WebSocketMessageType.Close)
-                {
-                    break;
-                }
-
-                if (result.MessageType != WebSocketMessageType.Text)
-                {
-                    continue;
-                }
-
-                pending.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
-                await FlushPendingLinesAsync(pending, cancellationToken);
+                wsContext = await context.AcceptWebSocketAsync(subProtocol: null);
             }
-        }
-        catch (OperationCanceledException)
-        {
-            // shutting down
-        }
-        catch (WebSocketException ex)
-        {
-            _log?.Invoke($"[nl ws] socket error: {ex.Message}");
+            catch (Exception ex)
+            {
+                _log?.Invoke($"[nl ws] upgrade failed: {ex.Message}");
+                context.Response.StatusCode = 500;
+                context.Response.Close();
+                return;
+            }
+
+            var socket = wsContext.WebSocket;
+            var session = new NlWebSocketSession(socket);
+            ActiveSession = session;
+            _log?.Invoke("[nl ws] bridge connected");
+
+            var buffer = new byte[8192];
+            var pending = new StringBuilder();
+            try
+            {
+                while (socket.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
+                {
+                    var result = await socket.ReceiveAsync(buffer, cancellationToken);
+                    if (result.MessageType == WebSocketMessageType.Close)
+                    {
+                        break;
+                    }
+
+                    if (result.MessageType != WebSocketMessageType.Text)
+                    {
+                        continue;
+                    }
+
+                    pending.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
+                    await FlushPendingLinesAsync(pending, cancellationToken);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // shutting down
+            }
+            catch (WebSocketException ex)
+            {
+                _log?.Invoke($"[nl ws] socket error: {ex.Message}");
+            }
+            finally
+            {
+                if (ActiveSession == session)
+                {
+                    ActiveSession = null;
+                }
+
+                if (socket.State == WebSocketState.Open)
+                {
+                    try
+                    {
+                        await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "bye", CancellationToken.None);
+                    }
+                    catch
+                    {
+                        // ignore close races
+                    }
+                }
+
+                socket.Dispose();
+                _log?.Invoke("[nl ws] bridge disconnected");
+            }
         }
         finally
         {
-            if (ActiveSession == session)
-            {
-                ActiveSession = null;
-            }
-
-            if (socket.State == WebSocketState.Open)
-            {
-                try
-                {
-                    await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "bye", CancellationToken.None);
-                }
-                catch
-                {
-                    // ignore close races
-                }
-            }
-
-            socket.Dispose();
-            _log?.Invoke("[nl ws] bridge disconnected");
+            guard?.Release(remoteIp);
         }
     }
 

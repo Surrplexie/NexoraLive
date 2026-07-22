@@ -1,38 +1,14 @@
-using System.Collections.Concurrent;
+using NL.Server.Core.Security;
 
 namespace NL.Server;
 
-/// <summary>Simple sliding-window rate limiter for spectator trigger endpoints.</summary>
+/// <summary>Rate limiter alias for spectator triggers (uses shared sliding-window limiter).</summary>
 public sealed class NlSpectatorRateLimiter
 {
-    private readonly int _maxPerWindow;
-    private readonly TimeSpan _window;
-    private readonly ConcurrentDictionary<string, Queue<DateTimeOffset>> _buckets = new();
+    private readonly NlSlidingWindowRateLimiter _inner;
 
-    public NlSpectatorRateLimiter(int maxPerMinute, TimeSpan? window = null)
-    {
-        _maxPerWindow = Math.Max(1, maxPerMinute);
-        _window = window ?? TimeSpan.FromMinutes(1);
-    }
+    public NlSpectatorRateLimiter(int maxPerMinute, TimeSpan? window = null) =>
+        _inner = new NlSlidingWindowRateLimiter(maxPerMinute, window);
 
-    public bool TryAcquire(string key)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var queue = _buckets.GetOrAdd(key, _ => new Queue<DateTimeOffset>());
-        lock (queue)
-        {
-            while (queue.Count > 0 && now - queue.Peek() > _window)
-            {
-                queue.Dequeue();
-            }
-
-            if (queue.Count >= _maxPerWindow)
-            {
-                return false;
-            }
-
-            queue.Enqueue(now);
-            return true;
-        }
-    }
+    public bool TryAcquire(string key) => _inner.TryAcquire(key);
 }

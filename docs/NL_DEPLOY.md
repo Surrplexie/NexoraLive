@@ -139,6 +139,7 @@ Demo compose mounts **`nl-demo-data`** at `/data` (`NL_DATA_ROOT`):
 | `GET /health` | `{"status":"ok","service":"nl-session-server"}` |
 | `GET /api/v1/security` | `operatorAuthRequired: true` in public mode |
 | `GET /api/v1/demo/status` | Phase G: `enabled`, `sessionRunning`, `decisions` |
+| `GET /api/v1/ops/status` | Phase K: uptime, rate limits, WebSocket metrics |
 
 Docker images and compose services include built-in healthchecks on `/health`.
 
@@ -161,7 +162,8 @@ powershell -File scripts\deploy-demo.ps1
 
 ## Related docs
 
-- [NL Hosted Demo Loop (Phase G)](NL_DEMO.md)
+- [NL Demo Runbook](NL_DEMO_RUNBOOK.md) — operator maintenance (Phase K)
+- [NL Demo Hardening (Phase K)](NL_HARDENING.md)
 - [NL Demo Security (Phase E)](NL_DEMO_SECURITY.md)
 - [NL Session Server (Phase D)](NL_SESSION_SERVER.md)
 - [Headless Linux / Docker](NL_HEADLESS_LINUX.md)

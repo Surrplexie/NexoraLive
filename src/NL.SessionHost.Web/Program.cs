@@ -11,6 +11,8 @@ using NL.Web.Shared;
 var security = NlSecuritySettings.LoadFromEnvironment();
 var demoSettings = NlDemoSettings.LoadFromEnvironment();
 var spectatorSettings = NlSpectatorSettings.LoadFromEnvironment();
+var hardeningSettings = NlHardeningSettings.LoadFromEnvironment(security.PublicMode);
+NlWebSocketConnectionGuard.Configure(hardeningSettings);
 var bindHost = security.BindHost;
 var httpPort = int.Parse(Environment.GetEnvironmentVariable("NL_HTTP_PORT") ?? NlSessionBusDefaults.HttpPort.ToString());
 var wsPort = int.Parse(Environment.GetEnvironmentVariable("NL_WS_PORT") ?? NlSessionBusDefaults.WebSocketPort.ToString());
@@ -35,6 +37,8 @@ builder.Services.AddSingleton(bus);
 builder.Services.AddSingleton(moderation);
 builder.Services.AddSingleton(demoSettings);
 builder.Services.AddSingleton(spectatorSettings);
+builder.Services.AddSingleton(hardeningSettings);
+builder.Services.AddSingleton(new NlPublicRateLimitService(hardeningSettings));
 builder.Services.AddSingleton(new NlSpectatorService(spectatorSettings));
 builder.Services.AddNlWebSecurity(security);
 if (demoSettings.Enabled)
@@ -44,6 +48,7 @@ if (demoSettings.Enabled)
 
 var app = builder.Build();
 app.UseCors();
+app.UseNlPublicRateLimits();
 app.UseNlOperatorAuth();
 app.UseDefaultFiles();
 app.UseStaticFiles();
@@ -145,7 +150,37 @@ app.MapPost("/api/v1/moderation/clear", async (ModerationHostState m, Moderation
     await IssueModerationAsync(m, body, async (svc, s, p, by, reason, _) =>
         await svc.ClearStandingAsync(s, p, by, string.IsNullOrWhiteSpace(reason) ? null : reason, ct), requireReason: false));
 
-app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "nl-session-server" }));
+app.MapGet("/health", (NlSecuritySettings security, NlHardeningSettings hardening, NlDemoSettings demo, BusHostState bus) =>
+    Results.Json(new
+    {
+        status = "ok",
+        service = "nl-session-server",
+        uptimeSeconds = (long)NlOpsMetrics.Uptime.TotalSeconds,
+        publicMode = security.PublicMode,
+        hardening = hardening.Enabled,
+        demoMode = demo.Enabled,
+        sessionRunning = bus.Sessions.IsRunning,
+    }));
+
+app.MapGet("/api/v1/ops/status", (
+    NlHardeningSettings hardening,
+    NlPublicRateLimitService rateLimits,
+    NlDemoSettings demo,
+    NlSpectatorSettings spectator,
+    BusHostState bus) =>
+{
+    var wsGuard = NlWebSocketConnectionGuard.Current;
+    return Results.Json(new
+    {
+        uptime = NlOpsMetrics.UptimePayload(),
+        hardening = hardening.ToPublicInfo(),
+        rateLimits = rateLimits.GetMetrics(),
+        webSocket = wsGuard?.GetMetrics(),
+        demo = demo.ToPublicInfo(bus.Sessions.IsRunning, bus.Sessions.DecisionCount, bus.GetProfile().ConfigPath),
+        spectator = new { triggersEnabled = spectator.TriggersEnabled, triggerRatePerMinute = spectator.TriggerRatePerMinute },
+        session = new { state = bus.Sessions.State.ToString(), decisions = bus.Sessions.DecisionCount },
+    });
+});
 
 app.MapGet("/api/v1/demo/status", (NlDemoSettings demo, BusHostState b) =>
     Results.Json(demo.ToPublicInfo(
@@ -212,6 +247,7 @@ Console.WriteLine($"Moderation console     → {manifest.ModerationUrl}");
 Console.WriteLine($"Public mode            → {security.PublicMode}");
 Console.WriteLine($"Demo loop (Phase G)    → {demoSettings.Enabled}");
 Console.WriteLine($"Spectator UX (Phase H) → triggers={spectatorSettings.TriggersEnabled}, rate={spectatorSettings.TriggerRatePerMinute}/min");
+Console.WriteLine($"Hardening (Phase K)    → {hardeningSettings.Enabled} (admit={hardeningSettings.AdmitRatePerMinute}/min, ws max={hardeningSettings.WebSocketMaxConnections})");
 if (demoSettings.Enabled)
 {
     Console.WriteLine($"Demo config            → {demoSettings.ConfigFileName}");
