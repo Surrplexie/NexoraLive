@@ -83,7 +83,81 @@ Native game invites to NLS addresses **fail by design** — traffic is filtered 
 | **Fork runtime** | Hello-fork + session bus; server-side mod loader | Phase P — prototype |
 | **BeamNG.drive bridge** | Lua mod → NDJSON → rules → localhost UDP + BeamMP kick queue | Freeroam / BeamMP operator path |
 
-**Not implemented yet:** hosted NLServers with in-path packet anti-play, economy / trading cards, mobile clients, cloud hosting, encrypted `.nle` packaging, and most of the broader platform vision. Treat this repo as an **early working guide**: enough to learn the model, validate configs, and dogfood a few real sessions — not a finished operator product.
+**Not implemented yet:** production fork orchestration at scale, publisher SDK menu integrations, mobile NL Client overlay, cloud fleet ops, encrypted `.nle` packaging, and economy features (SrCs, SPt) from the long-form vision doc. Treat this repo as an **early working guide** — enough to learn the model, validate configs, and dogfood control-plane + hello-fork paths — not a finished operator product or a substitute for publisher-hosted multiplayer.
+
+---
+
+## For game publishers and platforms
+
+This section is for **rights holders, platform operators, and legal/compliance teams** evaluating NexoraLive. NL is designed so that **legitimate partnership is the default path**; “at own risk” is a **fallback tier for titles without an agreement**, not a workaround to avoid publisher consent.
+
+### What NL is
+
+NexoraLive enables **streamer-hosted community sessions** with enforceable, streamer-authored rules — follow/sub requirements, standing-based join gates, server-side mod application, and NLE-driven moderation — on infrastructure the streamer (via NL) controls. It is **not** a game store, a crack client, or a progress-sync layer.
+
+### What NL is not
+
+| NL does not | Why it matters |
+|-------------|----------------|
+| Sell game copies, DLC, or in-game currency | Publisher monetization stays with the publisher |
+| Bypass publisher or platform bans | Banned users remain blocked at the ownership/admission layer |
+| Accept pirated or unlicensed clients | Ownership verification is required before join |
+| Write session progress to publisher cloud saves, MMR, or live-service backends | Fork sessions are **ephemeral by design** |
+| Modify retail game installs permanently | Fork snapshots run isolated; clients reconnect to publisher services normally after the session |
+| Substitute for publisher anti-cheat on publisher matchmaking | NL fork sessions are **separate instances**, not injections into official servers |
+
+### Partnership model
+
+NL catalog entries carry a **partnership tier**. Publishers and platforms choose how deeply to integrate — NL does not require every title to launch as “at own risk.”
+
+| Tier | Who opts in | Player experience | NL obligation |
+|------|-------------|-------------------|---------------|
+| **Official** | Publisher (SDK, API, or formal agreement) | “Play on NL” surfaced in-product or via approved channel; EULA-aligned copy | Publisher-approved snapshot, legal review, coordinated deprecation |
+| **Platform** | Platform operator (e.g. per-app Steam flag) | NL may host opted-in app IDs under platform terms | Platform agreement; ownership via platform APIs |
+| **At own risk** | **No publisher or platform agreement** | Clear banner: not endorsed; no progress transfer; user acknowledgment | NL + streamer only; used when Official/Platform path is unavailable |
+
+**Important:** “At own risk” is **not** NL’s preferred or default operating mode for major titles. It exists so streamers and communities have a **disclosed, bounded fallback** when no partnership exists — with explicit legal copy, no progress transfer, and no implied endorsement. NL actively pursues **Official** and **Platform** tiers for cataloged games.
+
+### Technical assurances for partners
+
+1. **Ownership gate** — Join admission verifies platform identity and game ownership (Steam Web API and extensible verifiers) before Allow.
+2. **Major-version discipline** — One catalog row per publisher major release (`1.0`, `2.0`); client major must match session major or join is denied.
+3. **Snapshot registry** — Container image digests, min client version, and deprecation policy are recorded in the fork catalog (`NL.Fork.Catalog`).
+4. **Server-side mods only** — Verified mod hub with hash checks; mods execute on the fork instance, not on player clients.
+5. **Auditability** — Moderation JSONL, admit decisions, and session manifests are logged on the control plane.
+6. **Invite filtering** — Players join via NL admission URLs; native platform invites to NLS endpoints are rejected by design (documented in [`docs/NL_SOCIAL_GATE.md`](docs/NL_SOCIAL_GATE.md)).
+
+### Data handling
+
+| Persisted after a session | Discarded with the fork |
+|---------------------------|-------------------------|
+| Streamer `.nle` config | World / save state on the fork |
+| Moderation audit + SP standing | Session inventory |
+| Join/offense metadata | Fork container volumes |
+| Orchestrator audit (when built) | Any state that would sync to publisher live services |
+
+NL sessions **must not** become a backdoor for cloud-save manipulation, ranked progression, or economy extraction on publisher backends.
+
+### Engagement path for publishers and platforms
+
+If you represent a **game publisher**, **platform store**, or **first-party multiplayer service** and want NL integration beyond the at-own-risk tier:
+
+1. **Contact** — Open a discussion via your publisher/platform partnership channel (GitHub Discussions on this repo for technical preview; formal partnership inquiries should use your designated business contact when available).
+2. **Scope** — Define allowed snapshot majors, branding, EULA snippets, ownership API, and whether Official or Platform tier applies.
+3. **Catalog** — NL registers the title in the fork catalog as **Official** or **Platform** with agreed image digest, legal notice, and deprecation rules.
+4. **Launch** — Streamers select the partnered entry in the fork catalog; users see tier-appropriate copy at join time; sessions remain ephemeral unless explicitly agreed otherwise.
+
+NL welcomes **SDK hooks, menu entries, and co-marketing** for Official tier titles. NL does **not** require publishers to approve at-own-risk operation as a condition of technical conversation — the goal is to **replace** at-own-risk with a sanctioned path where both sides agree.
+
+### Reference documents
+
+| Document | Audience |
+|----------|----------|
+| [`docs/NL_FORK_PLATFORM.md`](docs/NL_FORK_PLATFORM.md) | Architecture: control plane vs data plane, lifecycle |
+| [`docs/NL_FORK_CATALOG.md`](docs/NL_FORK_CATALOG.md) | Snapshot registry, tiers, major-only policy |
+| [`docs/NL_IDENTITY.md`](docs/NL_IDENTITY.md) | Ownership verification and platform linking |
+| [`docs/NL_SOCIAL_GATE.md`](docs/NL_SOCIAL_GATE.md) | Join gate, live-only sessions, invite policy |
+| [`NexoraLive.txt`](NexoraLive.txt) | Long-form product vision (hypothetical / exploratory) |
 
 ---
 
@@ -249,7 +323,11 @@ One Start/Stop UI for a session profile: game adapter, `.nle` path, event source
 dotnet run --project src/NL.SessionHost.Web
 ```
 
-Open `http://127.0.0.1:27020` — remote bridge manifest, join admission API, moderation at `/moderation.html`. See [docs/NL_SESSION_SERVER.md](docs/NL_SESSION_SERVER.md).
+Open `http://127.0.0.1:27020` — remote bridge manifest, join admission API, moderation at `/moderation.html`, join gate at `/join-gate.html`, fork catalog at `/fork-catalog.html`. See [docs/NL_SESSION_SERVER.md](docs/NL_SESSION_SERVER.md).
+
+**Fork catalog (Phase N):** enable with `NL_FORK_CATALOG_ENABLED=true`, copy `samples/fork/catalog.json` to your catalog path, open `/fork-catalog.html` to select `gameId@major` and apply the default `.nle` template. See [docs/NL_FORK_CATALOG.md](docs/NL_FORK_CATALOG.md).
+
+**Identity + social gate (Phases L–M):** see [docs/NL_IDENTITY.md](docs/NL_IDENTITY.md) and [docs/NL_SOCIAL_GATE.md](docs/NL_SOCIAL_GATE.md).
 
 **Public demo (Phase E):** set `NL_PUBLIC_MODE=true` plus `NL_BUS_TOKEN` and `NL_OPERATOR_KEY` before exposing the server. Copy [`.env.example`](.env.example) and see [docs/NL_DEMO_SECURITY.md](docs/NL_DEMO_SECURITY.md).
 
@@ -333,18 +411,22 @@ Seeds a banned Eve profile under `%LOCALAPPDATA%\NL` and can replay the join-gat
 ## 6. How the pieces fit
 
 ```text
-.nle config  →  Lexer / Parser  →  RuleEngine
+.nle config  →  Lexer / Parser  →  RuleEngine  ←  NL Server (control plane)
                                       ↑
-     Minecraft log | NDJSON | hotkeys | mock events
+     Minecraft log | NDJSON | hotkeys | Fork runtime | mock events
                                       ↓
                          Allow / Block / Warn
                                       ↓
-              RCON | process | UDP | tray action | console
+              RCON | process | UDP | tray action | fork action | console
+                                      ↑
+                         NL Fork (data plane) — licensed snapshot + server mods
 ```
 
-- **Same engine** for simulator, daemon, and NLServer — configs are not siloed per app.
+- **NL Server** owns admission, standing, ownership, social gate, and the session bus.
+- **NL Fork** owns the game snapshot instance; it emits events and receives actions through the same integration contract.
+- **Same engine** for simulator, daemon, NLServer, and fork runtime — configs are not siloed per app.
 - **Game adapters** only produce `GameEvent`s (name + properties); they do not reimplement rules.
-- **Anti-cheat** is meant to sit on the session path (player input → check → NLServer → in-game). Today that is an early anomaly signal layer; the target is NLE-driven enforcement of gameplay/network signatures. See below.
+- **Anti-cheat** is meant to sit on the session path (player input → check → NL Server → in-game). Today that is an early anomaly signal layer; the target is NLE-driven enforcement of gameplay/network signatures. See below.
 - **Moderation** records decisions and can change SP standing, which the join gate reads on the next join.
 
 Architecture notes: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Server details: [`docs/NLSERVER.md`](docs/NLSERVER.md).
@@ -395,8 +477,13 @@ Detector vocabulary and wiring: [`docs/ANTICHEAT.md`](docs/ANTICHEAT.md).
 | `src/NL.Moderation` (+ `.Core`, Console) | Audit store + admin UI |
 | `src/NL.AntiCheat.Core` | Early anti-cheat anomaly detectors (session-path signals) |
 | `src/NL.SessionHost` | Windows Start/Stop session shell |
-| `src/NL.SessionHost.Web` | Cross-platform session bus + web dashboard |
+| `src/NL.SessionHost.Web` | Cross-platform session bus + web dashboard (operator, join gate, fork catalog) |
 | `src/NL.Moderation.Web` | Cross-platform moderation console (web) |
+| `src/NL.Identity` (+ `.Core`) | Platform identity, ownership verification (Phase L) |
+| `src/NL.Social` (+ `.Core`) | Live social gate, follow/sub cache (Phase M) |
+| `src/NL.Fork.Core` | Fork runtime, server-side mods, hello-fork |
+| `src/NL.Fork.Catalog` (+ `.Core`) | Major-version snapshot registry (Phase N) |
+| `src/NL.Fork.Runtime` | Fork runtime CLI |
 | `tests/` | Unit tests |
 | `samples/` | Safe example configs, logs, NDJSON (no real secrets) |
 | `beamng-mod/` | BeamNG Lua bridge |
@@ -440,6 +527,12 @@ Detector vocabulary and wiring: [`docs/ANTICHEAT.md`](docs/ANTICHEAT.md).
 | [`docs/NL_SPECTATOR.md`](docs/NL_SPECTATOR.md) | Spectator vs operator UX (Phase H) |
 | [`docs/NL_HARDENING.md`](docs/NL_HARDENING.md) | Demo hardening & ops (Phase K) |
 | [`docs/NL_DEMO_RUNBOOK.md`](docs/NL_DEMO_RUNBOOK.md) | Operator runbook (deploy, reset, monitor) |
+| [`docs/NL_FORK_PLATFORM.md`](docs/NL_FORK_PLATFORM.md) | Fork platform architecture (Server vs Fork) |
+| [`docs/NL_FORK_CATALOG.md`](docs/NL_FORK_CATALOG.md) | Snapshot registry, partnership tiers (Phase N) |
+| [`docs/NL_FORK_RUNTIME.md`](docs/NL_FORK_RUNTIME.md) | Fork runtime + hello-fork (Phase P) |
+| [`docs/NL_IDENTITY.md`](docs/NL_IDENTITY.md) | Platform identity & ownership (Phase L) |
+| [`docs/NL_SOCIAL_GATE.md`](docs/NL_SOCIAL_GATE.md) | Live social gate & join policy (Phase M) |
+| [`docs/NL_INTEGRATION_SPEC.md`](docs/NL_INTEGRATION_SPEC.md) | Universal game integration contract |
 
 ---
 
