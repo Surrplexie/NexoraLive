@@ -50,6 +50,7 @@ public static class JoinRequirementsStore
     {
         public bool RequireFollow { get; set; }
         public bool RequireSubscription { get; set; }
+        public bool RequireDiscordMember { get; set; }
         public int MinAccountAgeDays { get; set; }
         public SpVerification RequiredVerification { get; set; }
         public int MaxActiveOffenses { get; set; } = int.MaxValue;
@@ -59,6 +60,7 @@ public static class JoinRequirementsStore
         {
             RequireFollow = r.RequireFollow,
             RequireSubscription = r.RequireSubscription,
+            RequireDiscordMember = r.RequireDiscordMember,
             MinAccountAgeDays = r.MinAccountAgeDays,
             RequiredVerification = r.RequiredVerification,
             MaxActiveOffenses = r.MaxActiveOffenses,
@@ -68,6 +70,7 @@ public static class JoinRequirementsStore
         public JoinRequirements ToRequirements() => new(
             RequireFollow,
             RequireSubscription,
+            RequireDiscordMember,
             MinAccountAgeDays,
             RequiredVerification,
             MaxActiveOffenses,

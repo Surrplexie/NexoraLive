@@ -83,6 +83,7 @@ internal sealed class SpRelationshipDto
     public SpStanding Standing { get; set; }
     public bool IsFollowing { get; set; }
     public bool IsSubscribed { get; set; }
+    public bool IsDiscordMember { get; set; }
     public List<SpRole> Roles { get; set; } = new();
 
     public static SpRelationshipDto FromRelationship(SpStreamerRelationship relationship) => new()
@@ -91,9 +92,10 @@ internal sealed class SpRelationshipDto
         Standing = relationship.Standing,
         IsFollowing = relationship.IsFollowing,
         IsSubscribed = relationship.IsSubscribed,
+        IsDiscordMember = relationship.IsDiscordMember,
         Roles = relationship.RolesOrEmpty.ToList(),
     };
 
     public SpStreamerRelationship ToRelationship() =>
-        new(StreamerId, Standing, IsFollowing, IsSubscribed, Roles.ToHashSet());
+        new(StreamerId, Standing, IsFollowing, IsSubscribed, IsDiscordMember, Roles.ToHashSet());
 }

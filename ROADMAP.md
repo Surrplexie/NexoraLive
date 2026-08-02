@@ -439,18 +439,15 @@ sessions. Anti-pirate / anti-alt from nl.txt section 5.
 Wire Phase 2's `JoinEligibilityEngine` to **live platform APIs** instead of caller-supplied
 bools. nl.txt section 2: SP joins via NL only, not native game invites.
 
-- [ ] **Twitch / YouTube / Kick OAuth** — follow + paid sub status with cache + refresh
-- [ ] **Discord optional link** — server member checks for streamer communities
-- [ ] **`JoinRequirements` from streamer dashboard** — web UI to set follow/sub, min age,
-      verification, max offenses (partially exists; needs live backing)
-- [ ] **Live-only NLS** — session cannot start unless streamer is live on a connected channel
-      (Twitch EventSub / YouTube live ping); auto-stop when stream ends
-- [ ] **SP standing UI** — normal / graylist / banned per streamer; mod/admin actions write
-      through to real profiles (extend Phase 4 web moderation)
-- [ ] **Native invite blocking** — document + client behavior: game platform invites to NLS
-      addresses fail by design (traffic filtered at NL join layer)
-- [ ] **Offense archive** — 2-year active window enforced in storage; archived view for mods
-- [ ] **Tests** — mock platform APIs, live-gate session lifecycle, graylist hold → deny path
+- [x] **Twitch / YouTube / Kick OAuth** — follow + paid sub status with cache + refresh
+      (mock + Twitch Helix; full browser OAuth deferred)
+- [x] **Discord optional link** — server member checks for streamer communities
+- [x] **`JoinRequirements` from streamer dashboard** — web UI at `/join-gate.html` + REST API
+- [x] **Live-only NLS** — start blocked when offline; `NlLiveOnlyHostedService` auto-stops
+- [x] **SP standing UI** — standing + active/archived offenses in moderation console
+- [x] **Native invite blocking** — documented in `docs/NL_SOCIAL_GATE.md`
+- [x] **Offense archive** — 2-year active window; `activeOffenses` / `archivedOffenses` API
+- [x] **Tests** — `tests/NL.Social.Tests` + `scripts/nl-social-smoke.ps1`
 
 **Exit criteria:** Streamer goes live → opens NLS → only followers/subs meeting requirements
 can admit; stream ends → session stops automatically.

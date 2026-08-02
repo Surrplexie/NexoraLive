@@ -62,6 +62,12 @@ public sealed class SessionProfileFile
 
     public bool StrictOwnershipUnknown { get; set; } = true;
 
+    /// <summary>Phase M — session may only start while streamer is live on a connected channel.</summary>
+    public bool RequireLiveStream { get; set; }
+
+    /// <summary>Phase M — enable live social gate hydration at admit time.</summary>
+    public bool SocialGateEnabled { get; set; } = true;
+
     public NlSessionOptions ToSessionOptions(bool replay = false) => new()
     {
         Game = Game,

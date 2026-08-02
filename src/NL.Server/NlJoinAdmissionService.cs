@@ -5,6 +5,7 @@ using NL.Identity.Core;
 using NL.Moderation;
 using NL.Moderation.Core;
 using NL.Server.Core.Integration;
+using NL.Social;
 
 namespace NL.Server;
 
@@ -52,6 +53,7 @@ public sealed class NlJoinAdmissionService
         NlAdmitPlayerRequest request,
         SessionProfileFile? profile,
         NlIdentityHost? identity,
+        NlSocialHost? social = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.PlayerId))
@@ -62,6 +64,28 @@ public sealed class NlJoinAdmissionService
         var playerId = request.PlayerId.Trim();
         var name = string.IsNullOrWhiteSpace(request.DisplayName) ? playerId : request.DisplayName.Trim();
         var spProfile = _moderation.GetOrCreateProfile(playerId, name);
+
+        if (social?.Settings.Enabled == true && social.Settings.Mode != NlSocialMode.Off)
+        {
+            var linkInput = SocialLinkInput.FromAdmitRequest(
+                request.TwitchUserId,
+                request.YouTubeChannelId,
+                request.KickUserId,
+                request.DiscordUserId,
+                request.SocialPlatform,
+                request.SocialUserId);
+            var links = social.Gate.ResolveLinks(playerId, linkInput);
+            await social.Gate.RefreshRelationshipAsync(
+                spProfile,
+                _streamerId,
+                links,
+                _requirements.RequireFollow,
+                _requirements.RequireSubscription,
+                _requirements.RequireDiscordMember,
+                cancellationToken);
+            _moderation.SaveProfile(spProfile);
+        }
+
         var join = JoinEligibilityEngine.Evaluate(spProfile, _streamerId, _requirements, _clock());
         var standing = spProfile.GetRelationship(_streamerId).Standing;
 
@@ -242,4 +266,17 @@ public sealed class NlAdmitPlayerRequest
     public string? MajorVersion { get; set; }
 
     public string? NlAccountId { get; set; }
+
+    /// <summary>Phase M — linked platform ids for live follow/sub/discord checks.</summary>
+    public string? TwitchUserId { get; set; }
+
+    public string? YouTubeChannelId { get; set; }
+
+    public string? KickUserId { get; set; }
+
+    public string? DiscordUserId { get; set; }
+
+    public string? SocialPlatform { get; set; }
+
+    public string? SocialUserId { get; set; }
 }

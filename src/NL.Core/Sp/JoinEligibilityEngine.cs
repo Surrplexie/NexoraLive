@@ -57,6 +57,11 @@ public static class JoinEligibilityEngine
             {
                 return JoinResult.Deny("Streamer requires SPs to be subscribed before joining.");
             }
+
+            if (requirements.RequireDiscordMember && !relationship.IsDiscordMember)
+            {
+                return JoinResult.Deny("Streamer requires SPs to be a Discord server member before joining.");
+            }
         }
 
         var accountAgeDays = profile.AccountAgeDays(nowUtc);

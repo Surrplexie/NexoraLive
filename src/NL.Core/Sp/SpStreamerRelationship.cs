@@ -11,6 +11,7 @@ public sealed record SpStreamerRelationship(
     SpStanding Standing = SpStanding.Normal,
     bool IsFollowing = false,
     bool IsSubscribed = false,
+    bool IsDiscordMember = false,
     IReadOnlySet<SpRole>? Roles = null)
 {
     private static readonly IReadOnlySet<SpRole> EmptyRoles = new HashSet<SpRole>();

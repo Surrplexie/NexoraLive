@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NL Join Gate — Session Host</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="operator-page">
+  <header>
+    <h1>Join Gate &amp; Live Social</h1>
+    <p class="sub">Configure follow/sub/discord requirements and live-only NLS (Phase M)</p>
+    <nav class="nav">
+      <a href="/">Watch demo</a>
+      <a href="/editor.html">Rule editor</a>
+      <a href="/operator.html">Operator</a>
+      <a href="/join-gate.html" aria-current="page">Join gate</a>
+      <a href="/moderation.html">Moderation</a>
+    </nav>
+  </header>
+
+  <section class="card" id="operator-auth" hidden>
+    <h2>Operator authentication</h2>
+    <div class="grid">
+      <label class="wide">Operator key
+        <input id="operator-key" type="password" autocomplete="off" placeholder="NL_OPERATOR_KEY value" />
+      </label>
+    </div>
+    <div class="actions">
+      <button type="button" id="save-operator-key">Save key</button>
+    </div>
+    <p id="operator-auth-status" class="status muted"></p>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Join requirements</h2>
+    <p class="hint">Applied by <code>JoinEligibilityEngine</code> after live social hydration.</p>
+    <div class="grid">
+      <label>Streamer id <input id="streamer" value="default-streamer" /></label>
+      <label><input type="checkbox" id="require-follow" /> Require follow</label>
+      <label><input type="checkbox" id="require-sub" /> Require subscription</label>
+      <label><input type="checkbox" id="require-discord" /> Require Discord member</label>
+      <label>Min account age (days) <input type="number" id="min-age" min="0" value="0" /></label>
+      <label>Max active offenses <input type="number" id="max-offenses" min="0" value="999999" /></label>
+      <label><input type="checkbox" id="graylist-hold" checked /> Allow graylist with hold</label>
+    </div>
+    <div class="actions">
+      <button type="button" id="save-requirements">Save requirements</button>
+    </div>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Streamer social channels</h2>
+    <div class="grid">
+      <label>Twitch broadcaster id <input id="twitch-id" /></label>
+      <label>YouTube channel id <input id="youtube-id" /></label>
+      <label>Kick slug <input id="kick-slug" /></label>
+      <label>Discord guild id <input id="discord-guild" /></label>
+      <label><input type="checkbox" id="require-live" /> Require live to start NLS</label>
+      <label>Live platform
+        <select id="live-platform">
+          <option value="">(auto)</option>
+          <option value="twitch">Twitch</option>
+          <option value="youtube">YouTube</option>
+          <option value="kick">Kick</option>
+        </select>
+      </label>
+    </div>
+    <div class="actions">
+      <button type="button" id="save-streamer">Save streamer config</button>
+      <button type="button" id="refresh-live">Refresh live status</button>
+    </div>
+    <p id="live-status" class="status muted"></p>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Social settings</h2>
+    <dl id="social-settings"></dl>
+  </section>
+
+  <p id="status" class="status muted"></p>
+  <script src="auth.js"></script>
+  <script src="join-gate-app.js"></script>
+</body>
+</html>

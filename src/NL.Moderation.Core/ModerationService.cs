@@ -142,12 +142,19 @@ public sealed class ModerationService
             .OrderByDescending(o => o.IssuedAtUtc)
             .ToList();
 
+        var active = offenses.Where(o => o.IsActive(now)).ToList();
+        var archived = offenses.Where(o => !o.IsActive(now)).ToList();
+
         return new OffenseHistory(
             streamerId,
             profile.GetRelationship(streamerId).Standing,
-            profile.ActiveOffenseCount(streamerId, now),
-            offenses);
+            active.Count,
+            offenses,
+            active,
+            archived);
     }
+
+    public void SaveProfile(SpProfile profile) => _profiles.Save(profile);
 
     public SpProfile GetOrCreateProfile(string playerId, string displayName) =>
         _profiles.GetOrCreate(playerId, displayName);

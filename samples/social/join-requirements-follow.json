@@ -1,0 +1,9 @@
+{
+  "requireFollow": true,
+  "requireSubscription": false,
+  "requireDiscordMember": false,
+  "minAccountAgeDays": 0,
+  "requiredVerification": "None",
+  "maxActiveOffenses": 999999,
+  "allowGraylistWithHold": true
+}

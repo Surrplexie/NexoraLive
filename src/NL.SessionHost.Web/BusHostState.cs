@@ -3,6 +3,8 @@ using NL.Server;
 using NL.Server.Core.Integration;
 using NL.Server.Core.Security;
 using NL.Identity;
+using NL.Social;
+using NL.Social.Core;
 
 namespace NL.SessionHost.Web;
 
@@ -95,7 +97,7 @@ public sealed class BusHostState
         }
     }
 
-    public async Task<IResult> StartAsync(bool replayOnce, CancellationToken cancellationToken)
+    public async Task<IResult> StartAsync(bool replayOnce, CancellationToken cancellationToken, NlSocialHost? social = null)
     {
         if (Sessions.IsRunning)
         {
@@ -106,6 +108,23 @@ public sealed class BusHostState
         if (string.IsNullOrWhiteSpace(profile.ConfigPath) || !File.Exists(profile.ConfigPath))
         {
             return Results.BadRequest(new { error = "Config (.nle) path missing or not found." });
+        }
+
+        if (profile.RequireLiveStream && social?.Settings.Enabled == true)
+        {
+            var streamerId = string.IsNullOrWhiteSpace(profile.StreamerId)
+                ? NlPaths.DefaultStreamerId
+                : profile.StreamerId;
+            var config = social.Gate.GetStreamerConfig(streamerId);
+            var live = await social.LiveMonitor.GetStatusAsync(config, cancellationToken);
+            if (!live.IsLive)
+            {
+                return Results.BadRequest(new
+                {
+                    error = "Session cannot start until the streamer is live on a connected channel.",
+                    liveStatus = live,
+                });
+            }
         }
 
         if (profile.UseSessionBus || string.IsNullOrWhiteSpace(profile.SourcePath))
@@ -189,6 +208,7 @@ public sealed class BusHostState
     public async Task<NlJoinAdmissionResult> AdmitAsync(
         NlAdmitPlayerRequest request,
         NlIdentityHost? identity = null,
+        NlSocialHost? social = null,
         CancellationToken cancellationToken = default)
     {
         var profile = GetProfile();
@@ -196,7 +216,8 @@ public sealed class BusHostState
             ? profile.StreamerId
             : request.StreamerId.Trim();
         var admission = NlJoinAdmissionService.CreateDefault(streamerId);
-        return await admission.EvaluateAsync(request, profile, identity, cancellationToken);
+        var useSocial = profile.SocialGateEnabled ? social : null;
+        return await admission.EvaluateAsync(request, profile, identity, useSocial, cancellationToken);
     }
 
     private static SessionProfileFile CloneProfile(SessionProfileFile p) => new()
@@ -220,6 +241,8 @@ public sealed class BusHostState
         GameMajorVersion = p.GameMajorVersion,
         OwnershipPlatform = p.OwnershipPlatform,
         StrictOwnershipUnknown = p.StrictOwnershipUnknown,
+        RequireLiveStream = p.RequireLiveStream,
+        SocialGateEnabled = p.SocialGateEnabled,
     };
 
     private static string ResolveSampleConfig(string name) => NlSampleConfigPaths.Resolve(name);

@@ -8,4 +8,6 @@ public sealed record OffenseHistory(
     string StreamerId,
     SpStanding Standing,
     int ActiveOffenseCount,
-    IReadOnlyList<SpOffense> Offenses);
+    IReadOnlyList<SpOffense> Offenses,
+    IReadOnlyList<SpOffense> ActiveOffenses,
+    IReadOnlyList<SpOffense> ArchivedOffenses);

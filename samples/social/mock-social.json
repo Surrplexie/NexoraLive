@@ -1,0 +1,37 @@
+{
+  "relationships": {
+    "follower-sp": {
+      "default-streamer": {
+        "isFollowing": true,
+        "isSubscribed": false,
+        "isDiscordMember": true
+      }
+    },
+    "sub-sp": {
+      "default-streamer": {
+        "isFollowing": true,
+        "isSubscribed": true,
+        "isDiscordMember": true
+      }
+    },
+    "stranger-sp": {
+      "default-streamer": {
+        "isFollowing": false,
+        "isSubscribed": false,
+        "isDiscordMember": false
+      }
+    }
+  },
+  "liveStatus": {
+    "default-streamer": {
+      "isLive": true,
+      "platform": "twitch",
+      "title": "Phase M smoke stream"
+    },
+    "offline-streamer": {
+      "isLive": false,
+      "platform": "twitch",
+      "title": ""
+    }
+  }
+}

@@ -80,15 +80,23 @@ function renderHistory(history) {
   }
 
   const st = history.standing ?? history.Standing;
-  standing.textContent = `Standing: ${st} (active offenses: ${history.activeOffenseCount ?? history.ActiveOffenseCount ?? 0})`;
+  const activeCount = history.activeOffenseCount ?? history.ActiveOffenseCount ?? 0;
+  const archivedCount = (history.archivedOffenses ?? history.ArchivedOffenses ?? []).length;
+  standing.textContent = `Standing: ${st} (active: ${activeCount}, archived: ${archivedCount})`;
   standing.className = "standing " + (st === "Banned" ? "bad" : st === "Graylist" ? "warn" : "ok");
 
   const offenses = history.offenses ?? history.Offenses ?? [];
-  const twoYearsMs = 730 * 24 * 60 * 60 * 1000;
+  const activeSet = new Set((history.activeOffenses ?? history.ActiveOffenses ?? offenses).map(o =>
+    (o.issuedAtUtc ?? o.IssuedAtUtc ?? "") + (o.reason ?? o.Reason ?? "")));
   for (const o of offenses) {
     const issued = o.issuedAtUtc ?? o.IssuedAtUtc ?? "";
-    const issuedMs = issued ? new Date(issued).getTime() : 0;
-    const active = issuedMs > 0 && (Date.now() - issuedMs) < twoYearsMs;
+    const key = issued + (o.reason ?? o.Reason ?? "");
+    const active = activeSet.has(key) || (history.activeOffenses ?? history.ActiveOffenses)
+      ? activeSet.has(key)
+      : (() => {
+          const issuedMs = issued ? new Date(issued).getTime() : 0;
+          return issuedMs > 0 && (Date.now() - issuedMs) < (730 * 24 * 60 * 60 * 1000);
+        })();
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${issued.replace("T", " ").slice(0, 19)}</td>

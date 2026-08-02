@@ -1,5 +1,6 @@
 using NL.Core;
 using NL.Core.Security;
+using NL.Core.Sp;
 using NL.Fork.Core;
 using NL.Identity;
 using NL.Identity.Core;
@@ -11,6 +12,8 @@ using NL.Server;
 using NL.Server.Core.Integration;
 using NL.Server.Core.Security;
 using NL.SessionHost.Web;
+using NL.Social;
+using NL.Social.Core;
 using NL.Web.Shared;
 
 var security = NlSecuritySettings.LoadFromEnvironment();
@@ -30,6 +33,8 @@ NlPaths.EnsureRoot();
 
 var identitySettings = NlIdentitySettings.LoadFromEnvironment();
 var identityHost = new NlIdentityHost(identitySettings);
+var socialSettings = NlSocialSettings.LoadFromEnvironment();
+var socialHost = new NlSocialHost(socialSettings);
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls($"http://{bindHost}:{httpPort}");
@@ -45,6 +50,8 @@ builder.Services.AddSingleton(bus);
 builder.Services.AddSingleton(moderation);
 builder.Services.AddSingleton(identitySettings);
 builder.Services.AddSingleton(identityHost);
+builder.Services.AddSingleton(socialSettings);
+builder.Services.AddSingleton(socialHost);
 builder.Services.AddSingleton(demoSettings);
 builder.Services.AddSingleton(spectatorSettings);
 builder.Services.AddSingleton(hardeningSettings);
@@ -55,6 +62,11 @@ builder.Services.AddNlWebSecurity(security);
 if (demoSettings.Enabled)
 {
     builder.Services.AddHostedService<NlDemoHostedService>();
+}
+
+if (socialSettings.Enabled && socialSettings.Mode != NlSocialMode.Off)
+{
+    builder.Services.AddHostedService<NlLiveOnlyHostedService>();
 }
 
 var app = builder.Build();
@@ -75,7 +87,7 @@ app.MapGet("/api/v1/session/manifest", (BusHostState b, HttpContext ctx) =>
 app.MapGet("/api/v1/session", (BusHostState b, HttpContext ctx) =>
     Results.Json(b.GetStatus(NlWebSecurityExtensions.IsAuthorized(ctx))));
 
-app.MapPost("/api/v1/session/admit", async (BusHostState b, NlIdentityHost identity, NlAdmitPlayerRequest body, CancellationToken ct) =>
+app.MapPost("/api/v1/session/admit", async (BusHostState b, NlIdentityHost identity, NlSocialHost social, NlAdmitPlayerRequest body, CancellationToken ct) =>
 {
     if (string.IsNullOrWhiteSpace(body.PlayerId))
     {
@@ -84,7 +96,7 @@ app.MapPost("/api/v1/session/admit", async (BusHostState b, NlIdentityHost ident
 
     try
     {
-        return Results.Json(await b.AdmitAsync(body, identity, ct));
+        return Results.Json(await b.AdmitAsync(body, identity, social, ct));
     }
     catch (ArgumentException ex)
     {
@@ -163,6 +175,71 @@ app.MapGet("/api/v1/identity/accounts/{accountId}", (NlIdentityHost host, string
 app.MapGet("/api/v1/identity/audit", (NlIdentityHost host, int? count) =>
     Results.Json(host.Audit.ReadRecent(count ?? 50)));
 
+app.MapGet("/api/v1/social/settings", (NlSocialSettings s) => Results.Json(s.ToPublicInfo()));
+
+app.MapGet("/api/v1/social/join-requirements", () =>
+    Results.Json(JoinRequirementsStore.LoadOrDefault(NlPaths.JoinRequirements)));
+
+app.MapPut("/api/v1/social/join-requirements", async (HttpRequest req) =>
+{
+    var body = await req.ReadFromJsonAsync<JoinRequirements>();
+    if (body is null)
+    {
+        return Results.BadRequest(new { error = "Invalid join requirements JSON." });
+    }
+
+    JoinRequirementsStore.Save(NlPaths.JoinRequirements, body);
+    return Results.Json(body);
+});
+
+app.MapGet("/api/v1/social/streamer-config", (NlSocialHost host, string? streamer) =>
+{
+    var streamerId = string.IsNullOrWhiteSpace(streamer) ? NlPaths.DefaultStreamerId : streamer.Trim();
+    return Results.Json(host.StreamerStore.GetOrDefault(streamerId));
+});
+
+app.MapPut("/api/v1/social/streamer-config", (NlSocialHost host, StreamerSocialConfig body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.StreamerId))
+    {
+        return Results.BadRequest(new { error = "streamerId required." });
+    }
+
+    host.StreamerStore.Save(body);
+    host.Cache.InvalidateAll();
+    return Results.Json(body);
+});
+
+app.MapGet("/api/v1/social/live-status", async (NlSocialHost host, string? streamer, CancellationToken ct) =>
+{
+    var streamerId = string.IsNullOrWhiteSpace(streamer) ? NlPaths.DefaultStreamerId : streamer.Trim();
+    var config = host.Gate.GetStreamerConfig(streamerId);
+    var status = await host.LiveMonitor.GetStatusAsync(config, ct);
+    host.Cache.SetLive(streamerId, status);
+    return Results.Json(status);
+});
+
+app.MapPost("/api/v1/social/link", (NlSocialHost host, SocialLinkRequest body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.PlayerId))
+    {
+        return Results.BadRequest(new { error = "playerId required." });
+    }
+
+    var links = host.Gate.ResolveLinks(body.PlayerId.Trim(), new SocialLinkInput
+    {
+        TwitchUserId = body.TwitchUserId,
+        YouTubeChannelId = body.YouTubeChannelId,
+        KickUserId = body.KickUserId,
+        DiscordUserId = body.DiscordUserId,
+    });
+    host.Cache.InvalidateAll();
+    return Results.Json(links);
+});
+
+app.MapGet("/api/v1/social/links/{playerId}", (NlSocialHost host, string playerId) =>
+    Results.Json(host.LinkStore.GetOrDefault(playerId)));
+
 app.MapPut("/api/v1/session/profile", async (BusHostState b, HttpRequest req) =>
 {
     var profile = await req.ReadFromJsonAsync<SessionProfileFile>();
@@ -181,10 +258,10 @@ app.MapPost("/api/v1/session/bus-defaults", (BusHostState b, string? config) =>
     return Results.Ok(b.GetStatus(includeSecrets: true));
 });
 
-app.MapPost("/api/v1/session/start", async (BusHostState b, HttpRequest req, CancellationToken ct) =>
+app.MapPost("/api/v1/session/start", async (BusHostState b, NlSocialHost social, HttpRequest req, CancellationToken ct) =>
 {
     var body = await req.ReadFromJsonAsync<StartSessionRequest>();
-    return await b.StartAsync(body?.ReplayOnce ?? false, ct);
+    return await b.StartAsync(body?.ReplayOnce ?? false, ct, social);
 });
 
 app.MapPost("/api/v1/session/stop", (BusHostState b) => b.Stop());
@@ -198,11 +275,29 @@ app.MapGet("/api/v1/moderation/recent", async (ModerationHostState m, string? st
     return Results.Json(records);
 });
 
-app.MapGet("/api/v1/moderation/players/{playerId}/history", (ModerationHostState m, string playerId, string? streamer) =>
+app.MapGet("/api/v1/moderation/players/{playerId}/history", (ModerationHostState m, string playerId, string? streamer, bool? includeArchived) =>
 {
     var streamerId = string.IsNullOrWhiteSpace(streamer) ? NlPaths.DefaultStreamerId : streamer.Trim();
     var history = m.Moderation.GetOffenseHistory(streamerId, playerId);
-    return history is null ? Results.NotFound(new { error = $"Unknown SP '{playerId}'." }) : Results.Json(history);
+    if (history is null)
+    {
+        return Results.NotFound(new { error = $"Unknown SP '{playerId}'." });
+    }
+
+    if (includeArchived == false)
+    {
+        return Results.Json(new
+        {
+            history.StreamerId,
+            history.Standing,
+            history.ActiveOffenseCount,
+            offenses = history.ActiveOffenses,
+            activeOffenses = history.ActiveOffenses,
+            archivedOffenses = Array.Empty<object>(),
+        });
+    }
+
+    return Results.Json(history);
 });
 
 app.MapPost("/api/v1/moderation/profiles", (ModerationHostState m, CreateProfileRequest body) =>
@@ -406,6 +501,7 @@ app.MapPost("/api/v1/editor/evaluate", async (HttpRequest req) =>
 app.MapPost("/api/v1/editor/apply", async (
     NlWebEditorStore store,
     BusHostState bus,
+    NlSocialHost social,
     EditorApplyRequest? body,
     CancellationToken ct) =>
 {
@@ -435,7 +531,7 @@ app.MapPost("/api/v1/editor/apply", async (
         await bus.WaitForIdleAsync(ct);
     }
 
-    var start = await bus.StartAsync(replayOnce: false, ct);
+    var start = await bus.StartAsync(replayOnce: false, ct, social);
     return start;
 });
 
@@ -462,6 +558,7 @@ Console.WriteLine($"Public mode            → {security.PublicMode}");
 Console.WriteLine($"Demo loop (Phase G)    → {demoSettings.Enabled}");
 Console.WriteLine($"Spectator UX (Phase H) → triggers={spectatorSettings.TriggersEnabled}, rate={spectatorSettings.TriggerRatePerMinute}/min");
 Console.WriteLine($"Hardening (Phase K)    → {hardeningSettings.Enabled} (admit={hardeningSettings.AdmitRatePerMinute}/min, ws max={hardeningSettings.WebSocketMaxConnections})");
+Console.WriteLine($"Social gate (Phase M)  → {socialSettings.Enabled} mode={socialSettings.Mode}");
 Console.WriteLine($"Web editor (Phase I)   → /editor.html + /api/v1/editor/*");
 if (demoSettings.Enabled)
 {
@@ -540,4 +637,13 @@ internal sealed class LinkPlatformRequest
     public string? Platform { get; set; }
     public string? ExternalUserId { get; set; }
     public string? RefreshToken { get; set; }
+}
+
+internal sealed class SocialLinkRequest
+{
+    public string? PlayerId { get; set; }
+    public string? TwitchUserId { get; set; }
+    public string? YouTubeChannelId { get; set; }
+    public string? KickUserId { get; set; }
+    public string? DiscordUserId { get; set; }
 }

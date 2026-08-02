@@ -10,6 +10,7 @@ namespace NL.Core.Sp;
 public sealed record JoinRequirements(
     bool RequireFollow = false,
     bool RequireSubscription = false,
+    bool RequireDiscordMember = false,
     int MinAccountAgeDays = 0,
     SpVerification RequiredVerification = SpVerification.None,
     int MaxActiveOffenses = int.MaxValue,
