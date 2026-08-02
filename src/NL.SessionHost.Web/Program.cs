@@ -152,8 +152,13 @@ app.MapPost("/api/v1/session/admit", async (BusHostState b, NlIdentityHost ident
 
 app.MapGet("/api/v1/identity/settings", (NlIdentitySettings s) => Results.Json(s.ToPublicInfo()));
 
-app.MapPost("/api/v1/identity/accounts", (NlIdentityHost host, CreateIdentityAccountRequest body) =>
+app.MapPost("/api/v1/identity/accounts", (NlIdentityHost host, NlIdentitySettings settings, CreateIdentityAccountRequest body) =>
 {
+    if (!settings.Enabled)
+    {
+        return Results.Json(new { error = "Identity service disabled." }, statusCode: 503);
+    }
+
     if (string.IsNullOrWhiteSpace(body.DisplayName))
     {
         return Results.BadRequest(new { error = "displayName required." });
@@ -163,8 +168,13 @@ app.MapPost("/api/v1/identity/accounts", (NlIdentityHost host, CreateIdentityAcc
     return Results.Json(new { accountId = account.Id, displayName = account.DisplayName });
 });
 
-app.MapPost("/api/v1/identity/link", (NlIdentityHost host, LinkPlatformRequest body) =>
+app.MapPost("/api/v1/identity/link", (NlIdentityHost host, NlIdentitySettings settings, LinkPlatformRequest body) =>
 {
+    if (!settings.Enabled)
+    {
+        return Results.Json(new { error = "Identity service disabled." }, statusCode: 503);
+    }
+
     if (string.IsNullOrWhiteSpace(body.AccountId) || string.IsNullOrWhiteSpace(body.ExternalUserId))
     {
         return Results.BadRequest(new { error = "accountId and externalUserId required." });
@@ -198,6 +208,34 @@ app.MapPost("/api/v1/identity/link", (NlIdentityHost host, LinkPlatformRequest b
     }
 });
 
+app.MapDelete("/api/v1/identity/link", (NlIdentityHost host, NlIdentitySettings settings, LinkPlatformRequest body) =>
+{
+    if (!settings.Enabled)
+    {
+        return Results.Json(new { error = "Identity service disabled." }, statusCode: 503);
+    }
+
+    if (string.IsNullOrWhiteSpace(body.AccountId) || string.IsNullOrWhiteSpace(body.ExternalUserId))
+    {
+        return Results.BadRequest(new { error = "accountId and externalUserId required." });
+    }
+
+    if (!NlPlatformNames.TryParse(body.Platform, out var platform))
+    {
+        return Results.BadRequest(new { error = "Invalid platform." });
+    }
+
+    try
+    {
+        host.Identity.UnlinkPlatform(body.AccountId.Trim(), platform, body.ExternalUserId.Trim());
+        return Results.Ok(new { ok = true });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+});
+
 app.MapGet("/api/v1/identity/accounts/{accountId}", (NlIdentityHost host, string accountId) =>
 {
     var account = host.Identity.GetAccount(accountId);
@@ -216,6 +254,78 @@ app.MapGet("/api/v1/identity/accounts/{accountId}", (NlIdentityHost host, string
                 hasToken = !string.IsNullOrWhiteSpace(l.ProtectedRefreshToken),
             }),
         });
+});
+
+app.MapGet("/api/v1/identity/accounts/by-platform/{platform}/{externalUserId}", (NlIdentityHost host, string platform, string externalUserId) =>
+{
+    if (!NlPlatformNames.TryParse(platform, out var parsed))
+    {
+        return Results.BadRequest(new { error = "Invalid platform." });
+    }
+
+    var account = host.Identity.GetAccountByPlatform(parsed, externalUserId);
+    return account is null
+        ? Results.NotFound(new { error = "No NL account linked to this platform user." })
+        : Results.Json(new { accountId = account.Id, account.DisplayName });
+});
+
+app.MapGet("/api/v1/identity/oauth/steam/authorize", (
+    NlIdentityHost host,
+    NlIdentitySettings settings,
+    HttpContext ctx,
+    string accountId,
+    string? returnUrl) =>
+{
+    if (!settings.Enabled)
+    {
+        return Results.Json(new { error = "Identity service disabled." }, statusCode: 503);
+    }
+
+    if (string.IsNullOrWhiteSpace(accountId))
+    {
+        return Results.BadRequest(new { error = "accountId required." });
+    }
+
+    if (host.Identity.GetAccount(accountId.Trim()) is null)
+    {
+        return Results.NotFound(new { error = "Account not found." });
+    }
+
+    var publicBase = ResolveIdentityPublicBase(ctx, settings);
+    var redirect = host.SteamOpenId.BuildAuthorizeRedirect(accountId.Trim(), returnUrl, publicBase);
+    return Results.Redirect(redirect);
+});
+
+app.MapGet("/api/v1/identity/oauth/steam/callback", async (
+    NlIdentityHost host,
+    NlIdentitySettings settings,
+    HttpContext ctx,
+    CancellationToken ct) =>
+{
+    if (!settings.Enabled)
+    {
+        return Results.Content("Identity service disabled.", "text/plain", statusCode: 503);
+    }
+
+    var query = ctx.Request.Query.ToDictionary(
+        kv => kv.Key,
+        kv => kv.Value.ToString(),
+        StringComparer.OrdinalIgnoreCase);
+
+    var result = await host.SteamOpenId.HandleCallbackAsync(query, host.Identity, ct);
+    var landing = string.IsNullOrWhiteSpace(result.ReturnUrl)
+        ? "/identity-link.html"
+        : result.ReturnUrl!;
+
+    var sep = landing.Contains('?') ? "&" : "?";
+    if (result.Success)
+    {
+        return Results.Redirect(
+            $"{landing}{sep}linked=steam&accountId={Uri.EscapeDataString(result.AccountId!)}&steamId={Uri.EscapeDataString(result.SteamId!)}");
+    }
+
+    return Results.Redirect(
+        $"{landing}{sep}error={Uri.EscapeDataString(result.Error ?? "Steam sign-in failed.")}");
 });
 
 app.MapGet("/api/v1/identity/audit", (NlIdentityHost host, int? count) =>
@@ -1047,6 +1157,7 @@ Console.WriteLine($"Hardening (Phase K)    → {hardeningSettings.Enabled} (admi
 Console.WriteLine($"Social gate (Phase M)  → {socialSettings.Enabled} mode={socialSettings.Mode}");
 Console.WriteLine($"Fork catalog (Phase N) → {catalogSettings.Enabled} manifest={NlForkCatalogPaths.Manifest}");
 Console.WriteLine($"Fork orchestrator (O)  → {orchestratorSettings.Enabled} mode={orchestratorSettings.Mode} provisioner={orchestratorHost.ResolveProvisionerKind()}");
+Console.WriteLine($"Identity (Phase L)       → {identitySettings.Enabled} mode={identitySettings.Mode} steamOpenId=/identity-link.html");
 Console.WriteLine($"Partnership (Phase Q)  → {partnershipSettings.Enabled} gate={partnershipSettings.RequireGateAtAdmit}");
 Console.WriteLine($"NL Client (Phase R)    → /nl-client.html + NL.Client CLI");
 Console.WriteLine($"Fleet ops (Phase S)    → {fleetSettings.Enabled} /fleet-ops.html max={fleetSettings.Autoscale.MaxConcurrentSessions}");
@@ -1067,6 +1178,17 @@ else
 }
 
 app.Run();
+
+static string ResolveIdentityPublicBase(HttpContext ctx, NlIdentitySettings settings)
+{
+    if (!string.IsNullOrWhiteSpace(settings.PublicBaseUrl))
+    {
+        return settings.PublicBaseUrl.TrimEnd('/');
+    }
+
+    var req = ctx.Request;
+    return $"{req.Scheme}://{req.Host}";
+}
 
 static string ResolveSamplesRoot()
 {

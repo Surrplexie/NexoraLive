@@ -48,6 +48,7 @@
         playerId: document.getElementById('player-id').value.trim(),
         streamerId: document.getElementById('streamer-id').value.trim(),
         platformUserId: document.getElementById('platform-user').value.trim(),
+        nlAccountId: document.getElementById('nl-account-id').value.trim() || localStorage.getItem('nlAccountId'),
         platform: 'steam',
         atOwnRiskAcknowledged: document.getElementById('at-own-risk-ack').checked,
         mode: mode(),
@@ -89,4 +90,37 @@
   };
 
   loadStreamers().catch(function () {});
+
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('linked') === 'steam') {
+    if (params.get('accountId')) {
+      document.getElementById('nl-account-id').value = params.get('accountId');
+      localStorage.setItem('nlAccountId', params.get('accountId'));
+    }
+    if (params.get('steamId')) {
+      document.getElementById('platform-user').value = params.get('steamId');
+      localStorage.setItem('nlSteam64', params.get('steamId'));
+    }
+    setStatus('Steam linked for join flow.');
+    window.history.replaceState({}, '', '/nl-client.html');
+  }
+  if (params.get('error')) {
+    setStatus(decodeURIComponent(params.get('error')), true);
+    window.history.replaceState({}, '', '/nl-client.html');
+  }
+
+  var savedAccount = localStorage.getItem('nlAccountId');
+  var savedSteam = localStorage.getItem('nlSteam64');
+  if (savedAccount) document.getElementById('nl-account-id').value = savedAccount;
+  if (savedSteam) document.getElementById('platform-user').value = savedSteam;
+
+  document.getElementById('steam-sign-in').onclick = function () {
+    var accountId = document.getElementById('nl-account-id').value.trim() || localStorage.getItem('nlAccountId');
+    if (!accountId) {
+      window.location.href = '/identity-link.html';
+      return;
+    }
+    window.location.href = '/api/v1/identity/oauth/steam/authorize?accountId='
+      + encodeURIComponent(accountId) + '&returnUrl=' + encodeURIComponent('/nl-client.html');
+  };
 })();

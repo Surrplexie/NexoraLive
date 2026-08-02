@@ -22,16 +22,18 @@ public sealed class NlIdentitySettings
 
     public bool EnforceOneLinkPerPlatform { get; init; } = true;
 
+    /// <summary>Public HTTP base for OAuth callbacks (e.g. http://127.0.0.1:27020).</summary>
+    public string? PublicBaseUrl { get; init; }
+
+    /// <summary>Steam OpenID realm; defaults to public base URL.</summary>
+    public string? SteamRealm { get; init; }
+
     public static NlIdentitySettings LoadFromEnvironment()
     {
-        var enabled = string.Equals(
-            Environment.GetEnvironmentVariable(EnabledVariable),
-            "1",
-            StringComparison.OrdinalIgnoreCase)
-            || string.Equals(
-                Environment.GetEnvironmentVariable(EnabledVariable),
-                "true",
-                StringComparison.OrdinalIgnoreCase);
+        var enabledRaw = Environment.GetEnvironmentVariable(EnabledVariable);
+        var enabled = enabledRaw is null
+            || string.Equals(enabledRaw, "1", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(enabledRaw, "true", StringComparison.OrdinalIgnoreCase);
 
         var modeRaw = Environment.GetEnvironmentVariable(ModeVariable)?.Trim();
         var mode = modeRaw?.ToLowerInvariant() switch
@@ -57,6 +59,9 @@ public sealed class NlIdentitySettings
             Enabled = enabled,
             Mode = mode,
             StrictUnknown = strictUnknown,
+            PublicBaseUrl = Environment.GetEnvironmentVariable("NL_PUBLIC_BASE_URL")
+                ?? Environment.GetEnvironmentVariable("NL_SESSION_HTTP_URL"),
+            SteamRealm = Environment.GetEnvironmentVariable("NL_STEAM_OPENID_REALM"),
         };
     }
 
@@ -66,6 +71,14 @@ public sealed class NlIdentitySettings
         mode = Mode.ToString(),
         strictUnknown = StrictUnknown,
         steamConfigured = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY")),
+        steamOpenIdEnabled = Enabled,
+        publicBaseUrl = PublicBaseUrl,
+        oauth = new
+        {
+            steamAuthorize = "/api/v1/identity/oauth/steam/authorize",
+            steamCallback = "/api/v1/identity/oauth/steam/callback",
+            linkUi = "/identity-link.html",
+        },
         storePath = NlIdentityPaths.Root,
     };
 }
@@ -107,7 +120,11 @@ public sealed class NlIdentityHost
             BanChecker,
             SubscriptionChecker,
             Identity,
-            settings);
+            settings,
+            Audit);
+
+        OAuthStates = new JsonOAuthStateStore();
+        SteamOpenId = new SteamOpenIdService(OAuthStates, settings);
     }
 
     public NlIdentitySettings Settings { get; }
@@ -125,6 +142,10 @@ public sealed class NlIdentityHost
     public IMultiplayerSubscriptionChecker SubscriptionChecker { get; }
 
     public NlOwnershipAdmissionGate OwnershipGate { get; }
+
+    public JsonOAuthStateStore OAuthStates { get; }
+
+    public SteamOpenIdService SteamOpenId { get; }
 }
 
 internal sealed class OffGameOwnershipVerifier : IGameOwnershipVerifier

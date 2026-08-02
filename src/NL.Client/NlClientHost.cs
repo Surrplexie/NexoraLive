@@ -153,6 +153,7 @@ internal sealed class InProcessNlClientSessionApi : INlClientSessionApi
             PlatformUserId = request.PlatformUserId,
             Platform = request.Platform,
             AppId = request.AppId,
+            NlAccountId = request.NlAccountId,
             AtOwnRiskAcknowledged = request.AtOwnRiskAcknowledged,
         });
 

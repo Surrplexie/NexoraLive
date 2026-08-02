@@ -37,6 +37,11 @@ public sealed class NlOwnershipAdmissionGate
             return null;
         }
 
+        if (!_settings.Enabled)
+        {
+            return null;
+        }
+
         if (context.Mode == NlOwnershipMode.Off)
         {
             return Deny("Game ownership required but NL_OWNERSHIP_MODE=off.");

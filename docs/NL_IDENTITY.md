@@ -1,19 +1,39 @@
 # NL Identity — Phase L
 
-Platform identity, game ownership verification, and anti-alt linking for NL session admission.
+Platform identity, game ownership verification, anti-alt linking, and **Steam OpenID** browser sign-in for NL session admission.
 
 ## Enable
 
 ```powershell
-$env:NL_IDENTITY_ENABLED = "1"
+$env:NL_IDENTITY_ENABLED = "true"
 $env:NL_OWNERSHIP_MODE = "mock"   # mock | live | off
-# Optional live Steam:
+$env:NL_PUBLIC_BASE_URL = "http://127.0.0.1:27020"  # OAuth callback base (required behind reverse proxy)
+# Optional live Steam Web API (ownership + bans at admit):
 # $env:STEAM_WEB_API_KEY = "..."
+# $env:NL_STEAM_OPENID_REALM = "http://127.0.0.1:27020"
 # $env:NL_IDENTITY_ENCRYPTION_KEY = "<32-byte-base64>"  # Linux token encryption
 ```
 
 Copy `samples/identity/mock-ownership.json` to `%LOCALAPPDATA%\NL\identity\mock-ownership.json`
 (or `$NL_DATA_ROOT/identity/`).
+
+## Steam OpenID sign-in (browser)
+
+1. Open **`/identity-link.html`** (or use **Sign in with Steam** on `/nl-client.html`)
+2. **Create account** → receives `accountId`
+3. **Sign in with Steam** → redirects to Steam → callback links Steam64 to account
+4. Use linked Steam64 + `nlAccountId` on admit / join flow
+
+### OAuth routes
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/v1/identity/oauth/steam/authorize?accountId=…&returnUrl=…` | Start Steam OpenID redirect |
+| GET | `/api/v1/identity/oauth/steam/callback` | Verify OpenID, link platform, redirect to `returnUrl` |
+
+CSRF protection: short-lived `state` token in `identity/oauth-state.json`.
+
+Manual linking (API / dev): `POST /api/v1/identity/link` still works without browser.
 
 ## Session profile (ownership required)
 
@@ -40,7 +60,7 @@ See `samples/identity/session-profile-ownership.json`.
   "platformUserId": "76561198000000001",
   "gameId": "hello-fork",
   "appId": "440",
-  "nlAccountId": "optional-nl-account-guid"
+  "nlAccountId": "nl-account-guid-from-identity-linker"
 }
 ```
 
@@ -50,11 +70,15 @@ Response includes `ownershipStatus` on denial.
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/api/v1/identity/settings` | Public mode info |
+| GET | `/api/v1/identity/settings` | Public mode + OAuth URLs |
 | POST | `/api/v1/identity/accounts` | Create NL account |
-| POST | `/api/v1/identity/link` | Link Steam/Epic/… (one per platform globally) |
+| POST | `/api/v1/identity/link` | Link Steam/Epic/… manually |
+| DELETE | `/api/v1/identity/link` | Unlink platform |
 | GET | `/api/v1/identity/accounts/{id}` | Account + links |
+| GET | `/api/v1/identity/accounts/by-platform/{platform}/{externalUserId}` | Reverse lookup |
 | GET | `/api/v1/identity/audit` | Recent audit events |
+
+Returns **503** when `NL_IDENTITY_ENABLED=false`.
 
 ## Anti-alt rule
 
@@ -74,4 +98,7 @@ Live Xbox/PS enforcement requires platform SDK partnership (documented stub).
 
 ```powershell
 powershell -File scripts/nl-identity-smoke.ps1
+dotnet test tests/NL.Identity.Tests
 ```
+
+Browser test: Session Host running → `/identity-link.html` → create account → Sign in with Steam (requires reachable `NL_PUBLIC_BASE_URL` for callback).

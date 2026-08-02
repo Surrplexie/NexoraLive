@@ -427,7 +427,7 @@ sessions. Anti-pirate / anti-alt from nl.txt section 5.
 - [x] **Identity REST API** — `/api/v1/identity/*` on session server
 - [x] **Tests** — `tests/NL.Identity.Tests` + `scripts/nl-identity-smoke.ps1`
 - [x] **Docs** — [docs/NL_IDENTITY.md](docs/NL_IDENTITY.md)
-- [ ] **Steam OpenID sign-in flow** — live OAuth redirect UI (API link endpoint works today)
+- [x] **Steam OpenID sign-in flow** — live OAuth redirect UI at `/identity-link.html` + `/api/v1/identity/oauth/steam/*`
 
 **Exit criteria:** Player without ownership of title X denied at admit — **met** via mock Steam app
 440/730 matrix and integration tests.

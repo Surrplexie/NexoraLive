@@ -32,6 +32,7 @@ public sealed record NlClientJoinRequest(
     string? PlatformUserId = null,
     string? Platform = null,
     string? AppId = null,
+    string? NlAccountId = null,
     bool AtOwnRiskAcknowledged = false,
     NlClientMode Mode = NlClientMode.Player);
 

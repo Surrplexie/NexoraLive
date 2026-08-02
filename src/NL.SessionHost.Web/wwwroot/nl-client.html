@@ -12,6 +12,7 @@
     <p class="sub">Sign in, pick a streamer, verify ownership, join fork session (Phase R)</p>
     <nav class="nav">
       <a href="/">Demo</a>
+      <a href="/identity-link.html">Identity</a>
       <a href="/nl-client.html" aria-current="page">NL Client</a>
       <a href="/nl-client-mobile.html">Mobile companion</a>
       <a href="/partnership.html">Partnership</a>
@@ -33,11 +34,20 @@
   </section>
 
   <section class="card operator-panel">
+    <h2>Platform identity</h2>
+    <p class="sub">Link Steam via OpenID for ownership verification. <a href="/identity-link.html">Open identity linker</a></p>
+    <div class="grid">
+      <label>NL account id <input id="nl-account-id" placeholder="from identity linker" /></label>
+      <label>Platform user (Steam64) <input id="platform-user" placeholder="linked via Steam sign-in" /></label>
+    </div>
+    <button type="button" id="steam-sign-in">Sign in with Steam</button>
+  </section>
+
+  <section class="card operator-panel">
     <h2>Join</h2>
     <div class="grid">
       <label>Player id <input id="player-id" value="sp-demo-1" /></label>
       <label>Streamer <input id="streamer-id" value="default-streamer" /></label>
-      <label>Platform user (Steam64) <input id="platform-user" value="76561198000000001" /></label>
       <label class="wide"><input type="checkbox" id="at-own-risk-ack" /> At-own-risk acknowledged</label>
     </div>
     <div class="actions">
