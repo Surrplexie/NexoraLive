@@ -32,8 +32,8 @@ public class SteamOpenIdServiceTests
             var url = svc.BuildAuthorizeRedirect("acct-99", "/nl-client.html", "http://test.local");
             Assert.StartsWith("https://steamcommunity.com/openid/login?", url);
             Assert.Contains("openid.return_to=", url);
-            Assert.Contains("state=", url);
             Assert.Contains("openid.realm=", url);
+            Assert.Contains(Uri.EscapeDataString("http://test.local/api/v1/identity/oauth/steam/callback"), url);
         }
         finally
         {
