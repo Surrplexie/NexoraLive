@@ -10,6 +10,7 @@
     <ProjectReference Include="..\NL.Server\NL.Server.csproj" />
     <ProjectReference Include="..\NL.Fork.Core\NL.Fork.Core.csproj" />
     <ProjectReference Include="..\NL.Fork.Orchestrator\NL.Fork.Orchestrator.csproj" />
+    <ProjectReference Include="..\NL.Client\NL.Client.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\NL.Web.Shared\NlWebSecurityExtensions.cs" Link="Shared\NlWebSecurityExtensions.cs" />

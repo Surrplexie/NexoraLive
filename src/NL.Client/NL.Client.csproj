@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>NL.Client</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>NL.Client</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NL.Client.Core\NL.Client.Core.csproj" />
+    <ProjectReference Include="..\NL.Core\NL.Core.csproj" />
+    <ProjectReference Include="..\NL.Server\NL.Server.csproj" />
+    <ProjectReference Include="..\NL.Server.Core\NL.Server.Core.csproj" />
+    <ProjectReference Include="..\NL.Social\NL.Social.csproj" />
+  </ItemGroup>
+
+</Project>

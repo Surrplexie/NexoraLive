@@ -3,8 +3,8 @@
 This tracks progress against the ideas in [`NexoraLive.txt`](NexoraLive.txt), broken into phases
 roughly ordered by dependency (each later phase leans on earlier ones).
 
-**Built:** Phases 0–K + **Phase P** (fork runtime) + **Phase L** (platform identity) + **Phase M** (live social gate) + **Phase N** (fork catalog) + **Phase O** (fork orchestrator) + **Phase Q** (partnerships).
-**Next track:** Phases R–S. See
+**Built:** Phases 0–K + **Phase P** (fork runtime) + **Phase L** (platform identity) + **Phase M** (live social gate) + **Phase N** (fork catalog) + **Phase O** (fork orchestrator) + **Phase Q** (partnerships) + **Phase R** (NL Client).
+**Next track:** Phase S. See
 [docs/NL_FORK_PLATFORM.md](docs/NL_FORK_PLATFORM.md).
 
 Status legend: `[x]` done, `[~]` partially done / in progress, `[ ]` not started.
@@ -546,15 +546,15 @@ banner; unpartnered requires acknowledgment once per user per title.
 Optional unified client for join flow, ownership proof, and session UX (players may still use
 normal game client where fork allows direct connect).
 
-- [ ] **`NL.Client` app** — cross-platform shell: sign-in, link platforms, browse live streamers
-- [ ] **Join flow** — pick streamer → ownership check → admit API → receive connect manifest
-- [ ] **Launch or deep-link** — start game with connect params, or NL-modified launcher for
+- [x] **`NL.Client` app** — cross-platform shell: sign-in, link platforms, browse live streamers
+- [x] **Join flow** — pick streamer → ownership check → admit API → receive connect manifest
+- [x] **Launch or deep-link** — start game with connect params, or NL-modified launcher for
       fork endpoints
-- [ ] **Block stray invites** — intercept / fail native multiplayer invites to NLS endpoints
-- [ ] **In-session overlay** — SP standing, warnings, clip trigger (nl.txt overlay / clips sync)
-- [ ] **Streamer variant** — same app, elevated actions (NLS volatile controls, hotkeys)
-- [ ] **Mobile companion (subset)** — mod notifications + kick/warn (full mobile admin deferred)
-- [ ] **Tests** — join flow integration against mock orchestrator + admit API
+- [x] **Block stray invites** — intercept / fail native multiplayer invites to NLS endpoints
+- [x] **In-session overlay** — SP standing, warnings, clip trigger (nl.txt overlay / clips sync)
+- [x] **Streamer variant** — same app, elevated actions (NLS volatile controls, hotkeys)
+- [x] **Mobile companion (subset)** — mod notifications + kick/warn (full mobile admin deferred)
+- [x] **Tests** — join flow integration against mock orchestrator + admit API
 
 **Exit criteria:** SP opens NL Client → joins live streamer's fork session with ownership
 verified end-to-end.

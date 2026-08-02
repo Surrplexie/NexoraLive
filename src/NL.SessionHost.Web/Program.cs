@@ -5,6 +5,8 @@ using NL.Fork.Core;
 using NL.Fork.Catalog;
 using NL.Partnership;
 using NL.Partnership.Core;
+using NL.Client;
+using NL.Client.Core;
 using NL.Fork.Catalog.Core;
 using NL.Fork.Orchestrator;
 using NL.Fork.Orchestrator.Core;
@@ -54,6 +56,7 @@ builder.WebHost.UseUrls($"http://{bindHost}:{httpPort}");
 
 var bus = new BusHostState(bindHost, httpPort, wsPort, busToken, modPort);
 var moderation = new ModerationHostState(moderationLog, spStore);
+var clientHost = CreateClientHost(bus, moderation, identityHost, socialHost, catalogHost, partnershipHost, orchestratorHost);
 if (File.Exists(NlPaths.SessionProfile))
 {
     bus.SaveProfile(NlSessionRunner.LoadProfile(NlPaths.SessionProfile));
@@ -71,6 +74,7 @@ builder.Services.AddSingleton(orchestratorSettings);
 builder.Services.AddSingleton(orchestratorHost);
 builder.Services.AddSingleton(partnershipSettings);
 builder.Services.AddSingleton(partnershipHost);
+builder.Services.AddSingleton(clientHost);
 builder.Services.AddSingleton(demoSettings);
 builder.Services.AddSingleton(spectatorSettings);
 builder.Services.AddSingleton(hardeningSettings);
@@ -522,6 +526,71 @@ app.MapPost("/api/v1/partnership/sdk/ownership-token", (PartnershipOwnershipToke
     });
 });
 
+app.MapGet("/api/v1/client/settings", (NlClientHost client) => Results.Json(client.ToPublicSettings()));
+
+app.MapGet("/api/v1/client/streamers", async (NlClientHost client, CancellationToken ct) =>
+    Results.Json(await client.ListStreamersAsync(ct)));
+
+app.MapPost("/api/v1/client/join-flow", async (NlClientHost client, NlClientJoinRequest body, CancellationToken ct) =>
+{
+    var result = await client.JoinFlow.ExecuteAsync(body, ct);
+    return Results.Json(result);
+});
+
+app.MapPost("/api/v1/client/launch-params", (NlClientManifest body) =>
+{
+    var launch = NlClientLaunchBuilder.Build(body);
+    return Results.Json(launch);
+});
+
+app.MapPost("/api/v1/client/block-invite", (NlClientBlockInviteRequest body, BusHostState bus) =>
+{
+    var host = bus.GetManifest().HttpBaseUrl;
+    var result = NlInviteBlocker.Evaluate(body.InviteUrl ?? "", body.ExpectedHost ?? host);
+    return Results.Json(result);
+});
+
+app.MapGet("/api/v1/client/overlay/{playerId}", (NlClientHost client, ModerationHostState mod, string playerId, string? streamer, BusHostState bus) =>
+{
+    var streamerId = string.IsNullOrWhiteSpace(streamer) ? bus.GetProfile().StreamerId : streamer.Trim();
+    var profile = mod.Moderation.GetOrCreateProfile(playerId, playerId);
+    return Results.Json(NlClientOverlayBuilder.Build(profile, streamerId));
+});
+
+app.MapPost("/api/v1/client/mobile/action", async (ModerationHostState mod, NlClientMobileActionRequest body, CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(body.PlayerId) || string.IsNullOrWhiteSpace(body.Action))
+    {
+        return Results.BadRequest(new { error = "playerId and action required." });
+    }
+
+    var streamerId = string.IsNullOrWhiteSpace(body.StreamerId) ? NL.Core.NlPaths.DefaultStreamerId : body.StreamerId.Trim();
+    var action = body.Action.Trim().ToLowerInvariant();
+    var reason = string.IsNullOrWhiteSpace(body.Reason) ? "mobile-companion" : body.Reason.Trim();
+
+    try
+    {
+        if (action is "warn" or "warning")
+        {
+            await mod.Moderation.IssueWarningAsync(streamerId, body.PlayerId.Trim(), "nl-client-mobile", reason, null, ct);
+        }
+        else if (action is "kick" or "ban")
+        {
+            await mod.Moderation.IssueBanAsync(streamerId, body.PlayerId.Trim(), "nl-client-mobile", reason, null, ct);
+        }
+        else
+        {
+            return Results.BadRequest(new { error = "Unknown action. Use warn or kick." });
+        }
+
+        return Results.Json(new NlClientMobileActionResult(true));
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
 app.MapPut("/api/v1/session/profile", async (BusHostState b, HttpRequest req) =>
 {
     var profile = await req.ReadFromJsonAsync<SessionProfileFile>();
@@ -846,6 +915,7 @@ Console.WriteLine($"Social gate (Phase M)  → {socialSettings.Enabled} mode={so
 Console.WriteLine($"Fork catalog (Phase N) → {catalogSettings.Enabled} manifest={NlForkCatalogPaths.Manifest}");
 Console.WriteLine($"Fork orchestrator (O)  → {orchestratorSettings.Enabled} mode={orchestratorSettings.Mode} provisioner={orchestratorHost.ResolveProvisionerKind()}");
 Console.WriteLine($"Partnership (Phase Q)  → {partnershipSettings.Enabled} gate={partnershipSettings.RequireGateAtAdmit}");
+Console.WriteLine($"NL Client (Phase R)    → /nl-client.html + NL.Client CLI");
 Console.WriteLine($"Web editor (Phase I)   → /editor.html + /api/v1/editor/*");
 if (demoSettings.Enabled)
 {
@@ -916,6 +986,53 @@ static async Task<IResult> IssueModerationAsync(
     {
         return Results.BadRequest(new { error = ex.Message });
     }
+}
+
+static NlClientHost CreateClientHost(
+    BusHostState bus,
+    ModerationHostState moderation,
+    NlIdentityHost identity,
+    NlSocialHost social,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlForkOrchestratorHost orchestrator)
+{
+    NlSessionManifestDto MapManifest()
+    {
+        var m = bus.GetManifest(orchestrator);
+        return new NlSessionManifestDto(
+            m.SessionId,
+            m.StreamerId,
+            m.HttpBaseUrl,
+            m.BridgeConnectUrl,
+            m.AdmitUrl,
+            m.ForkConnectEndpoint,
+            m.PartnershipTier,
+            m.RequiresAtOwnRiskAcknowledgment,
+            m.SessionRunning,
+            m.GameId,
+            m.CatalogMajorVersion);
+    }
+
+    return new NlClientHost(
+        bus.GetProfile,
+        () => bus.Sessions.IsRunning,
+        MapManifest,
+        req => bus.AdmitAsync(req, identity, social, catalog, partnership),
+        (playerId, gameId) =>
+        {
+            var entry = catalog.Catalog.ListGames(true).FirstOrDefault(e =>
+                string.Equals(e.GameId, gameId, StringComparison.OrdinalIgnoreCase));
+            var tier = entry?.Tier ?? PartnershipTier.AtOwnRisk;
+            partnership.Gate.RecordAcknowledgment(playerId, gameId, tier);
+            return Task.FromResult(true);
+        },
+        (playerId, streamerId) =>
+        {
+            var profile = moderation.Moderation.GetOrCreateProfile(playerId, playerId);
+            return Task.FromResult<NlClientOverlayState?>(NlClientOverlayBuilder.Build(profile, streamerId));
+        },
+        social);
 }
 
 internal sealed class StartSessionRequest
@@ -994,4 +1111,10 @@ internal sealed class PartnershipOwnershipTokenRequest
     public string? GameId { get; set; }
     public string? AppId { get; set; }
     public string? Platform { get; set; }
+}
+
+internal sealed class NlClientBlockInviteRequest
+{
+    public string? InviteUrl { get; set; }
+    public string? ExpectedHost { get; set; }
 }
