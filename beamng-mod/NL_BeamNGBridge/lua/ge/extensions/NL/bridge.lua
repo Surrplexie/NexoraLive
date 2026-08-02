@@ -11,13 +11,18 @@
 
 local M = {}
 
+-- BeamNG Lua only supports table.insert(t, index, value); use append helper instead.
+local function listAppend(t, v)
+  t[#t + 1] = v
+end
+
 local EVENT_PATH = nil
 local KICK_QUEUE_PATH = nil
 local CMD_PORT = 27022
 local MAGIC = "SCBN1"
 
 local MOVE_INTERVAL = 0.35
-local CRASH_DV_THRESHOLD = 10.0
+local CRASH_DV_THRESHOLD = 8.0
 local AIRTIME_THRESHOLD = 1.5
 local ROLLOVER_THRESHOLD = 1.75
 local BOUNDARY = {
@@ -30,6 +35,15 @@ local playerName = "Driver"
 local sessionActive = false
 local lastMoveT = 0
 local lastSpeed = 0
+local peakSpeed = 0
+local peakSpeedAge = 0
+local sessionTime = 0
+local lastCrashEmitT = -999
+local CRASH_WINDOW = 0.45
+local CRASH_COOLDOWN = 1.25
+local CRASH_MIN_PEAK = 4.0
+local MAX_SPEED_SANE = 120.0
+local MAX_FRAME_DV = 50.0
 local airtimeAcc = 0
 local rolloverAcc = 0
 local outsideBoundary = false
@@ -178,23 +192,23 @@ local function loadBridgeJson()
   local candidates = {}
   local root = modRoot()
   if root then
-    table.insert(candidates, root .. "/bridge.json")
-    table.insert(candidates, root .. "\\bridge.json")
+    listAppend(candidates, root .. "/bridge.json")
+    listAppend(candidates, root .. "\\bridge.json")
   end
   -- Unpacked mod typical layout: .../mods/unpacked/NL_BeamNGBridge/bridge.json
   local localApp = os.getenv("LOCALAPPDATA")
   if localApp then
     -- BeamNG 0.38+ user data
-    table.insert(candidates, localApp .. "\\BeamNG\\BeamNG.drive\\current\\mods\\unpacked\\NL_BeamNGBridge\\bridge.json")
+    listAppend(candidates, localApp .. "\\BeamNG\\BeamNG.drive\\current\\mods\\unpacked\\NL_BeamNGBridge\\bridge.json")
     for _, ver in ipairs({ "", "0.38", "0.37", "0.36", "0.35", "0.34", "0.33" }) do
       local base = localApp .. "\\BeamNG.drive"
       if ver ~= "" then
         base = base .. "\\" .. ver
       end
-      table.insert(candidates, base .. "\\mods\\unpacked\\NL_BeamNGBridge\\bridge.json")
+      listAppend(candidates, base .. "\\mods\\unpacked\\NL_BeamNGBridge\\bridge.json")
     end
   end
-  table.insert(candidates, "bridge.json")
+  listAppend(candidates, "bridge.json")
 
   for _, path in ipairs(candidates) do
     local f = io.open(path, "r")
@@ -227,6 +241,12 @@ local function loadBridgeJson()
           end
           if type(cfg.crashDvThreshold) == "number" then
             CRASH_DV_THRESHOLD = cfg.crashDvThreshold
+          end
+          if type(cfg.crashWindow) == "number" then
+            CRASH_WINDOW = cfg.crashWindow
+          end
+          if type(cfg.crashCooldown) == "number" then
+            CRASH_COOLDOWN = cfg.crashCooldown
           end
           if type(cfg.airtimeThreshold) == "number" then
             AIRTIME_THRESHOLD = cfg.airtimeThreshold
@@ -265,7 +285,7 @@ end
 local function openForAppend(path)
   local tries = { path }
   if path:find("/") then
-    table.insert(tries, path:gsub("/", package.config:sub(1, 1)))
+    listAppend(tries, path:gsub("/", package.config:sub(1, 1)))
   end
   for _, p in ipairs(tries) do
     local f = io.open(p, "a")
@@ -289,12 +309,12 @@ local function appendEvent(eventName, props)
     local propParts = {}
     for k, v in pairs(props) do
       if type(v) == "number" then
-        table.insert(propParts, string.format('"%s":%.6g', k, v))
+        listAppend(propParts, string.format('"%s":%.6g', k, v))
       elseif type(v) == "boolean" then
-        table.insert(propParts, string.format('"%s":%s', k, v and "true" or "false"))
+        listAppend(propParts, string.format('"%s":%s', k, v and "true" or "false"))
       end
     end
-    table.insert(parts, '"props":{' .. table.concat(propParts, ",") .. "}")
+    listAppend(parts, '"props":{' .. table.concat(propParts, ",") .. "}")
   end
   local line = "{" .. table.concat(parts, ",") .. "}\n"
   local f, usedPath = openForAppend(EVENT_PATH)
@@ -548,6 +568,9 @@ local function getVehiclePose()
     if vel then
       local vx, vy, vz = vel.x or vel[1] or 0, vel.y or vel[2] or 0, vel.z or vel[3] or 0
       speed = math.sqrt(vx * vx + vy * vy + vz * vz)
+      if speed ~= speed or speed < 0 then
+        speed = 0
+      end
     end
     if veh.getDirectionVectorUp then
       local up = veh:getDirectionVectorUp()
@@ -621,6 +644,10 @@ function M.onWorldReadyState(state)
 end
 
 function M.onClientStartMission()
+  peakSpeed = 0
+  peakSpeedAge = 0
+  lastCrashEmitT = -999
+  sessionTime = 0
   if not sessionActive then
     sessionActive = true
     appendEvent("sessionStart", { ["map.id"] = 1 })
@@ -629,6 +656,8 @@ function M.onClientStartMission()
 end
 
 function M.onClientEndMission()
+  peakSpeed = 0
+  peakSpeedAge = 0
   if sessionActive then
     appendEvent("playerLeave", { ["player.alive"] = 0 })
     appendEvent("sessionEnd", {})
@@ -665,19 +694,43 @@ function M.onUpdate(dt)
     return
   end
   dt = dt or 0.016
+  sessionTime = sessionTime + dt
   local x, y, z, speed, inverted, airborne = getVehiclePose()
   if not speed then
     return
   end
 
-  local dv = lastSpeed - speed
-  if dv > CRASH_DV_THRESHOLD and lastSpeed > 5 then
+  -- BeamNG occasionally returns one-frame velocity spikes; ignore for crash/peak tracking.
+  if speed > MAX_SPEED_SANE then
+    speed = lastSpeed
+  elseif lastSpeed > 0 and (speed - lastSpeed) > MAX_FRAME_DV then
+    speed = lastSpeed
+  end
+
+  -- Peak speed over a short window: per-frame dv misses real crashes (decel spreads across frames).
+  peakSpeedAge = peakSpeedAge + dt
+  if speed >= peakSpeed then
+    peakSpeed = speed
+    peakSpeedAge = 0
+  elseif peakSpeedAge > CRASH_WINDOW then
+    peakSpeed = speed
+  end
+
+  local dvFromPeak = peakSpeed - speed
+  if dvFromPeak > CRASH_DV_THRESHOLD
+      and peakSpeed > CRASH_MIN_PEAK
+      and peakSpeedAge <= CRASH_WINDOW
+      and (sessionTime - lastCrashEmitT) >= CRASH_COOLDOWN then
     appendEvent("crash", {
-      ["crash.severity"] = dv,
+      ["crash.severity"] = dvFromPeak,
       ["vehicle.speed"] = speed,
-      ["vehicle.damage"] = math.min(100, dv * 4),
+      ["vehicle.damage"] = math.min(100, dvFromPeak * 4),
       ["player.alive"] = 1,
+      ["crash.peakSpeed"] = peakSpeed,
     })
+    lastCrashEmitT = sessionTime
+    peakSpeed = speed
+    peakSpeedAge = 0
   end
   lastSpeed = speed
 

@@ -106,7 +106,9 @@ $bridgeJson = @"
   "eventsPath": "$relEvents",
   "kicksPath": "$relKicks",
   "moveInterval": 0.35,
-  "crashDvThreshold": 10.0,
+  "crashDvThreshold": 8.0,
+  "crashWindow": 0.45,
+  "crashCooldown": 1.25,
   "airtimeThreshold": 1.5,
   "rolloverThreshold": 1.75,
   "boundary": {
