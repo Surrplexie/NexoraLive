@@ -3,8 +3,8 @@
 This tracks progress against the ideas in [`NexoraLive.txt`](NexoraLive.txt), broken into phases
 roughly ordered by dependency (each later phase leans on earlier ones).
 
-**Built:** Phases 0–K (rules engine through demo hardening) + **Phase P** (fork runtime).
-**Next track:** Phases L–O, Q–S — fork platform (ownership, ephemeral provisioning, partnerships). See
+**Built:** Phases 0–K + **Phase P** (fork runtime) + **Phase L** (platform identity).
+**Next track:** Phases M–O, Q–S. See
 [docs/NL_FORK_PLATFORM.md](docs/NL_FORK_PLATFORM.md).
 
 Status legend: `[x]` done, `[~]` partially done / in progress, `[ ]` not started.
@@ -410,27 +410,27 @@ Status legend for this track: same as above — `[x]` done, `[~]` partial, `[ ]`
 
 ---
 
-### Phase L — Platform identity & game ownership
+### Phase L — Platform identity & game ownership ✓
 
 Connect NL accounts to real gaming platforms so only **legitimate owners** join forked
 sessions. Anti-pirate / anti-alt from nl.txt section 5.
 
-- [ ] **`NL.Identity` service** — account model, linked platforms, one-active-link-per-platform
-      (same Steam/Twitch/YouTube cannot bind two NL accounts)
-- [ ] **Steam OpenID / Web API** — sign-in + `ISteamUserStats`/ownership check for app id
-- [ ] **Epic / Ubisoft / EA / Xbox / PlayStation / Riot / itch.io** — add providers incrementally;
-      common interface: `IGameOwnershipVerifier.Verify(userId, appId) → Owned | NotOwned | Unknown`
-- [ ] **Ownership gate on admit** — extend `NlJoinAdmissionService` to require proof for the
-      session's `gameId` + major version before `Allow`
-- [ ] **Publisher ban respect** — where APIs exist, deny admit if user is banned on publisher
-      services for that title (no bypass)
-- [ ] **Console multiplayer pass** — document + enforce subscription checks where platform SDKs
-      expose them
-- [ ] **Secrets & token storage** — encrypted refresh tokens, rotation, audit log
-- [ ] **Tests** — mock ownership providers, admit denial matrix, one-account-per-platform rule
+- [x] **`NL.Identity` service** — `NlIdentityService`, `JsonFileIdentityStore`, platform index
+- [x] **One-active-link-per-platform** — `PlatformLinkConflictException` + admit anti-alt check
+- [x] **Steam Web API** — `SteamWebApiOwnershipVerifier` when `STEAM_WEB_API_KEY` set
+- [x] **Epic / Ubisoft / EA / Xbox / PS / Riot / itch.io** — `StubPlatformOwnershipVerifier` + mock matrix
+- [x] **`IGameOwnershipVerifier`** — `Owned | NotOwned | Unknown | Banned | SubscriptionRequired`
+- [x] **Ownership gate on admit** — `NlOwnershipAdmissionGate` + extended `NlAdmitPlayerRequest`
+- [x] **Publisher ban respect** — mock + Steam `GetPlayerBans`
+- [x] **Console multiplayer pass** — mock `subscriptionRequired` / documented in `docs/NL_IDENTITY.md`
+- [x] **Secrets & token storage** — `NlTokenProtector` (DPAPI/AES-GCM) + identity audit JSONL
+- [x] **Identity REST API** — `/api/v1/identity/*` on session server
+- [x] **Tests** — `tests/NL.Identity.Tests` + `scripts/nl-identity-smoke.ps1`
+- [x] **Docs** — [docs/NL_IDENTITY.md](docs/NL_IDENTITY.md)
+- [ ] **Steam OpenID sign-in flow** — live OAuth redirect UI (API link endpoint works today)
 
-**Exit criteria:** A player without Steam ownership of title X cannot join an NL fork session
-for title X; alts on the same Steam account are rejected.
+**Exit criteria:** Player without ownership of title X denied at admit — **met** via mock Steam app
+440/730 matrix and integration tests.
 
 ---
 

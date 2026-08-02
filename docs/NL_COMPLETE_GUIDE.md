@@ -826,7 +826,7 @@ Full security notes: [`docs/NL_DEMO_SECURITY.md`](NL_DEMO_SECURITY.md)
 | Operator runbook | [`docs/NL_DEMO_RUNBOOK.md`](NL_DEMO_RUNBOOK.md) |
 | Build status | [`ROADMAP.md`](../ROADMAP.md) |
 | Fork platform vision (Phases L–S) | [`docs/NL_FORK_PLATFORM.md`](NL_FORK_PLATFORM.md) |
-| Fork runtime (Phase P) | [`docs/NL_FORK_RUNTIME.md`](NL_FORK_RUNTIME.md) |
+| Platform identity (Phase L) | [`docs/NL_IDENTITY.md`](NL_IDENTITY.md) |
 
 ---
 

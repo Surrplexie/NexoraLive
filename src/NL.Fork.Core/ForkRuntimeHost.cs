@@ -1,6 +1,5 @@
 using System.Text.Json;
 using NL.Core;
-using NL.Server.Core;
 
 namespace NL.Fork.Core;
 
@@ -116,13 +115,24 @@ public sealed class ForkRuntimeHost : IAsyncDisposable
 /// <summary>POST /api/v1/session/admit helper for fork runtimes.</summary>
 public static class ForkAdmitClient
 {
-    public static async Task<bool> TryAdmitAsync(string admitUrl, string player, CancellationToken cancellationToken)
+    public static async Task<bool> TryAdmitAsync(
+        string admitUrl,
+        string player,
+        CancellationToken cancellationToken,
+        string? platformUserId = null,
+        string? platform = null,
+        string? gameId = null,
+        string? appId = null)
     {
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
         var payload = JsonSerializer.Serialize(new
         {
             playerId = player,
             displayName = player,
+            platformUserId,
+            platform,
+            gameId,
+            appId,
         });
 
         using var content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");

@@ -1,6 +1,8 @@
 using NL.Core;
 using NL.Core.Security;
 using NL.Fork.Core;
+using NL.Identity;
+using NL.Identity.Core;
 using NL.Moderation;
 using NL.Moderation.Core;
 using NL.NleEditor;
@@ -26,6 +28,9 @@ var spStore = Environment.GetEnvironmentVariable("NL_SP_STORE");
 
 NlPaths.EnsureRoot();
 
+var identitySettings = NlIdentitySettings.LoadFromEnvironment();
+var identityHost = new NlIdentityHost(identitySettings);
+
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls($"http://{bindHost}:{httpPort}");
 
@@ -38,6 +43,8 @@ if (File.Exists(NlPaths.SessionProfile))
 
 builder.Services.AddSingleton(bus);
 builder.Services.AddSingleton(moderation);
+builder.Services.AddSingleton(identitySettings);
+builder.Services.AddSingleton(identityHost);
 builder.Services.AddSingleton(demoSettings);
 builder.Services.AddSingleton(spectatorSettings);
 builder.Services.AddSingleton(hardeningSettings);
@@ -68,7 +75,7 @@ app.MapGet("/api/v1/session/manifest", (BusHostState b, HttpContext ctx) =>
 app.MapGet("/api/v1/session", (BusHostState b, HttpContext ctx) =>
     Results.Json(b.GetStatus(NlWebSecurityExtensions.IsAuthorized(ctx))));
 
-app.MapPost("/api/v1/session/admit", (BusHostState b, NlAdmitPlayerRequest body) =>
+app.MapPost("/api/v1/session/admit", async (BusHostState b, NlIdentityHost identity, NlAdmitPlayerRequest body, CancellationToken ct) =>
 {
     if (string.IsNullOrWhiteSpace(body.PlayerId))
     {
@@ -77,13 +84,84 @@ app.MapPost("/api/v1/session/admit", (BusHostState b, NlAdmitPlayerRequest body)
 
     try
     {
-        return Results.Json(b.Admit(body));
+        return Results.Json(await b.AdmitAsync(body, identity, ct));
     }
     catch (ArgumentException ex)
     {
         return Results.BadRequest(new { error = ex.Message });
     }
 });
+
+app.MapGet("/api/v1/identity/settings", (NlIdentitySettings s) => Results.Json(s.ToPublicInfo()));
+
+app.MapPost("/api/v1/identity/accounts", (NlIdentityHost host, CreateIdentityAccountRequest body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.DisplayName))
+    {
+        return Results.BadRequest(new { error = "displayName required." });
+    }
+
+    var account = host.Identity.CreateAccount(body.DisplayName.Trim());
+    return Results.Json(new { accountId = account.Id, displayName = account.DisplayName });
+});
+
+app.MapPost("/api/v1/identity/link", (NlIdentityHost host, LinkPlatformRequest body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.AccountId) || string.IsNullOrWhiteSpace(body.ExternalUserId))
+    {
+        return Results.BadRequest(new { error = "accountId and externalUserId required." });
+    }
+
+    if (!NlPlatformNames.TryParse(body.Platform, out var platform))
+    {
+        return Results.BadRequest(new { error = "Invalid platform." });
+    }
+
+    try
+    {
+        var account = host.Identity.LinkPlatform(
+            body.AccountId.Trim(),
+            platform,
+            body.ExternalUserId.Trim(),
+            body.RefreshToken);
+        return Results.Json(new
+        {
+            accountId = account.Id,
+            links = account.Links.Select(l => new { platform = l.Platform.ToString(), externalUserId = l.ExternalUserId }),
+        });
+    }
+    catch (PlatformLinkConflictException ex)
+    {
+        return Results.Conflict(new { error = ex.Message, existingAccountId = ex.ExistingAccountId });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/api/v1/identity/accounts/{accountId}", (NlIdentityHost host, string accountId) =>
+{
+    var account = host.Identity.GetAccount(accountId);
+    return account is null
+        ? Results.NotFound(new { error = "Account not found." })
+        : Results.Json(new
+        {
+            account.Id,
+            account.DisplayName,
+            account.CreatedAtUtc,
+            links = account.Links.Select(l => new
+            {
+                platform = l.Platform.ToString(),
+                l.ExternalUserId,
+                l.LinkedAtUtc,
+                hasToken = !string.IsNullOrWhiteSpace(l.ProtectedRefreshToken),
+            }),
+        });
+});
+
+app.MapGet("/api/v1/identity/audit", (NlIdentityHost host, int? count) =>
+    Results.Json(host.Audit.ReadRecent(count ?? 50)));
 
 app.MapPut("/api/v1/session/profile", async (BusHostState b, HttpRequest req) =>
 {
@@ -449,4 +527,17 @@ internal sealed class EditorEvaluateRequest
 internal sealed class EditorApplyRequest
 {
     public bool RestartSession { get; set; } = true;
+}
+
+internal sealed class CreateIdentityAccountRequest
+{
+    public string? DisplayName { get; set; }
+}
+
+internal sealed class LinkPlatformRequest
+{
+    public string? AccountId { get; set; }
+    public string? Platform { get; set; }
+    public string? ExternalUserId { get; set; }
+    public string? RefreshToken { get; set; }
 }

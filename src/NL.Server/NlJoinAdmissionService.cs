@@ -1,5 +1,7 @@
 using NL.Core;
 using NL.Core.Sp;
+using NL.Identity;
+using NL.Identity.Core;
 using NL.Moderation;
 using NL.Moderation.Core;
 using NL.Server.Core.Integration;
@@ -8,7 +10,7 @@ namespace NL.Server;
 
 /// <summary>
 /// Evaluates join eligibility at connect time (before <c>playerJoin</c> events) for networked
-/// NL session servers. Bridges call the REST admit endpoint; game servers gate on <see cref="NlJoinAdmissionResult.Admit"/>.
+/// NL session servers. Phase L adds game ownership verification before Allow.
 /// </summary>
 public sealed class NlJoinAdmissionService
 {
@@ -40,18 +42,59 @@ public sealed class NlJoinAdmissionService
         return new NlJoinAdmissionService(moderation, streamerId, requirements);
     }
 
-    public NlJoinAdmissionResult Evaluate(string playerId, string? displayName = null)
+    public NlJoinAdmissionResult Evaluate(string playerId, string? displayName = null) =>
+        EvaluateAsync(
+            new NlAdmitPlayerRequest { PlayerId = playerId, DisplayName = displayName },
+            null,
+            null).GetAwaiter().GetResult();
+
+    public async Task<NlJoinAdmissionResult> EvaluateAsync(
+        NlAdmitPlayerRequest request,
+        SessionProfileFile? profile,
+        NlIdentityHost? identity,
+        CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(playerId))
+        if (string.IsNullOrWhiteSpace(request.PlayerId))
         {
-            throw new ArgumentException("playerId required.", nameof(playerId));
+            throw new ArgumentException("playerId required.", nameof(request));
         }
 
-        var name = string.IsNullOrWhiteSpace(displayName) ? playerId.Trim() : displayName.Trim();
-        var profile = _moderation.GetOrCreateProfile(playerId.Trim(), name);
-        var join = JoinEligibilityEngine.Evaluate(profile, _streamerId, _requirements, _clock());
-        var standing = profile.GetRelationship(_streamerId).Standing;
-        return NlJoinAdmissionResult.FromJoinResult(join, playerId.Trim(), standing);
+        var playerId = request.PlayerId.Trim();
+        var name = string.IsNullOrWhiteSpace(request.DisplayName) ? playerId : request.DisplayName.Trim();
+        var spProfile = _moderation.GetOrCreateProfile(playerId, name);
+        var join = JoinEligibilityEngine.Evaluate(spProfile, _streamerId, _requirements, _clock());
+        var standing = spProfile.GetRelationship(_streamerId).Standing;
+
+        if (join.Decision != JoinDecision.Allow)
+        {
+            return NlJoinAdmissionResult.FromJoinResult(join, playerId, standing);
+        }
+
+        if (profile?.RequireGameOwnership == true && identity is not null)
+        {
+            var ownershipContext = new OwnershipAdmissionContext(
+                RequireGameOwnership: true,
+                Mode: identity.Settings.Mode,
+                Platform: request.Platform ?? profile.OwnershipPlatform,
+                PlatformUserId: request.PlatformUserId,
+                GameId: request.GameId ?? profile.GameId,
+                AppId: request.AppId ?? profile.PlatformAppId,
+                MajorVersion: request.MajorVersion ?? profile.GameMajorVersion,
+                NlAccountId: request.NlAccountId,
+                StrictUnknown: profile.StrictOwnershipUnknown);
+
+            var ownershipDeny = await identity.OwnershipGate.EvaluateAsync(ownershipContext, cancellationToken);
+            if (ownershipDeny is not null)
+            {
+                return NlJoinAdmissionResult.FromOwnershipDeny(
+                    playerId,
+                    ownershipDeny.Reason,
+                    standing,
+                    ownershipDeny.OwnershipStatus.ToString());
+            }
+        }
+
+        return NlJoinAdmissionResult.FromJoinResult(join, playerId, standing);
     }
 
     public ModerationService Moderation => _moderation;
@@ -174,6 +217,9 @@ public static class NlSessionServerHelper
             JoinGateEnabled = profile.JoinGate,
             SessionRunning = sessionRunning,
             AntiCheatEnabled = profile.AntiCheat,
+            OwnershipRequired = profile.RequireGameOwnership,
+            GameId = profile.GameId,
+            PlatformAppId = profile.PlatformAppId,
         };
     }
 }
@@ -183,4 +229,17 @@ public sealed class NlAdmitPlayerRequest
     public string? StreamerId { get; set; }
     public string PlayerId { get; set; } = "";
     public string? DisplayName { get; set; }
+
+    /// <summary>Phase L — platform user id (e.g. Steam64).</summary>
+    public string? PlatformUserId { get; set; }
+
+    public string? Platform { get; set; }
+
+    public string? GameId { get; set; }
+
+    public string? AppId { get; set; }
+
+    public string? MajorVersion { get; set; }
+
+    public string? NlAccountId { get; set; }
 }

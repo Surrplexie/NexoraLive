@@ -2,6 +2,7 @@ using NL.Core;
 using NL.Server;
 using NL.Server.Core.Integration;
 using NL.Server.Core.Security;
+using NL.Identity;
 
 namespace NL.SessionHost.Web;
 
@@ -182,14 +183,20 @@ public sealed class BusHostState
             BusInfo, profile, BindHost, HttpPort, WsPort, ModPort, Sessions.IsRunning);
     }
 
-    public NlJoinAdmissionResult Admit(NlAdmitPlayerRequest request)
+    public NlJoinAdmissionResult Admit(NlAdmitPlayerRequest request, NlIdentityHost? identity = null) =>
+        AdmitAsync(request, identity).GetAwaiter().GetResult();
+
+    public async Task<NlJoinAdmissionResult> AdmitAsync(
+        NlAdmitPlayerRequest request,
+        NlIdentityHost? identity = null,
+        CancellationToken cancellationToken = default)
     {
         var profile = GetProfile();
         var streamerId = string.IsNullOrWhiteSpace(request.StreamerId)
             ? profile.StreamerId
             : request.StreamerId.Trim();
         var admission = NlJoinAdmissionService.CreateDefault(streamerId);
-        return admission.Evaluate(request.PlayerId, request.DisplayName);
+        return await admission.EvaluateAsync(request, profile, identity, cancellationToken);
     }
 
     private static SessionProfileFile CloneProfile(SessionProfileFile p) => new()
@@ -207,6 +214,12 @@ public sealed class BusHostState
         JoinGate = p.JoinGate,
         AnomalyAutoMod = p.AnomalyAutoMod,
         UseDefaultDataPaths = p.UseDefaultDataPaths,
+        RequireGameOwnership = p.RequireGameOwnership,
+        GameId = p.GameId,
+        PlatformAppId = p.PlatformAppId,
+        GameMajorVersion = p.GameMajorVersion,
+        OwnershipPlatform = p.OwnershipPlatform,
+        StrictOwnershipUnknown = p.StrictOwnershipUnknown,
     };
 
     private static string ResolveSampleConfig(string name) => NlSampleConfigPaths.Resolve(name);

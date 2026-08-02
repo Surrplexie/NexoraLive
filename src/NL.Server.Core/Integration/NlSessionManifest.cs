@@ -10,6 +10,7 @@ public sealed class NlJoinAdmissionResult
     public required string PlayerId { get; init; }
     public required bool Admit { get; init; }
     public SpStanding Standing { get; init; }
+    public string? OwnershipStatus { get; init; }
 
     public static NlJoinAdmissionResult FromJoinResult(JoinResult join, string playerId, SpStanding standing) =>
         new()
@@ -19,6 +20,17 @@ public sealed class NlJoinAdmissionResult
             PlayerId = playerId,
             Admit = join.Decision == JoinDecision.Allow,
             Standing = standing,
+        };
+
+    public static NlJoinAdmissionResult FromOwnershipDeny(string playerId, string reason, SpStanding standing, string ownershipStatus) =>
+        new()
+        {
+            Decision = JoinDecision.Deny,
+            Reason = reason,
+            PlayerId = playerId,
+            Admit = false,
+            Standing = standing,
+            OwnershipStatus = ownershipStatus,
         };
 }
 
@@ -35,6 +47,9 @@ public sealed class NlSessionManifest
     public bool JoinGateEnabled { get; init; }
     public bool SessionRunning { get; init; }
     public bool AntiCheatEnabled { get; init; }
+    public bool OwnershipRequired { get; init; }
+    public string? GameId { get; init; }
+    public string? PlatformAppId { get; init; }
 }
 
 public static class NlSessionServerDefaults

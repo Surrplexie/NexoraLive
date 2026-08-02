@@ -16,6 +16,7 @@
     <ProjectReference Include="..\NL.Moderation\NL.Moderation.csproj" />
     <ProjectReference Include="..\NL.AntiCheat.Core\NL.AntiCheat.Core.csproj" />
     <ProjectReference Include="..\NL.NleEditor.Core\NL.NleEditor.Core.csproj" />
+    <ProjectReference Include="..\NL.Identity\NL.Identity.csproj" />
   </ItemGroup>
 
 </Project>
