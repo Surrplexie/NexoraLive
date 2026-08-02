@@ -1,8 +1,11 @@
 # NL Roadmap / Progress Guide
 
-This tracks progress against the ideas in [`nl.txt`](nl.txt), broken into phases roughly
-ordered by dependency (each later phase leans on earlier ones). Only Phases 0, 0.5, 0.6, and 0.7
-are actually built right now — everything else is a plan, not a promise or a deadline.
+This tracks progress against the ideas in [`NexoraLive.txt`](NexoraLive.txt), broken into phases
+roughly ordered by dependency (each later phase leans on earlier ones).
+
+**Built:** Phases 0–K (rules engine through demo hardening) + **Phase P** (fork runtime).
+**Next track:** Phases L–O, Q–S — fork platform (ownership, ephemeral provisioning, partnerships). See
+[docs/NL_FORK_PLATFORM.md](docs/NL_FORK_PLATFORM.md).
 
 Status legend: `[x]` done, `[~]` partially done / in progress, `[ ]` not started.
 
@@ -378,17 +381,241 @@ Browser `.nle` editor for demo visitors — no WinForms required. See [docs/NL_E
 - [x] **Tests** — round-trip, evaluate, sandbox save/load, security paths, demo reset
 - [x] **CI smoke** — editor evaluate check in demo smoke script
 
-## Phase 6+ — Long-term / high-risk ideas (documented only, not scheduled)
+## Fork platform track (Phases L–S) — updated vision
+
+Phases 0–K built the **brain** (rules, SP model, session server, moderation, demo). The
+fork-platform track builds the **body**: licensed game snapshots on NL infrastructure,
+ephemeral per-streamer servers, platform ownership proof, and server-side enforcement — the
+model described in [`NexoraLive.txt`](NexoraLive.txt) (NLS always used; mods server-loaded;
+no progress transfer to publisher servers).
+
+**Architecture sketch:** [docs/NL_FORK_PLATFORM.md](docs/NL_FORK_PLATFORM.md)
+
+Dependency order (each phase assumes the ones above unless marked optional):
+
+```text
+L Platform auth ──► M Live SP gate ──► N Fork catalog
+                                              │
+                                              ▼
+                    P Fork runtime ◄── O Ephemeral NLS ◄── Q Partnership tiers
+                                              │
+                                              ▼
+                                    R NL Client shell ──► S Fleet ops
+                                              │
+                                              ▼
+                              (bridge titles migrate into hosted forks)
+```
+
+Status legend for this track: same as above — `[x]` done, `[~]` partial, `[ ]` not started.
+
+---
+
+### Phase L — Platform identity & game ownership
+
+Connect NL accounts to real gaming platforms so only **legitimate owners** join forked
+sessions. Anti-pirate / anti-alt from nl.txt section 5.
+
+- [ ] **`NL.Identity` service** — account model, linked platforms, one-active-link-per-platform
+      (same Steam/Twitch/YouTube cannot bind two NL accounts)
+- [ ] **Steam OpenID / Web API** — sign-in + `ISteamUserStats`/ownership check for app id
+- [ ] **Epic / Ubisoft / EA / Xbox / PlayStation / Riot / itch.io** — add providers incrementally;
+      common interface: `IGameOwnershipVerifier.Verify(userId, appId) → Owned | NotOwned | Unknown`
+- [ ] **Ownership gate on admit** — extend `NlJoinAdmissionService` to require proof for the
+      session's `gameId` + major version before `Allow`
+- [ ] **Publisher ban respect** — where APIs exist, deny admit if user is banned on publisher
+      services for that title (no bypass)
+- [ ] **Console multiplayer pass** — document + enforce subscription checks where platform SDKs
+      expose them
+- [ ] **Secrets & token storage** — encrypted refresh tokens, rotation, audit log
+- [ ] **Tests** — mock ownership providers, admit denial matrix, one-account-per-platform rule
+
+**Exit criteria:** A player without Steam ownership of title X cannot join an NL fork session
+for title X; alts on the same Steam account are rejected.
+
+---
+
+### Phase M — Live social gate (real SP join)
+
+Wire Phase 2's `JoinEligibilityEngine` to **live platform APIs** instead of caller-supplied
+bools. nl.txt section 2: SP joins via NL only, not native game invites.
+
+- [ ] **Twitch / YouTube / Kick OAuth** — follow + paid sub status with cache + refresh
+- [ ] **Discord optional link** — server member checks for streamer communities
+- [ ] **`JoinRequirements` from streamer dashboard** — web UI to set follow/sub, min age,
+      verification, max offenses (partially exists; needs live backing)
+- [ ] **Live-only NLS** — session cannot start unless streamer is live on a connected channel
+      (Twitch EventSub / YouTube live ping); auto-stop when stream ends
+- [ ] **SP standing UI** — normal / graylist / banned per streamer; mod/admin actions write
+      through to real profiles (extend Phase 4 web moderation)
+- [ ] **Native invite blocking** — document + client behavior: game platform invites to NLS
+      addresses fail by design (traffic filtered at NL join layer)
+- [ ] **Offense archive** — 2-year active window enforced in storage; archived view for mods
+- [ ] **Tests** — mock platform APIs, live-gate session lifecycle, graylist hold → deny path
+
+**Exit criteria:** Streamer goes live → opens NLS → only followers/subs meeting requirements
+can admit; stream ends → session stops automatically.
+
+---
+
+### Phase N — Fork catalog & snapshot registry
+
+NL-maintained **major-version snapshots** of partner / at-own-risk titles. nl.txt: server-side
+mods without SP downloads; version discipline.
+
+- [ ] **`ForkCatalog` manifest** — `gameId`, display name, `majorVersion` (e.g. `1.0`, `2.0`),
+      container image digest, min client version, partnership tier
+- [ ] **Major-only policy** — no `v1.2` / `v1.4` rows; patches roll into current major image
+- [ ] **Storage governance** — max N majors per title; when over quota, deprecate oldest major
+      and force migration (auto-update policy from vision doc)
+- [ ] **Partnership tiers** — `Official` (publisher SDK) | `Platform` (e.g. Steam-wide opt-in)
+      | `AtOwnRisk` (fork without blessing) — surfaced in UI + legal copy
+- [ ] **Streamer game picker** — Session Host / web: choose game + major → loads default
+      `.nle` template from catalog
+- [ ] **Mod slot model** — streamer attaches verified mod ids from hub (hash-checked); mods
+      baked into fork instance, never pushed to SP clients
+- [ ] **No progress transfer flag** — catalog metadata declares session data is ephemeral;
+      shown at join time
+- [ ] **Tests** — manifest validation, deprecation migration, tier labeling
+
+**Exit criteria:** Operator can register `gameA@1.0` in catalog; streamer selects it; system
+refuses unknown or deprecated majors.
+
+---
+
+### Phase O — Ephemeral NLS provisioning
+
+Spin up and tear down **one forked game server per stream session**. Extends Phase D–G Docker
+work into a game-aware orchestrator.
+
+- [ ] **`NlForkOrchestrator`** — API: `CreateSession(streamerId, gameId, major, nlePath, mods[])
+      → sessionId, connectEndpoint, busToken`
+- [ ] **Provisioning backend** — Docker first; K8s Job / VM optional later; reuse
+      `NL.SessionHost.Web` as control plane
+- [ ] **Inject streamer config** — mount `.nle`, moderation store, join requirements into
+      instance; wire session bus (`ws://…/nl/v1`)
+- [ ] **Connect manifest** — extend `GET /api/v1/session/manifest` with fork connect string
+      (IP/port or relay URL) + ownership + admit URLs
+- [ ] **Lifecycle hooks** — create on streamer "Go live"; destroy on stream end + grace period;
+      max duration cap (extends demo `NL_DEMO_SESSION_MAX_HOURS` pattern)
+- [ ] **Discard world state** — on destroy, delete container volumes; persist only NLE, moderation
+      JSONL, clip metadata — never export to publisher cloud saves
+- [ ] **Reserved mod/admin slots** — nl.txt: few slots always free for privileged roles
+- [ ] **Cost hooks** — idle detection, streamer quota placeholders (no billing yet)
+- [ ] **Tests** — create/destroy integration test with hello-world fork image; manifest round-trip
+
+**Exit criteria:** Streamer starts session → orchestrator runs a container → bridge connects →
+stream ends → container gone; config files remain in `NL_DATA_ROOT`.
+
+---
+
+### Phase P — Fork runtime & server-side enforcement ✓
+
+The game process on NL infrastructure emits events and accepts actions **inside the fork**, not
+only via external log/UDP bridges. This is what enables "~100% enforcement."
+
+- [x] **`IForkRuntime` hook layer** — `NL.Fork.Core/IForkRuntime.cs`, `HelloForkRuntime`
+- [x] **Server-side mod loader** — `ForkModLoader` + `samples/fork/hello-fork.mods.json`
+- [x] **Event richness** — `ForkEventFactory` (position, alive, weapon, chat props)
+- [x] **Packet / state validation** — `ForkStateValidator` (teleport, dead-shoot, bounds)
+- [x] **Action sink in fork** — `ForkActionApplicator` + `NlActionEnvelope.TryParse`
+- [x] **Reference fork image** — `NL.Fork.Runtime`, `docker/fork-hello/Dockerfile`
+- [x] **Join gate in fork** — `playerJoin` via `SpJoinGate` + `TryJoinAsync` spawn deny
+- [x] **Tests** — `tests/NL.Fork.Core.Tests` (9 tests, block shoot preserves health)
+- [x] **Operator API** — `GET /api/v1/fork/status`, `scripts/nl-fork-smoke.ps1`
+- [x] **Docs** — [docs/NL_FORK_RUNTIME.md](docs/NL_FORK_RUNTIME.md)
+- [ ] **Minecraft / BeamNG NL-hosted images** — optional; bridge path remains default
+
+**Exit criteria:** On NL-hosted fork, `event shoot: block` prevents damage without external
+RCON/UDP hack. **Met** via `HelloForkRuntimeTests.TryShootAsync_BlockRule_DoesNotApplyDamage`.
+
+---
+
+### Phase Q — Publisher & platform partnerships
+
+Legal and product layer for **official** vs **use at own risk** integrations.
+
+- [ ] **Publisher integration spec** — "Play on NL" SDK: ownership token, fork auth, disclaimer
+- [ ] **Platform-wide framework** — e.g. Steam: opt-in flag on app id → NL can host fork
+- [ ] **In-game entry point stub** — menu button spec (publisher implements); NL client deep-link
+- [ ] **EULA / ToS templates** — session disclaimer, no progress transfer, no NL sale of DLC
+- [ ] **At-own-risk flow** — explicit user acknowledgment before first join on unpartnered title
+- [ ] **Publisher dashboard placeholder** — opt titles in/out, view session counts (no revenue share
+      tooling — NL does not sell game content)
+- [ ] **Ban sync webhooks** — publisher → NL deny list where partnered
+- [ ] **Docs** — `docs/NL_PARTNERSHIP.md` for publishers and platforms
+
+**Exit criteria:** Catalog tier drives UI copy + legal gate; partnered title skips at-own-risk
+banner; unpartnered requires acknowledgment once per user per title.
+
+---
+
+### Phase R — NL Client shell
+
+Optional unified client for join flow, ownership proof, and session UX (players may still use
+normal game client where fork allows direct connect).
+
+- [ ] **`NL.Client` app** — cross-platform shell: sign-in, link platforms, browse live streamers
+- [ ] **Join flow** — pick streamer → ownership check → admit API → receive connect manifest
+- [ ] **Launch or deep-link** — start game with connect params, or NL-modified launcher for
+      fork endpoints
+- [ ] **Block stray invites** — intercept / fail native multiplayer invites to NLS endpoints
+- [ ] **In-session overlay** — SP standing, warnings, clip trigger (nl.txt overlay / clips sync)
+- [ ] **Streamer variant** — same app, elevated actions (NLS volatile controls, hotkeys)
+- [ ] **Mobile companion (subset)** — mod notifications + kick/warn (full mobile admin deferred)
+- [ ] **Tests** — join flow integration against mock orchestrator + admit API
+
+**Exit criteria:** SP opens NL Client → joins live streamer's fork session with ownership
+verified end-to-end.
+
+---
+
+### Phase S — Fleet operations & scale
+
+Run many ephemeral forks reliably in production.
+
+- [ ] **Multi-region placement** — streamer selects region; orchestrator schedules nearest
+- [ ] **Relay / TURN** — players behind NAT connect to forks without exposing raw host IPs
+- [ ] **Observability** — per-session metrics, fork health, decision rates, admit denials
+      (extend Phase K ops endpoints)
+- [ ] **Autoscaling** — pool warm snapshots; scale-to-zero on no live streams
+- [ ] **Incident runbook** — fork crash → auto-restart; streamer notification; spectator message
+- [ ] **Abuse controls** — global rate limits on fork creation; streamer minimum requirements
+      (nl.txt: e.g. Twitch 50 followers — configurable)
+- [ ] **Backup & compliance** — moderation log retention; GDPR export/delete for SP profiles
+- [ ] **Load tests** — N concurrent sessions, M admits/sec on admission service
+
+**Exit criteria:** 100+ concurrent ephemeral sessions supported in staging with SLOs defined.
+
+---
+
+### Bridge migration note
+
+Today's **bridge path** (Minecraft log, BeamNG Lua, generic NDJSON) remains valid for
+self-hosted and dogfood. Phases O–P add an **NL-hosted fork path** for the same RuleEngine.
+Target end state:
+
+| Title style | Self-hosted bridge | NL-hosted fork |
+|-------------|-------------------|----------------|
+| Open dedicated server (Minecraft, CS2 community) | Phase 3–5 (now) | Phase P optional |
+| Moddable client + local server (BeamNG) | Phase BeamNG (now) | Phase P |
+| Closed AAA (GTA, Fortnite BR, Valorant) | Not realistic | Phase Q partnership only |
+
+---
+
+## Phase 6+ — Economy & social (long-term / high-risk)
 
 These involve real money, KYC/identity verification, blockchain, and gambling-adjacent
-mechanics, which carry legal and regulatory risk well beyond a prototype. Kept here as
-reference to nl.txt, deliberately not broken into build steps yet:
+mechanics. **Depends on Phase L** (identity) at minimum. Deliberately not scheduled until
+fork platform Phases L–M are stable:
 
-- [ ] SPt points economy (predictions, polls)
+- [ ] SPt points economy (predictions, polls) — non-monetary; nl.txt betting rules
 - [ ] SrC blockchain trading cards + marketplace
 - [ ] StreamerBids (live third-party-escrow auctions)
-- [ ] Mobile companion app for admins/mods
-- [ ] Cross-platform social integration (Twitch/Discord/Steam/Xbox/PlayStation/Epic/etc.)
+- [ ] Full mobile admin app
+- [ ] Community hub — verified NLE configs + mods marketplace (nl.txt hub pages)
+- [ ] Cross-platform clip sync (Twitch/YouTube ↔ NLE logs)
+- [ ] VIP paid streams (nl.txt — rights retained by streamer)
+- [ ] NL non-profit streamer ownership governance (nl.txt org model)
 
 ---
 

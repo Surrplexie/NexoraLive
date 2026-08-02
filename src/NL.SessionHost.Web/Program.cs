@@ -1,5 +1,6 @@
 using NL.Core;
 using NL.Core.Security;
+using NL.Fork.Core;
 using NL.Moderation;
 using NL.Moderation.Core;
 using NL.NleEditor;
@@ -190,6 +191,25 @@ app.MapGet("/api/v1/demo/status", (NlDemoSettings demo, BusHostState b) =>
         b.Sessions.IsRunning,
         b.Sessions.DecisionCount,
         b.GetProfile().ConfigPath)));
+
+app.MapGet("/api/v1/fork/status", () =>
+{
+    var path = Environment.GetEnvironmentVariable("NL_FORK_STATUS") ?? NlPaths.ForkStatus;
+    if (!File.Exists(path))
+    {
+        return Results.Json(new { connected = false, message = "No fork runtime status file yet." });
+    }
+
+    try
+    {
+        var json = File.ReadAllText(path);
+        return Results.Content(json, "application/json");
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { connected = false, error = ex.Message });
+    }
+});
 
 app.MapGet("/api/v1/spectator/status", (NlSpectatorService spectator, BusHostState b, NlDemoSettings demo) =>
     Results.Json(spectator.BuildStatus(

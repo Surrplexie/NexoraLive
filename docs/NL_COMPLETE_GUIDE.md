@@ -825,6 +825,8 @@ Full security notes: [`docs/NL_DEMO_SECURITY.md`](NL_DEMO_SECURITY.md)
 | Spectator / editor UX | [`docs/NL_SPECTATOR.md`](NL_SPECTATOR.md), [`docs/NL_EDITOR.md`](NL_EDITOR.md) |
 | Operator runbook | [`docs/NL_DEMO_RUNBOOK.md`](NL_DEMO_RUNBOOK.md) |
 | Build status | [`ROADMAP.md`](../ROADMAP.md) |
+| Fork platform vision (Phases L–S) | [`docs/NL_FORK_PLATFORM.md`](NL_FORK_PLATFORM.md) |
+| Fork runtime (Phase P) | [`docs/NL_FORK_RUNTIME.md`](NL_FORK_RUNTIME.md) |
 
 ---
 

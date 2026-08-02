@@ -48,6 +48,9 @@ public static class NlPaths
     /// <summary>Default localhost UDP port the BeamNG bridge listens on for Block actions.</summary>
     public const int BeamngCommandPort = 27022;
 
+    /// <summary>Phase P hello-fork status snapshot for operator dashboards.</summary>
+    public static string ForkStatus => Path.Combine(Root, "fork-status.json");
+
     public static string DefaultStreamerId => "default-streamer";
 
     public static void EnsureRoot() => Directory.CreateDirectory(Root);
