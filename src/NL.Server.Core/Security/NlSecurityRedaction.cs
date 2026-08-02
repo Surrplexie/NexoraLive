@@ -39,6 +39,8 @@ public static class NlSecurityRedaction
             ForkProvisioner = manifest.ForkProvisioner,
             ForkOrchestratorEnabled = manifest.ForkOrchestratorEnabled,
             ReservedPrivilegedSlots = manifest.ReservedPrivilegedSlots,
+            FleetRegionId = manifest.FleetRegionId,
+            FleetTurnUri = manifest.FleetTurnUri,
         };
     }
 

@@ -3,6 +3,8 @@ using NL.Fork.Catalog;
 using NL.Fork.Catalog.Core;
 using NL.Fork.Orchestrator;
 using NL.Fork.Orchestrator.Core;
+using NL.Fleet;
+using NL.Fleet.Core;
 using NL.Partnership;
 using NL.Identity;
 using NL.Server;
@@ -107,7 +109,8 @@ public sealed class BusHostState
         CancellationToken cancellationToken,
         NlSocialHost? social = null,
         NlForkCatalogHost? catalog = null,
-        NlForkOrchestratorHost? orchestrator = null)
+        NlForkOrchestratorHost? orchestrator = null,
+        NlFleetHost? fleet = null)
     {
         if (Sessions.IsRunning)
         {
@@ -198,31 +201,15 @@ public sealed class BusHostState
 
         if (profile.ForkOrchestratorEnabled && orchestrator?.Settings.Enabled == true)
         {
-            var manifest = GetManifest(orchestrator);
-            var gameId = profile.GameId ?? profile.Game;
-            var major = profile.GameMajorVersion ?? "1.0";
-            var create = await orchestrator.Orchestrator.CreateSessionAsync(
-                new CreateForkSessionRequest(
-                    profile.StreamerId,
-                    gameId,
-                    major,
-                    profile.ConfigPath,
-                    profile.AttachedModIds,
-                    ReservedPrivilegedSlots: profile.ForkReservedPrivilegedSlots > 0
-                        ? profile.ForkReservedPrivilegedSlots
-                        : orchestrator.Settings.DefaultReservedPrivilegedSlots),
-                manifest.BridgeConnectUrl,
-                manifest.AdmitUrl,
-                BusToken,
-                cancellationToken);
-
-            if (!create.Success)
+            var forkResult = await ProvisionForkSessionAsync(profile, orchestrator, fleet, twitchFollowers: null, cancellationToken);
+            if (!forkResult.Success)
             {
                 Sessions.Stop();
-                return Results.BadRequest(new { error = create.Error ?? "Fork orchestrator create failed." });
+                return Results.BadRequest(new { error = forkResult.Error ?? "Fork orchestrator create failed." });
             }
 
-            profile.ForkSessionId = create.Session!.SessionId;
+            profile.ForkSessionId = forkResult.SessionId;
+            profile.FleetPlacedRegionId = forkResult.RegionId;
             SaveProfile(profile);
         }
 
@@ -244,12 +231,12 @@ public sealed class BusHostState
         return Results.Ok(new { state = Sessions.State.ToString() });
     }
 
-    public object GetStatus(bool includeSecrets = true, NlForkOrchestratorHost? orchestrator = null) => new
+    public object GetStatus(bool includeSecrets = true, NlForkOrchestratorHost? orchestrator = null, NlFleetHost? fleet = null) => new
     {
         state = Sessions.State.ToString(),
         decisions = Sessions.DecisionCount,
         bus = includeSecrets ? BusInfo : NlSecurityRedaction.RedactStatusBus(BusInfo, includeSecrets: false),
-        manifest = NlSecurityRedaction.RedactManifest(GetManifest(orchestrator), includeSecrets),
+        manifest = NlSecurityRedaction.RedactManifest(GetManifest(orchestrator, fleet), includeSecrets),
         profile = includeSecrets ? GetProfile() : RedactProfileForPublic(GetProfile()),
         log = includeSecrets ? Sessions.GetLogSnapshot() : Array.Empty<string>(),
     };
@@ -264,26 +251,102 @@ public sealed class BusHostState
         useSessionBus = p.UseSessionBus,
     };
 
-    public NlSessionManifest GetManifest(NlForkOrchestratorHost? orchestrator = null)
+    public NlSessionManifest GetManifest(NlForkOrchestratorHost? orchestrator = null, NlFleetHost? fleet = null)
     {
         var profile = GetProfile();
         ForkManifestConnectInfo? forkConnect = null;
+        string? fleetRegionId = profile.FleetPlacedRegionId ?? fleet?.Settings.DefaultRegion;
+        string? fleetTurnUri = fleet?.Settings.Enabled == true ? fleet.Settings.Relay.TurnUri : null;
+
         if (orchestrator?.Settings.Enabled == true && !string.IsNullOrWhiteSpace(profile.ForkSessionId))
         {
             var fork = orchestrator.Orchestrator.GetSession(profile.ForkSessionId)
                 ?? orchestrator.Orchestrator.GetActiveForStreamer(profile.StreamerId);
             if (fork is not null)
             {
+                var endpoint = fork.ForkConnectEndpoint;
+                fleetRegionId ??= fleet?.Settings.DefaultRegion ?? "us-east";
+                if (fleet?.Settings.Enabled == true && !string.IsNullOrWhiteSpace(endpoint))
+                {
+                    endpoint = fleet.Relay.MaskEndpoint(endpoint, fleetRegionId, fork.SessionId).PublicConnectUrl;
+                }
+
                 forkConnect = new ForkManifestConnectInfo(
                     fork.SessionId,
-                    fork.ForkConnectEndpoint,
+                    endpoint,
                     fork.Provisioner.ToString(),
                     fork.ReservedPrivilegedSlots);
             }
         }
 
         return NlSessionServerHelper.CreateManifest(
-            BusInfo, profile, BindHost, HttpPort, WsPort, ModPort, Sessions.IsRunning, forkConnect);
+            BusInfo, profile, BindHost, HttpPort, WsPort, ModPort, Sessions.IsRunning, forkConnect, fleetRegionId, fleetTurnUri);
+    }
+
+    /// <summary>Phase S — shared fork create with abuse gate, region placement, and metrics.</summary>
+    public async Task<ForkProvisionResult> ProvisionForkSessionAsync(
+        SessionProfileFile profile,
+        NlForkOrchestratorHost orchestrator,
+        NlFleetHost? fleet,
+        int? twitchFollowers,
+        CancellationToken cancellationToken)
+    {
+        var manifest = GetManifest(orchestrator, fleet);
+        var streamerId = string.IsNullOrWhiteSpace(profile.StreamerId)
+            ? NlPaths.DefaultStreamerId
+            : profile.StreamerId;
+        var followers = ResolveTwitchFollowers(twitchFollowers);
+        var regionId = profile.FleetPlacedRegionId ?? fleet?.Settings.DefaultRegion ?? "us-east";
+
+        if (fleet?.Settings.Enabled == true)
+        {
+            var abuse = fleet.Abuse.CheckForkCreate(streamerId, followers);
+            if (!abuse.Allowed)
+            {
+                return new ForkProvisionResult(false, abuse.DenyReason, null, null);
+            }
+
+            var placement = fleet.Regions.Place(
+                new FleetPlacementRequest(streamerId, profile.FleetPreferredRegion, profile.FleetGeoHint),
+                manifest.HttpBaseUrl);
+            regionId = placement.RegionId;
+        }
+
+        var gameId = profile.GameId ?? profile.Game;
+        var major = profile.GameMajorVersion ?? "1.0";
+        var create = await orchestrator.Orchestrator.CreateSessionAsync(
+            new CreateForkSessionRequest(
+                streamerId,
+                gameId,
+                major,
+                profile.ConfigPath,
+                profile.AttachedModIds,
+                ReservedPrivilegedSlots: profile.ForkReservedPrivilegedSlots > 0
+                    ? profile.ForkReservedPrivilegedSlots
+                    : orchestrator.Settings.DefaultReservedPrivilegedSlots),
+            manifest.BridgeConnectUrl,
+            manifest.AdmitUrl,
+            BusToken,
+            cancellationToken);
+
+        if (!create.Success)
+        {
+            return new ForkProvisionResult(false, create.Error, null, null);
+        }
+
+        fleet?.Metrics.RecordForkCreate(streamerId, regionId);
+        return new ForkProvisionResult(true, null, create.Session!.SessionId, regionId);
+    }
+
+    private static int? ResolveTwitchFollowers(int? overrideFollowers)
+    {
+        if (overrideFollowers is >= 0)
+        {
+            return overrideFollowers;
+        }
+
+        var raw = Environment.GetEnvironmentVariable("NL_FLEET_DEV_TWITCH_FOLLOWERS");
+        return int.TryParse(raw, out var n) ? n : null;
     }
 
     public NlJoinAdmissionResult Admit(NlAdmitPlayerRequest request, NlIdentityHost? identity = null) =>
@@ -371,7 +434,16 @@ public sealed class BusHostState
         ForkReservedPrivilegedSlots = p.ForkReservedPrivilegedSlots,
         ForkSessionId = p.ForkSessionId,
         PartnershipGateEnabled = p.PartnershipGateEnabled,
+        FleetPreferredRegion = p.FleetPreferredRegion,
+        FleetGeoHint = p.FleetGeoHint,
+        FleetPlacedRegionId = p.FleetPlacedRegionId,
     };
 
     private static string ResolveSampleConfig(string name) => NlSampleConfigPaths.Resolve(name);
 }
+
+public sealed record ForkProvisionResult(
+    bool Success,
+    string? Error,
+    string? SessionId,
+    string? RegionId);

@@ -98,6 +98,15 @@ public sealed class SessionProfileFile
     /// <summary>Phase Q — enforce partnership legal gate at admit (default on).</summary>
     public bool PartnershipGateEnabled { get; set; } = true;
 
+    /// <summary>Phase S — preferred fleet region (us-east, us-west, eu-west).</summary>
+    public string? FleetPreferredRegion { get; set; }
+
+    /// <summary>Phase S — geo hint for placement (eu, west, etc.).</summary>
+    public string? FleetGeoHint { get; set; }
+
+    /// <summary>Phase S — region id assigned at last fork create.</summary>
+    public string? FleetPlacedRegionId { get; set; }
+
     public NlSessionOptions ToSessionOptions(bool replay = false) => new()
     {
         Game = Game,

@@ -81,6 +81,7 @@ Native game invites to NLS addresses **fail by design** — traffic is filtered 
 | **Fork orchestrator** | Ephemeral fork provisioning (mock/process/docker), lifecycle + manifest connect | Phase O — prototype |
 | **Publisher partnerships** | At-own-risk ack gate, Play on NL SDK spec, ban sync, platform opt-in | Phase Q — prototype |
 | **NL Client shell** | Join flow, deep links, overlay, stray-invite block, mobile mod companion | Phase R — prototype |
+| **Fleet operations** | Multi-region, relay/TURN, observability, autoscale, abuse, compliance | Phase S — prototype |
 | **Fork runtime** | Hello-fork + session bus; server-side mod loader | Phase P — prototype |
 | **BeamNG.drive bridge** | Lua mod → NDJSON → rules → localhost UDP + BeamMP kick queue | Freeroam / BeamMP operator path |
 
@@ -489,6 +490,7 @@ Detector vocabulary and wiring: [`docs/ANTICHEAT.md`](docs/ANTICHEAT.md).
 | `src/NL.Fork.Orchestrator` (+ `.Core`) | Ephemeral fork provisioning per session (Phase O) |
 | `src/NL.Partnership` (+ `.Core`) | Publisher/platform legal gate, SDK spec, ban sync (Phase Q) |
 | `src/NL.Client` (+ `.Core`) | Cross-platform join shell, deep links, overlay (Phase R) |
+| `src/NL.Fleet` (+ `.Core`) | Multi-region fleet ops, relay, observability, SLOs (Phase S) |
 | `src/NL.Fork.Runtime` | Fork runtime CLI |
 | `tests/` | Unit tests |
 | `samples/` | Safe example configs, logs, NDJSON (no real secrets) |
@@ -538,6 +540,7 @@ Detector vocabulary and wiring: [`docs/ANTICHEAT.md`](docs/ANTICHEAT.md).
 | [`docs/NL_FORK_ORCHESTRATOR.md`](docs/NL_FORK_ORCHESTRATOR.md) | Ephemeral fork provisioning (Phase O) |
 | [`docs/NL_PARTNERSHIP.md`](docs/NL_PARTNERSHIP.md) | Publisher partnerships, at-own-risk gate (Phase Q) |
 | [`docs/NL_CLIENT.md`](docs/NL_CLIENT.md) | NL Client join shell, deep links (Phase R) |
+| [`docs/NL_FLEET_OPS.md`](docs/NL_FLEET_OPS.md) | Fleet ops, relay, observability, SLOs (Phase S) |
 | [`docs/NL_FORK_RUNTIME.md`](docs/NL_FORK_RUNTIME.md) | Fork runtime + hello-fork (Phase P) |
 | [`docs/NL_IDENTITY.md`](docs/NL_IDENTITY.md) | Platform identity & ownership (Phase L) |
 | [`docs/NL_SOCIAL_GATE.md`](docs/NL_SOCIAL_GATE.md) | Live social gate & join policy (Phase M) |

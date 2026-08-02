@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NL Fleet Ops — Session Host</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="operator-page">
+  <header>
+    <h1>Fleet Operations</h1>
+    <p class="sub">Multi-region placement, relay, observability, autoscale, incidents (Phase S)</p>
+    <nav class="nav">
+      <a href="/operator.html">Operator</a>
+      <a href="/fork-orchestrator.html">Orchestrator</a>
+      <a href="/fleet-ops.html" aria-current="page">Fleet ops</a>
+      <a href="/partnership.html">Partnership</a>
+    </nav>
+  </header>
+
+  <section class="card operator-panel">
+    <h2>Settings &amp; SLOs</h2>
+    <dl id="fleet-settings"></dl>
+    <table id="slo-table">
+      <thead><tr><th>SLO</th><th>Target</th><th>Current</th><th>Met</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Observability</h2>
+    <pre id="observability" class="code-block"></pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Regions</h2>
+    <table id="regions-table">
+      <thead><tr><th>Id</th><th>Name</th><th>Latency bias (ms)</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Autoscale</h2>
+    <pre id="autoscale" class="code-block"></pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Recent incidents</h2>
+    <table id="incidents-table">
+      <thead><tr><th>Id</th><th>Kind</th><th>Session</th><th>Streamer</th><th>Auto-restart</th><th>When</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Session manifest (relay fields)</h2>
+    <pre id="manifest-preview" class="code-block"></pre>
+  </section>
+
+  <p id="status" class="status muted"></p>
+  <script src="nl-auth.js"></script>
+  <script src="fleet-ops-app.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+[
+  {
+    "streamerId": "demo-streamer",
+    "minTwitchFollowers": 50,
+    "minYouTubeSubscribers": 0,
+    "enforceOnForkCreate": true
+  }
+]

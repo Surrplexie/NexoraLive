@@ -120,6 +120,12 @@ public sealed class NlSessionManifest
     public bool ForkOrchestratorEnabled { get; init; }
 
     public int ReservedPrivilegedSlots { get; init; }
+
+    /// <summary>Phase S — relay region for fork connect (masked endpoint).</summary>
+    public string? FleetRegionId { get; init; }
+
+    /// <summary>Phase S — TURN URI for NAT traversal.</summary>
+    public string? FleetTurnUri { get; init; }
 }
 
 /// <summary>Phase O — optional fork instance metadata for session manifest.</summary>

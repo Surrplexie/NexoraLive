@@ -304,7 +304,9 @@ public static class NlSessionServerHelper
         int wsPort,
         int modPort,
         bool sessionRunning,
-        ForkManifestConnectInfo? forkConnect = null)
+        ForkManifestConnectInfo? forkConnect = null,
+        string? fleetRegionId = null,
+        string? fleetTurnUri = null)
     {
         var httpBase = ResolvePublicHttpBase(bindHost, httpPort);
         var wsBase = ResolvePublicWebSocketBase(bindHost, wsPort);
@@ -345,6 +347,8 @@ public static class NlSessionServerHelper
                 ?? (profile.ForkReservedPrivilegedSlots > 0
                     ? profile.ForkReservedPrivilegedSlots
                     : 2),
+            FleetRegionId = fleetRegionId,
+            FleetTurnUri = fleetTurnUri,
         };
     }
 

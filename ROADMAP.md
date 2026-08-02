@@ -565,16 +565,16 @@ verified end-to-end.
 
 Run many ephemeral forks reliably in production.
 
-- [ ] **Multi-region placement** — streamer selects region; orchestrator schedules nearest
-- [ ] **Relay / TURN** — players behind NAT connect to forks without exposing raw host IPs
-- [ ] **Observability** — per-session metrics, fork health, decision rates, admit denials
+- [x] **Multi-region placement** — streamer selects region; orchestrator schedules nearest
+- [x] **Relay / TURN** — players behind NAT connect to forks without exposing raw host IPs
+- [x] **Observability** — per-session metrics, fork health, decision rates, admit denials
       (extend Phase K ops endpoints)
-- [ ] **Autoscaling** — pool warm snapshots; scale-to-zero on no live streams
-- [ ] **Incident runbook** — fork crash → auto-restart; streamer notification; spectator message
-- [ ] **Abuse controls** — global rate limits on fork creation; streamer minimum requirements
+- [x] **Autoscaling** — pool warm snapshots; scale-to-zero on no live streams
+- [x] **Incident runbook** — fork crash → auto-restart; streamer notification; spectator message
+- [x] **Abuse controls** — global rate limits on fork creation; streamer minimum requirements
       (nl.txt: e.g. Twitch 50 followers — configurable)
-- [ ] **Backup & compliance** — moderation log retention; GDPR export/delete for SP profiles
-- [ ] **Load tests** — N concurrent sessions, M admits/sec on admission service
+- [x] **Backup & compliance** — moderation log retention; GDPR export/delete for SP profiles
+- [x] **Load tests** — N concurrent sessions, M admits/sec on admission service
 
 **Exit criteria:** 100+ concurrent ephemeral sessions supported in staging with SLOs defined.
 

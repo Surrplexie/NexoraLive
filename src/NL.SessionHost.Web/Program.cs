@@ -7,6 +7,8 @@ using NL.Partnership;
 using NL.Partnership.Core;
 using NL.Client;
 using NL.Client.Core;
+using NL.Fleet;
+using NL.Fleet.Core;
 using NL.Fork.Catalog.Core;
 using NL.Fork.Orchestrator;
 using NL.Fork.Orchestrator.Core;
@@ -49,6 +51,8 @@ var orchestratorSettings = NlForkOrchestratorSettings.LoadFromEnvironment();
 var orchestratorHost = new NlForkOrchestratorHost(orchestratorSettings, catalogHost);
 var partnershipSettings = NlPartnershipSettings.LoadFromEnvironment();
 var partnershipHost = new NlPartnershipHost(partnershipSettings);
+var fleetSettings = NlFleetSettings.LoadFromEnvironment();
+var fleetHost = new NlFleetHost(fleetSettings);
 var samplesRoot = ResolveSamplesRoot();
 
 var builder = WebApplication.CreateBuilder(args);
@@ -56,7 +60,7 @@ builder.WebHost.UseUrls($"http://{bindHost}:{httpPort}");
 
 var bus = new BusHostState(bindHost, httpPort, wsPort, busToken, modPort);
 var moderation = new ModerationHostState(moderationLog, spStore);
-var clientHost = CreateClientHost(bus, moderation, identityHost, socialHost, catalogHost, partnershipHost, orchestratorHost);
+var clientHost = CreateClientHost(bus, moderation, identityHost, socialHost, catalogHost, partnershipHost, orchestratorHost, fleetHost);
 if (File.Exists(NlPaths.SessionProfile))
 {
     bus.SaveProfile(NlSessionRunner.LoadProfile(NlPaths.SessionProfile));
@@ -74,6 +78,8 @@ builder.Services.AddSingleton(orchestratorSettings);
 builder.Services.AddSingleton(orchestratorHost);
 builder.Services.AddSingleton(partnershipSettings);
 builder.Services.AddSingleton(partnershipHost);
+builder.Services.AddSingleton(fleetSettings);
+builder.Services.AddSingleton(fleetHost);
 builder.Services.AddSingleton(clientHost);
 builder.Services.AddSingleton(demoSettings);
 builder.Services.AddSingleton(spectatorSettings);
@@ -97,6 +103,11 @@ if (orchestratorSettings.Enabled)
     builder.Services.AddHostedService<NlForkOrchestratorLifecycleHostedService>();
 }
 
+if (fleetSettings.Enabled)
+{
+    builder.Services.AddHostedService<NlFleetLifecycleHostedService>();
+}
+
 var app = builder.Build();
 app.UseCors();
 app.UseNlPublicRateLimits();
@@ -109,13 +120,13 @@ app.MapGet("/api/v1/security", (NlSecuritySettings s) => Results.Json(s.ToPublic
 app.MapGet("/api/v1/bus", (BusHostState b, HttpContext ctx) =>
     Results.Json(NlSecurityRedaction.RedactBusInfo(b.BusInfo, NlWebSecurityExtensions.IsAuthorized(ctx))));
 
-app.MapGet("/api/v1/session/manifest", (BusHostState b, NlForkOrchestratorHost orchestrator, HttpContext ctx) =>
-    Results.Json(NlSecurityRedaction.RedactManifest(b.GetManifest(orchestrator), NlWebSecurityExtensions.IsAuthorized(ctx))));
+app.MapGet("/api/v1/session/manifest", (BusHostState b, NlForkOrchestratorHost orchestrator, NlFleetHost fleet, HttpContext ctx) =>
+    Results.Json(NlSecurityRedaction.RedactManifest(b.GetManifest(orchestrator, fleet), NlWebSecurityExtensions.IsAuthorized(ctx))));
 
-app.MapGet("/api/v1/session", (BusHostState b, NlForkOrchestratorHost orchestrator, HttpContext ctx) =>
-    Results.Json(b.GetStatus(NlWebSecurityExtensions.IsAuthorized(ctx), orchestrator)));
+app.MapGet("/api/v1/session", (BusHostState b, NlForkOrchestratorHost orchestrator, NlFleetHost fleet, HttpContext ctx) =>
+    Results.Json(b.GetStatus(NlWebSecurityExtensions.IsAuthorized(ctx), orchestrator, fleet)));
 
-app.MapPost("/api/v1/session/admit", async (BusHostState b, NlIdentityHost identity, NlSocialHost social, NlForkCatalogHost catalog, NlPartnershipHost partnership, NlAdmitPlayerRequest body, CancellationToken ct) =>
+app.MapPost("/api/v1/session/admit", async (BusHostState b, NlIdentityHost identity, NlSocialHost social, NlForkCatalogHost catalog, NlPartnershipHost partnership, NlFleetHost fleet, NlAdmitPlayerRequest body, CancellationToken ct) =>
 {
     if (string.IsNullOrWhiteSpace(body.PlayerId))
     {
@@ -124,7 +135,14 @@ app.MapPost("/api/v1/session/admit", async (BusHostState b, NlIdentityHost ident
 
     try
     {
-        return Results.Json(await b.AdmitAsync(body, identity, social, catalog, partnership, ct));
+        var result = await b.AdmitAsync(body, identity, social, catalog, partnership, ct);
+        if (fleet.Settings.Enabled)
+        {
+            fleet.Metrics.RecordAdmit(result.Admit, body.StreamerId ?? b.GetProfile().StreamerId);
+            fleet.Metrics.RecordDecision(b.Sessions.DecisionCount);
+        }
+
+        return Results.Json(result);
     }
     catch (ArgumentException ex)
     {
@@ -345,6 +363,7 @@ app.MapGet("/api/v1/fork/orchestrator/sessions/{sessionId}", (NlForkOrchestrator
 app.MapPost("/api/v1/fork/orchestrator/create", async (
     BusHostState bus,
     NlForkOrchestratorHost host,
+    NlFleetHost fleet,
     ForkOrchestratorCreateRequest body,
     CancellationToken ct) =>
 {
@@ -353,31 +372,35 @@ app.MapPost("/api/v1/fork/orchestrator/create", async (
         return Results.BadRequest(new { error = "streamerId and nlePath required." });
     }
 
-    var manifest = bus.GetManifest(host);
-    var result = await host.Orchestrator.CreateSessionAsync(
-        new CreateForkSessionRequest(
-            body.StreamerId.Trim(),
-            body.GameId?.Trim() ?? bus.GetProfile().GameId ?? "generic",
-            body.MajorVersion?.Trim() ?? bus.GetProfile().GameMajorVersion ?? "1.0",
-            body.NlePath.Trim(),
-            body.ModIds ?? [],
-            body.DockerImage,
-            ReservedPrivilegedSlots: body.ReservedPrivilegedSlots ?? host.Settings.DefaultReservedPrivilegedSlots),
-        manifest.BridgeConnectUrl,
-        manifest.AdmitUrl,
-        bus.BusToken,
-        ct);
+    var profile = bus.GetProfile();
+    profile.StreamerId = body.StreamerId.Trim();
+    profile.ConfigPath = body.NlePath.Trim();
+    profile.GameId = body.GameId?.Trim() ?? profile.GameId ?? "generic";
+    profile.GameMajorVersion = body.MajorVersion?.Trim() ?? profile.GameMajorVersion ?? "1.0";
+    profile.AttachedModIds = body.ModIds ?? [];
+    profile.ForkReservedPrivilegedSlots = body.ReservedPrivilegedSlots ?? host.Settings.DefaultReservedPrivilegedSlots;
+    if (!string.IsNullOrWhiteSpace(body.PreferredRegion))
+    {
+        profile.FleetPreferredRegion = body.PreferredRegion.Trim();
+    }
 
+    var result = await bus.ProvisionForkSessionAsync(profile, host, fleet, body.TwitchFollowers, ct);
     if (!result.Success)
     {
         return Results.BadRequest(new { error = result.Error });
     }
 
-    var profile = bus.GetProfile();
     profile.ForkOrchestratorEnabled = true;
-    profile.ForkSessionId = result.Session!.SessionId;
+    profile.ForkSessionId = result.SessionId;
+    profile.FleetPlacedRegionId = result.RegionId;
     bus.SaveProfile(profile);
-    return Results.Json(result.Session);
+
+    return Results.Json(new
+    {
+        sessionId = result.SessionId,
+        regionId = result.RegionId,
+        manifest = bus.GetManifest(host, fleet),
+    });
 });
 
 app.MapPost("/api/v1/fork/orchestrator/destroy/{sessionId}", async (
@@ -387,6 +410,93 @@ app.MapPost("/api/v1/fork/orchestrator/destroy/{sessionId}", async (
 {
     var result = await host.Orchestrator.DestroySessionAsync(sessionId, ct);
     return result.Success ? Results.Ok(new { ok = true }) : Results.BadRequest(new { error = result.Error });
+});
+
+app.MapGet("/api/v1/fleet/settings", (NlFleetSettings s) => Results.Json(s.ToPublicInfo()));
+
+app.MapGet("/api/v1/fleet/regions", (NlFleetHost fleet) => Results.Json(fleet.Regions.ListRegions()));
+
+app.MapGet("/api/v1/fleet/observability", (NlFleetHost fleet, NlForkOrchestratorHost orchestrator, BusHostState bus) =>
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    return Results.Json(fleet.Metrics.BuildSnapshot(activeForks, activeNls));
+});
+
+app.MapGet("/api/v1/fleet/slos", (NlFleetHost fleet, NlForkOrchestratorHost orchestrator, BusHostState bus) =>
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    return Results.Json(fleet.Slo.Evaluate(snap));
+});
+
+app.MapGet("/api/v1/fleet/incidents", (NlFleetHost fleet, int? count) =>
+    Results.Json(fleet.Incidents.ListRecent(count ?? 50)));
+
+app.MapGet("/api/v1/fleet/autoscale", (NlFleetHost fleet, NlForkOrchestratorHost orchestrator, BusHostState bus) =>
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    return Results.Json(fleet.Autoscale.Evaluate(activeForks, activeNls > 0, null));
+});
+
+app.MapGet("/api/v1/fleet/streamer-requirements/{streamerId}", (NlFleetHost fleet, string streamerId) =>
+    Results.Json(fleet.StreamerRequirements.GetOrDefault(streamerId)));
+
+app.MapPut("/api/v1/fleet/streamer-requirements", (NlFleetHost fleet, FleetStreamerRequirements body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.StreamerId))
+    {
+        return Results.BadRequest(new { error = "streamerId required." });
+    }
+
+    fleet.StreamerRequirements.Save(body with { StreamerId = body.StreamerId.Trim() });
+    return Results.Ok(body);
+});
+
+app.MapPost("/api/v1/fleet/compliance/export/{playerId}", (NlFleetHost fleet, ModerationHostState mod, string playerId) =>
+{
+    try
+    {
+        var profile = mod.Moderation.GetOrCreateProfile(playerId.Trim(), playerId.Trim());
+        var export = fleet.Compliance.ExportSpProfile(playerId.Trim(), new { profile.Id, profile.DisplayName });
+        return Results.Json(new { export.PlayerId, export.ExportedAtUtc, path = NlFleetPaths.ComplianceExports });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapDelete("/api/v1/fleet/compliance/sp/{playerId}", (NlFleetHost fleet, string playerId) =>
+{
+    try
+    {
+        fleet.Compliance.DeleteSpProfile(NlPaths.SpProfiles, playerId.Trim());
+        return Results.Ok(new { deleted = playerId.Trim() });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/v1/fleet/load-test/report", (NlFleetHost fleet, FleetLoadTestReportRequest body) =>
+{
+    var snap = fleet.Metrics.BuildSnapshot(body.ActiveForkSessions, body.ActiveNlsSessions);
+    var load = new FleetLoadTestResult(
+        body.ConcurrentSessionsTarget,
+        body.AdmitsPerSecondTarget,
+        body.AdmitsSucceeded,
+        body.AdmitsFailed,
+        body.ElapsedSeconds,
+        []);
+    return Results.Json(new
+    {
+        loadTest = load,
+        slos = fleet.Slo.Evaluate(snap, load),
+    });
 });
 
 app.MapGet("/api/v1/partnership/settings", (NlPartnershipSettings s) => Results.Json(s.ToPublicInfo()));
@@ -609,10 +719,10 @@ app.MapPost("/api/v1/session/bus-defaults", (BusHostState b, string? config) =>
     return Results.Ok(b.GetStatus(includeSecrets: true));
 });
 
-app.MapPost("/api/v1/session/start", async (BusHostState b, NlSocialHost social, NlForkCatalogHost catalog, NlForkOrchestratorHost orchestrator, HttpRequest req, CancellationToken ct) =>
+app.MapPost("/api/v1/session/start", async (BusHostState b, NlSocialHost social, NlForkCatalogHost catalog, NlForkOrchestratorHost orchestrator, NlFleetHost fleet, HttpRequest req, CancellationToken ct) =>
 {
     var body = await req.ReadFromJsonAsync<StartSessionRequest>();
-    return await b.StartAsync(body?.ReplayOnce ?? false, ct, social, catalog, orchestrator);
+    return await b.StartAsync(body?.ReplayOnce ?? false, ct, social, catalog, orchestrator, fleet);
 });
 
 app.MapPost("/api/v1/session/stop", (BusHostState b, NlForkOrchestratorHost orchestrator) => b.Stop(orchestrator));
@@ -695,9 +805,23 @@ app.MapGet("/api/v1/ops/status", (
     NlPublicRateLimitService rateLimits,
     NlDemoSettings demo,
     NlSpectatorSettings spectator,
-    BusHostState bus) =>
+    BusHostState bus,
+    NlForkOrchestratorHost orchestrator,
+    NlFleetHost fleet) =>
 {
     var wsGuard = NlWebSocketConnectionGuard.Current;
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var fleetObs = fleet.Settings.Enabled
+        ? fleet.Metrics.BuildSnapshot(activeForks, activeNls)
+        : null;
+    var slos = fleetObs is not null
+        ? fleet.Slo.Evaluate(fleetObs)
+        : null;
+    var warm = fleet.Settings.Enabled
+        ? fleet.Autoscale.Evaluate(activeForks, activeNls > 0, null)
+        : null;
+
     return Results.Json(new
     {
         uptime = NlOpsMetrics.UptimePayload(),
@@ -707,6 +831,15 @@ app.MapGet("/api/v1/ops/status", (
         demo = demo.ToPublicInfo(bus.Sessions.IsRunning, bus.Sessions.DecisionCount, bus.GetProfile().ConfigPath),
         spectator = new { triggersEnabled = spectator.TriggersEnabled, triggerRatePerMinute = spectator.TriggerRatePerMinute },
         session = new { state = bus.Sessions.State.ToString(), decisions = bus.Sessions.DecisionCount },
+        fleet = fleet.Settings.Enabled
+            ? new
+            {
+                observability = fleetObs,
+                slos,
+                autoscale = warm,
+                incidents = fleet.Incidents.ListRecent(10),
+            }
+            : null,
     });
 });
 
@@ -902,7 +1035,7 @@ app.MapPost("/api/v1/editor/reset", (NlWebEditorStore store, NlDemoSettings demo
     });
 });
 
-var manifest = bus.GetManifest(orchestratorHost);
+var manifest = bus.GetManifest(orchestratorHost, fleetHost);
 Console.WriteLine($"NL Session Server      → {manifest.HttpBaseUrl}");
 Console.WriteLine($"Bridge (remote)        → {manifest.BridgeConnectUrl}");
 Console.WriteLine($"Join admission         → {manifest.AdmitUrl}");
@@ -916,6 +1049,7 @@ Console.WriteLine($"Fork catalog (Phase N) → {catalogSettings.Enabled} manifes
 Console.WriteLine($"Fork orchestrator (O)  → {orchestratorSettings.Enabled} mode={orchestratorSettings.Mode} provisioner={orchestratorHost.ResolveProvisionerKind()}");
 Console.WriteLine($"Partnership (Phase Q)  → {partnershipSettings.Enabled} gate={partnershipSettings.RequireGateAtAdmit}");
 Console.WriteLine($"NL Client (Phase R)    → /nl-client.html + NL.Client CLI");
+Console.WriteLine($"Fleet ops (Phase S)    → {fleetSettings.Enabled} /fleet-ops.html max={fleetSettings.Autoscale.MaxConcurrentSessions}");
 Console.WriteLine($"Web editor (Phase I)   → /editor.html + /api/v1/editor/*");
 if (demoSettings.Enabled)
 {
@@ -995,11 +1129,12 @@ static NlClientHost CreateClientHost(
     NlSocialHost social,
     NlForkCatalogHost catalog,
     NlPartnershipHost partnership,
-    NlForkOrchestratorHost orchestrator)
+    NlForkOrchestratorHost orchestrator,
+    NlFleetHost fleet)
 {
     NlSessionManifestDto MapManifest()
     {
-        var m = bus.GetManifest(orchestrator);
+        var m = bus.GetManifest(orchestrator, fleet);
         return new NlSessionManifestDto(
             m.SessionId,
             m.StreamerId,
@@ -1092,6 +1227,19 @@ internal sealed class ForkOrchestratorCreateRequest
     public List<string>? ModIds { get; set; }
     public string? DockerImage { get; set; }
     public int? ReservedPrivilegedSlots { get; set; }
+    public string? PreferredRegion { get; set; }
+    public int? TwitchFollowers { get; set; }
+}
+
+internal sealed class FleetLoadTestReportRequest
+{
+    public int ConcurrentSessionsTarget { get; set; } = 100;
+    public int AdmitsPerSecondTarget { get; set; } = 10;
+    public int AdmitsSucceeded { get; set; }
+    public int AdmitsFailed { get; set; }
+    public double ElapsedSeconds { get; set; }
+    public int ActiveForkSessions { get; set; }
+    public int ActiveNlsSessions { get; set; }
 }
 
 internal sealed class PartnershipAcknowledgeRequest
