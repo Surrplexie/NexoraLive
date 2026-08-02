@@ -14,9 +14,11 @@ var modsPath = parser.Get("mods") ?? Environment.GetEnvironmentVariable("NL_FORK
 var statusPath = parser.Get("status") ?? Environment.GetEnvironmentVariable("NL_FORK_STATUS")
     ?? Path.Combine(NlPaths.Root, "fork-status.json");
 var admitUrl = parser.Get("admit-url") ?? Environment.GetEnvironmentVariable("NL_FORK_ADMIT_URL");
+var gameRaw = parser.Get("game") ?? Environment.GetEnvironmentVariable("NL_FORK_GAME");
 var loop = parser.Flag("loop");
 var interval = parser.GetDouble("interval", 8);
 var embeddedConfig = parser.Get("config");
+var game = ForkGameProfiles.ParseGameArg(gameRaw);
 
 NlPaths.EnsureRoot();
 var mods = string.IsNullOrWhiteSpace(modsPath) ? new ForkModManifest() : ForkModLoader.LoadFromFile(modsPath);
@@ -27,8 +29,8 @@ ForkRuntimeHost host;
 if (!string.IsNullOrWhiteSpace(embeddedConfig))
 {
     var nle = File.ReadAllText(embeddedConfig);
-    host = ForkRuntimeHost.CreateEmbedded(nle, mods);
-    log("[fork] embedded mode (no session bus)");
+    host = ForkRuntimeHost.CreateEmbedded(game, nle, mods);
+    log($"[fork] embedded mode game={game} (no session bus)");
 }
 else
 {
@@ -43,8 +45,8 @@ else
     Func<string, Task<bool>>? admit = string.IsNullOrWhiteSpace(admitUrl)
         ? null
         : p => ForkAdmitClient.TryAdmitAsync(admitUrl!, p, CancellationToken.None);
-    host = ForkRuntimeHost.CreateRemote(bridge, mods, admit, statusPath, log);
-    log($"[fork] remote mode → {wsUrl}");
+    host = ForkRuntimeHost.CreateRemote(game, bridge, mods, admit, statusPath, log);
+    log($"[fork] remote mode game={game} → {wsUrl}");
 }
 
 await using (host)
@@ -64,15 +66,7 @@ await using (host)
     else
     {
         host.WriteStatus(sessionStarted: true);
-        await host.Runtime.TryJoinAsync("Alice", cts.Token);
-        await host.Runtime.TryJoinAsync("Bob", cts.Token);
-        var shoot = await host.Runtime.TryShootAsync("Alice", "Bob", 12, cts.Token);
-        log($"[fork] shoot → committed={shoot.Committed} decision={shoot.Decision}");
-        if (host.Runtime.World.TryGetPlayer("Bob", out var bob) && bob is not null)
-        {
-            log($"[fork] Bob health={bob.Health}");
-        }
-
+        await ForkDemoScenarios.RunOnceAsync(game, host.Runtime, log, cts.Token);
         host.WriteStatus(sessionStarted: true);
         log("[fork] one-shot complete");
     }
@@ -83,17 +77,18 @@ return 0;
 static void PrintHelp()
 {
     Console.WriteLine("""
-NL.Fork.Runtime — Phase P hello-fork (server-side enforcement)
+NL.Fork.Runtime — Phase P game fork runtimes (hello / minecraft / beamng)
 
-  --url ws://127.0.0.1:27021/nl/v1?token=...   NL session bus (required unless --config)
-  --config path/to/rules.nle                   Embedded RuleEngine (no bus)
-  --mods path/to/mods.json                     Server-side mod manifest
-  --status path/to/fork-status.json            Operator status file
+  --game hello|minecraft|beamng              Game profile (default hello)
+  --url ws://127.0.0.1:27021/nl/v1?token=... NL session bus (required unless --config)
+  --config path/to/rules.nle                 Embedded RuleEngine (no bus)
+  --mods path/to/mods.json                   Server-side mod manifest
+  --status path/to/fork-status.json          Operator status file
   --admit-url http://host/api/v1/session/admit Pre-connect join gate
-  --loop                                       Repeat demo scenario
-  --interval 8                                 Loop seconds (default 8)
+  --loop                                     Repeat demo scenario
+  --interval 8                               Loop seconds (default 8)
 
-Env: NL_FORK_WS_URL, NL_FORK_MODS, NL_FORK_STATUS, NL_FORK_ADMIT_URL
+Env: NL_FORK_GAME, NL_FORK_WS_URL, NL_FORK_MODS, NL_FORK_STATUS, NL_FORK_ADMIT_URL
 """);
 }
 

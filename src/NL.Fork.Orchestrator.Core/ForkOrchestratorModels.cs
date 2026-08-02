@@ -54,7 +54,8 @@ public sealed record ForkProvisionerStartRequest(
     string AdmitUrl,
     string ModsJsonPath,
     string NlePath,
-    string? DockerImage = null);
+    string? DockerImage = null,
+    string? GameId = null);
 
 public sealed record ForkProvisionerStartResult(
     bool Success,

@@ -68,7 +68,7 @@ target health unchanged — verified in `tests/NL.Fork.Core.Tests`.
 | Title | Path |
 |-------|------|
 | **Hello-fork** | Reference `IForkRuntime` in `NL.Fork.Core` |
-| **Minecraft dedicated** | Implement `IForkRuntime` in Paper/Purpur plugin; same WS contract |
-| **BeamNG** | Replace file-tail bridge with in-process fork hook + UDP actions optional |
+| **Minecraft** | `nl-fork-minecraft` sidecar + `nl-fork-minecraft-paper` (Paper plugin) — [NL_FORK_GAME_IMAGES.md](NL_FORK_GAME_IMAGES.md) |
+| **BeamNG** | `nl-fork-beamng` sidecar + host Lua mod — [NL_FORK_GAME_IMAGES.md](NL_FORK_GAME_IMAGES.md) |
 
 See [NL_INTEGRATION_SPEC.md](NL_INTEGRATION_SPEC.md) and [NL_FORK_PLATFORM.md](NL_FORK_PLATFORM.md).

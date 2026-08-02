@@ -18,10 +18,10 @@ Implement `IForkRuntime` from `NL.Fork.Core` inside your game server process.
 
 ## Migrating Minecraft / BeamNG
 
-**Minecraft (Paper/Purpur):** Plugin hooks `EntityDamageByEntityEvent` → `TryShootAsync` pattern;
-connect plugin to `ws://session-host:27021/nl/v1?token=…` instead of RCON-only.
+**Minecraft (Paper/Purpur):** See [`integrations/minecraft/paper/`](../../integrations/minecraft/paper/) — full WebSocket fork plugin + `nl-fork-minecraft-paper` Docker image.
 
-**BeamNG:** Move from file-tail NDJSON to in-mod call into a sidecar running `NL.Fork.Runtime`,
-or embed C# fork host via future native bridge.
+**Minecraft (sidecar):** `nl-fork-minecraft` C# runtime with `minecraft.nle` event vocabulary for orchestrator smoke tests.
+
+**BeamNG:** `nl-fork-beamng` sidecar + existing `NL_BeamNGBridge` Lua mod on the host. See [docs/NL_FORK_GAME_IMAGES.md](../../docs/NL_FORK_GAME_IMAGES.md).
 
 Today's log/UDP bridges **keep working** — fork runtime is the NL-hosted path.

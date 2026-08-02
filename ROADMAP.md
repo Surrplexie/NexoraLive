@@ -515,7 +515,7 @@ only via external log/UDP bridges. This is what enables "~100% enforcement."
 - [x] **Tests** — `tests/NL.Fork.Core.Tests` (9 tests, block shoot preserves health)
 - [x] **Operator API** — `GET /api/v1/fork/status`, `scripts/nl-fork-smoke.ps1`
 - [x] **Docs** — [docs/NL_FORK_RUNTIME.md](docs/NL_FORK_RUNTIME.md)
-- [ ] **Minecraft / BeamNG NL-hosted images** — optional; bridge path remains default
+- [x] **Minecraft / BeamNG NL-hosted images** — `nl-fork-minecraft`, `nl-fork-beamng`, `nl-fork-minecraft-paper`; see [docs/NL_FORK_GAME_IMAGES.md](docs/NL_FORK_GAME_IMAGES.md)
 
 **Exit criteria:** On NL-hosted fork, `event shoot: block` prevents damage without external
 RCON/UDP hack. **Met** via `HelloForkRuntimeTests.TryShootAsync_BlockRule_DoesNotApplyDamage`.

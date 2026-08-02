@@ -20,7 +20,7 @@ public sealed record ForkPlayerStatus(
 /// <summary>Builds status snapshots from a live fork runtime.</summary>
 public static class ForkRuntimeStatusBuilder
 {
-    public static ForkRuntimeStatus FromRuntime(HelloForkRuntime runtime, bool sessionStarted)
+    public static ForkRuntimeStatus FromRuntime(IForkRuntimeDetails runtime, bool sessionStarted)
     {
         var players = runtime.World.Players.Values
             .Select(p => new ForkPlayerStatus(p.Name, p.Health, p.Alive, p.HasWeapon, p.X, p.Y, p.Z))

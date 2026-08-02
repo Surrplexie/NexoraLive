@@ -93,6 +93,61 @@ public static class ForkEventFactory
             ["player.z"] = player.Z,
         });
 
+    public static SessionEvent PlayerDeath(ForkPlayerState player, ForkModManifest mods, double sessionDeathCount = 1) =>
+        WithProps("playerDeath", player.Name, mods, new Dictionary<string, double>
+        {
+            ["player.alive"] = 0,
+            ["player.health"] = 0,
+            ["player.sessionDeathCount"] = sessionDeathCount,
+        });
+
+    public static SessionEvent EntityDamage(
+        ForkPlayerState attacker,
+        ForkPlayerState? victim,
+        double damage,
+        ForkModManifest mods) =>
+        WithProps("entityDamage", attacker.Name, mods, new Dictionary<string, double>
+        {
+            ["weapon.damage"] = damage,
+            ["player.alive"] = attacker.Alive ? 1 : 0,
+            ["target.alive"] = victim?.Alive == true ? 1 : 0,
+        });
+
+    public static SessionEvent PlayerAdvancement(ForkPlayerState player, string advancementId, ForkModManifest mods) =>
+        WithProps("playerAdvancement", player.Name, mods, new Dictionary<string, double>
+        {
+            ["advancement.id"] = advancementId.GetHashCode(StringComparison.Ordinal) & 0xFFFF,
+        });
+
+    public static SessionEvent SessionEnd(ForkModManifest mods) =>
+        WithProps("sessionEnd", "NL-Fork", mods, new Dictionary<string, double>());
+
+    public static SessionEvent BeamngMove(ForkPlayerState player, double speedMph, ForkModManifest mods) =>
+        WithProps("move", player.Name, mods, new Dictionary<string, double>
+        {
+            ["vehicle.speed"] = speedMph,
+            ["player.alive"] = player.Alive ? 1 : 0,
+        });
+
+    public static SessionEvent Crash(ForkPlayerState player, double severity, ForkModManifest mods) =>
+        WithProps("crash", player.Name, mods, new Dictionary<string, double>
+        {
+            ["crash.severity"] = severity,
+            ["vehicle.speed"] = player.X,
+        });
+
+    public static SessionEvent Airtime(ForkPlayerState player, double seconds, ForkModManifest mods) =>
+        WithProps("airtime", player.Name, mods, new Dictionary<string, double>
+        {
+            ["airtime.seconds"] = seconds,
+        });
+
+    public static SessionEvent Rollover(ForkPlayerState player, ForkModManifest mods) =>
+        WithProps("rollover", player.Name, mods, new Dictionary<string, double>
+        {
+            ["player.alive"] = player.Alive ? 1 : 0,
+        });
+
     private static SessionEvent WithProps(
         string eventName,
         string? player,

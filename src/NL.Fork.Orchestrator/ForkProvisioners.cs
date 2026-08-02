@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using NL.Fork.Core;
 using NL.Fork.Orchestrator.Core;
 
 namespace NL.Fork.Orchestrator;
@@ -66,8 +67,10 @@ public sealed class ProcessForkProvisioner : IForkProvisioner
         }
 
         var statusPath = Path.Combine(request.WorkspacePath, "fork-status.json");
+        var profile = ForkGameProfiles.Resolve(request.GameId);
+        var gameArg = profile.GameArg;
         var args =
-            $"\"{runtimeDll}\" --url \"{request.BridgeWebSocketUrl}\" " +
+            $"\"{runtimeDll}\" --game {gameArg} --url \"{request.BridgeWebSocketUrl}\" " +
             $"--mods \"{request.ModsJsonPath}\" --status \"{statusPath}\" " +
             $"--admit-url \"{request.AdmitUrl}\" --loop --interval 8";
 
@@ -162,16 +165,23 @@ public sealed class DockerForkProvisioner : IForkProvisioner
         var image = string.IsNullOrWhiteSpace(request.DockerImage) ? "nl-fork-hello:latest" : request.DockerImage;
         var name = $"nl-fork-{request.SessionId}".ToLowerInvariant();
         var ws = request.WorkspacePath.Replace('\\', '/');
+        var profile = ForkGameProfiles.Resolve(request.GameId);
+        var gameArg = profile.GameArg;
+        var portMap = profile.PlayerConnectPort is int port
+            ? $"-p {port}:{port} "
+            : "";
 
         var args =
             $"run -d --rm --name {name} " +
+            portMap +
             $"-v \"{ws}:/data\" " +
             $"-e NL_FORK_WS_URL={request.BridgeWebSocketUrl} " +
             $"-e NL_FORK_MODS=/data/mods.json " +
             $"-e NL_FORK_STATUS=/data/fork-status.json " +
             $"-e NL_FORK_ADMIT_URL={request.AdmitUrl} " +
+            $"-e NL_FORK_GAME={gameArg} " +
             $"-e NL_DATA_ROOT=/data " +
-            $"{image} --loop --interval 8";
+            $"{image} --game {gameArg} --loop --interval 8";
 
         var (code, output, err) = await RunDockerAsync(args, cancellationToken);
         if (code != 0)
@@ -181,10 +191,26 @@ public sealed class DockerForkProvisioner : IForkProvisioner
 
         var containerId = output.Trim();
         _log?.Invoke($"[orchestrator] docker container {name} id={containerId}");
+        var connect = BuildConnectEndpoint(profile, name, port: profile.PlayerConnectPort);
         return new ForkProvisionerStartResult(
             true,
             ContainerOrProcessId: containerId,
-            ForkConnectEndpoint: $"docker://{name}");
+            ForkConnectEndpoint: connect);
+    }
+
+    private static string BuildConnectEndpoint(ForkGameProfile profile, string containerName, int? port)
+    {
+        if (port is int p && string.Equals(profile.ConnectScheme, "minecraft", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"minecraft://127.0.0.1:{p}";
+        }
+
+        if (string.Equals(profile.ConnectScheme, "beamng-sidecar", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"beamng-sidecar://127.0.0.1/udp/27022";
+        }
+
+        return $"docker://{containerName}";
     }
 
     public async Task StopAsync(ForkOrchestratorSession session, CancellationToken cancellationToken = default)

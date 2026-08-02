@@ -4,46 +4,56 @@ using NL.Server.Core;
 
 namespace NL.Fork.Core;
 
-/// <summary>Runs hello-fork against a remote NL session bus with optional demo loop.</summary>
+/// <summary>Runs a game fork runtime against a remote NL session bus with optional demo loop.</summary>
 public sealed class ForkRuntimeHost : IAsyncDisposable
 {
-    private readonly HelloForkRuntime _runtime;
+    private readonly IForkRuntimeDetails _runtime;
     private readonly ForkNlBridgeClient? _bridge;
+    private readonly ForkGameKind _game;
     private readonly string? _statusPath;
     private readonly Action<string>? _log;
 
     public ForkRuntimeHost(
-        HelloForkRuntime runtime,
+        IForkRuntimeDetails runtime,
+        ForkGameKind game,
         ForkNlBridgeClient? bridge,
         string? statusPath = null,
         Action<string>? log = null)
     {
         _runtime = runtime;
+        _game = game;
         _bridge = bridge;
         _statusPath = statusPath;
         _log = log;
     }
 
-    public HelloForkRuntime Runtime => _runtime;
+    public IForkRuntimeDetails Runtime => _runtime;
 
-    public static ForkRuntimeHost CreateEmbedded(string nleSource, ForkModManifest? mods = null, IJoinGate? joinGate = null)
+    public ForkGameKind Game => _game;
+
+    public static ForkRuntimeHost CreateEmbedded(
+        ForkGameKind game,
+        string nleSource,
+        ForkModManifest? mods = null,
+        IJoinGate? joinGate = null)
     {
-        var session = new EmbeddedForkSession(nleSource, mods, joinGate);
-        return new ForkRuntimeHost(session.Runtime, bridge: null);
+        var runtime = ForkRuntimeFactory.CreateEmbedded(game, nleSource, mods, joinGate);
+        return new ForkRuntimeHost(runtime, game, bridge: null);
     }
 
     public static ForkRuntimeHost CreateRemote(
+        ForkGameKind game,
         ForkNlBridgeClient bridge,
         ForkModManifest? mods = null,
         Func<string, Task<bool>>? admitAsync = null,
         string? statusPath = null,
         Action<string>? log = null)
     {
-        var runtime = new HelloForkRuntime(bridge, mods, admitAsync);
-        return new ForkRuntimeHost(runtime, bridge, statusPath, log);
+        var runtime = ForkRuntimeFactory.Create(game, bridge, mods, admitAsync);
+        return new ForkRuntimeHost(runtime, game, bridge, statusPath, log);
     }
 
-    public void WriteStatus(bool sessionStarted)
+    public void WriteStatus(bool sessionStarted, bool connected = true)
     {
         if (string.IsNullOrWhiteSpace(_statusPath))
         {
@@ -51,7 +61,7 @@ public sealed class ForkRuntimeHost : IAsyncDisposable
         }
 
         var status = ForkRuntimeStatusBuilder.FromRuntime(_runtime, sessionStarted);
-        ForkStatusFile.Write(_statusPath, status);
+        ForkStatusFile.Write(_statusPath, status, connected, _game);
     }
 
     public async Task RunDemoLoopAsync(
@@ -60,47 +70,11 @@ public sealed class ForkRuntimeHost : IAsyncDisposable
         CancellationToken cancellationToken)
     {
         _ = admitUrl;
-        var runtime = _runtime;
-        var players = new[] { "Alice", "Bob" };
         while (!cancellationToken.IsCancellationRequested)
         {
             WriteStatus(sessionStarted: true);
-
-            foreach (var player in players)
-            {
-                var join = await runtime.TryJoinAsync(player, cancellationToken);
-                _log?.Invoke($"[fork] join {player} → {(join.Committed ? "ok" : join.Message)}");
-            }
-
-            var shoot = await runtime.TryShootAsync("Alice", "Bob", 12, cancellationToken);
-            _log?.Invoke($"[fork] Alice shoots Bob → committed={shoot.Committed} decision={shoot.Decision}");
-
-            if (runtime.World.TryGetPlayer("Bob", out var bob) && bob is not null)
-            {
-                _log?.Invoke($"[fork] Bob health={bob.Health}");
-            }
-
-            await runtime.TryChatAsync("Bob", "HELLO EVERYONE!!!", cancellationToken);
-            await runtime.TryRespawnAsync("Bob", cancellationToken);
-
-            foreach (var player in players)
-            {
-                if (runtime.World.TryGetPlayer(player, out _))
-                {
-                    await runtime.TryLeaveAsync(player, cancellationToken);
-                }
-            }
-
+            await ForkDemoScenarios.RunLoopAsync(_game, _runtime, intervalSeconds, _log, cancellationToken);
             WriteStatus(sessionStarted: true);
-
-            try
-            {
-                await Task.Delay(TimeSpan.FromSeconds(intervalSeconds), cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
         }
     }
 

@@ -11,7 +11,7 @@ public static class ForkStatusFile
         WriteIndented = true,
     };
 
-    public static void Write(string path, ForkRuntimeStatus status)
+    public static void Write(string path, ForkRuntimeStatus status, bool connected = true, ForkGameKind? game = null)
     {
         var dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir))
@@ -22,6 +22,8 @@ public static class ForkStatusFile
         var payload = new
         {
             updatedAtUtc = DateTimeOffset.UtcNow,
+            connected,
+            game = game?.ToString().ToLowerInvariant(),
             sessionStarted = status.SessionStarted,
             connectedPlayers = status.ConnectedPlayers,
             players = status.Players,

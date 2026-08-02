@@ -1,6 +1,45 @@
 {
-  "maxMajorsPerGame": 2,
+  "maxMajorsPerGame": 3,
   "entries": [
+    {
+      "gameId": "minecraft",
+      "displayName": "Minecraft Java",
+      "majorVersion": "1.0",
+      "imageDigest": "sha256:minecraftfork10",
+      "tier": "AtOwnRisk",
+      "minClientVersion": "1.21",
+      "defaultNleTemplate": "configs/minecraft.nle",
+      "dockerImage": "nl-fork-minecraft:latest",
+      "noProgressTransfer": true,
+      "status": "Active",
+      "registeredAtUtc": "2026-01-01T00:00:00Z"
+    },
+    {
+      "gameId": "minecraft-paper",
+      "displayName": "Minecraft Java (Paper dedicated)",
+      "majorVersion": "1.0",
+      "imageDigest": "sha256:minecraftpaper10",
+      "tier": "AtOwnRisk",
+      "minClientVersion": "1.21.1",
+      "defaultNleTemplate": "configs/minecraft.nle",
+      "dockerImage": "nl-fork-minecraft-paper:latest",
+      "noProgressTransfer": true,
+      "status": "Active",
+      "registeredAtUtc": "2026-02-01T00:00:00Z"
+    },
+    {
+      "gameId": "beamng",
+      "displayName": "BeamNG.drive",
+      "majorVersion": "1.0",
+      "imageDigest": "sha256:beamngfork10",
+      "tier": "AtOwnRisk",
+      "minClientVersion": "0.38",
+      "defaultNleTemplate": "configs/beamng.nle",
+      "dockerImage": "nl-fork-beamng:latest",
+      "noProgressTransfer": true,
+      "status": "Active",
+      "registeredAtUtc": "2026-01-01T00:00:00Z"
+    },
     {
       "gameId": "gameA",
       "displayName": "Game A (demo fork)",
@@ -9,6 +48,7 @@
       "tier": "AtOwnRisk",
       "minClientVersion": "1.0.0",
       "defaultNleTemplate": "configs/fork-hello.nle",
+      "dockerImage": "nl-fork-hello:latest",
       "noProgressTransfer": true,
       "status": "Active",
       "registeredAtUtc": "2026-01-01T00:00:00Z"
@@ -21,6 +61,7 @@
       "tier": "Platform",
       "minClientVersion": "2.0.0",
       "defaultNleTemplate": "configs/fork-hello.nle",
+      "dockerImage": "nl-fork-hello:latest",
       "noProgressTransfer": true,
       "status": "Active",
       "registeredAtUtc": "2026-06-01T00:00:00Z"
@@ -33,6 +74,7 @@
       "tier": "Official",
       "minClientVersion": "1.0.0",
       "defaultNleTemplate": "configs/fork-hello.nle",
+      "dockerImage": "nl-fork-hello:latest",
       "noProgressTransfer": true,
       "status": "Active",
       "registeredAtUtc": "2026-01-15T00:00:00Z"

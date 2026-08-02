@@ -119,6 +119,9 @@ public sealed class NlForkOrchestratorService
         _store.Save(session);
         _audit.Append("create_pending", session);
 
+        var gameProfile = ForkGameProfiles.Resolve(request.GameId);
+        var dockerImage = request.DockerImage ?? gameProfile.DockerImage ?? _settings.DefaultDockerImage;
+
         var start = await provisioner.StartAsync(new ForkProvisionerStartRequest(
             sessionId,
             layout.Root,
@@ -126,7 +129,8 @@ public sealed class NlForkOrchestratorService
             admitUrl,
             layout.ModsJsonPath,
             layout.RulesNlePath,
-            request.DockerImage ?? _settings.DefaultDockerImage), cancellationToken);
+            dockerImage,
+            request.GameId), cancellationToken);
 
         if (!start.Success)
         {

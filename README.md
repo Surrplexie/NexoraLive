@@ -542,6 +542,7 @@ Detector vocabulary and wiring: [`docs/ANTICHEAT.md`](docs/ANTICHEAT.md).
 | [`docs/NL_CLIENT.md`](docs/NL_CLIENT.md) | NL Client join shell, deep links (Phase R) |
 | [`docs/NL_FLEET_OPS.md`](docs/NL_FLEET_OPS.md) | Fleet ops, relay, observability, SLOs (Phase S) |
 | [`docs/NL_FORK_RUNTIME.md`](docs/NL_FORK_RUNTIME.md) | Fork runtime + hello-fork (Phase P) |
+| [`docs/NL_FORK_GAME_IMAGES.md`](docs/NL_FORK_GAME_IMAGES.md) | Minecraft / BeamNG Docker fork images (Phase P) |
 | [`docs/NL_IDENTITY.md`](docs/NL_IDENTITY.md) | Platform identity & ownership (Phase L) |
 | [`docs/NL_SOCIAL_GATE.md`](docs/NL_SOCIAL_GATE.md) | Live social gate & join policy (Phase M) |
 | [`docs/NL_INTEGRATION_SPEC.md`](docs/NL_INTEGRATION_SPEC.md) | Universal game integration contract |

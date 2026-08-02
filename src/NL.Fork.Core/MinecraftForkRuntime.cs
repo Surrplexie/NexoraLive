@@ -3,17 +3,18 @@ using NL.Server.Core;
 
 namespace NL.Fork.Core;
 
-/// <summary>Reference <see cref="IForkRuntime"/> — minimal FPS-like fork for Phase P smoke tests.</summary>
-public sealed class HelloForkRuntime : IForkRuntimeDetails
+/// <summary>Minecraft Java fork runtime — playerJoin, playerChat, entityDamage, playerDeath (Phase P).</summary>
+public sealed class MinecraftForkRuntime : IForkRuntimeDetails
 {
     private readonly IForkDecisionSink _decisions;
     private readonly ForkModManifest _mods;
     private readonly ForkStateValidator _validator = new();
     private readonly ForkActionApplicator _applicator = new();
     private readonly Func<string, Task<bool>>? _admitAsync;
+    private readonly Dictionary<string, int> _deathCounts = new(StringComparer.OrdinalIgnoreCase);
     private bool _sessionStarted;
 
-    public HelloForkRuntime(
+    public MinecraftForkRuntime(
         IForkDecisionSink decisions,
         ForkModManifest? mods = null,
         Func<string, Task<bool>>? admitAsync = null)
@@ -37,8 +38,7 @@ public sealed class HelloForkRuntime : IForkRuntimeDetails
             return;
         }
 
-        var evt = ForkEventFactory.SessionStart(_mods);
-        await _decisions.EvaluateAsync(evt, cancellationToken);
+        await _decisions.EvaluateAsync(ForkEventFactory.SessionStart(_mods), cancellationToken);
         _sessionStarted = true;
     }
 
@@ -93,18 +93,14 @@ public sealed class HelloForkRuntime : IForkRuntimeDetails
             return new ForkActionResult(false, Decision.Block, validation.Reason);
         }
 
-        var shootEvent = ForkEventFactory.Shoot(shooterState, targetState, damage, _mods);
-        var outcome = await _decisions.EvaluateAsync(shootEvent, cancellationToken);
+        var damageEvent = ForkEventFactory.EntityDamage(shooterState, targetState, damage, _mods);
+        var outcome = await _decisions.EvaluateAsync(damageEvent, cancellationToken);
 
         if (outcome.Decision == Decision.Block)
         {
             if (outcome.Action is not null)
             {
                 _applicator.Apply(outcome.Action, World);
-            }
-            else
-            {
-                _applicator.ApplyBlockSideEffects(shootEvent, ActionResult.Block(outcome.Message), World);
             }
 
             return new ForkActionResult(false, outcome.Decision, outcome.Message, outcome.Action?.Action);
@@ -113,50 +109,23 @@ public sealed class HelloForkRuntime : IForkRuntimeDetails
         if (targetState is not null)
         {
             targetState.Health = Math.Max(0, targetState.Health - damage);
+            if (targetState.Health <= 0)
+            {
+                targetState.Health = 0;
+                await TryDeathAsync(target, cancellationToken);
+            }
         }
 
         return new ForkActionResult(true, Decision.Allow, outcome.Message);
     }
 
-    public async Task<ForkActionResult> TryMoveAsync(
+    public Task<ForkActionResult> TryMoveAsync(
         string player,
         double x,
         double y,
         double z,
-        CancellationToken cancellationToken = default)
-    {
-        if (!World.TryGetPlayer(player, out var state) || state is null)
-        {
-            return new ForkActionResult(false, Decision.Block, "unknown player");
-        }
-
-        var validation = _validator.ValidateMove(state, x, y, z, World);
-        if (!validation.Allowed)
-        {
-            var boundaryEvent = ForkEventFactory.LeaveBoundary(state, _mods);
-            var boundaryOutcome = await _decisions.EvaluateAsync(boundaryEvent, cancellationToken);
-            if (boundaryOutcome.Action is not null)
-            {
-                _applicator.Apply(boundaryOutcome.Action, World);
-            }
-
-            return new ForkActionResult(false, Decision.Block, validation.Reason);
-        }
-
-        state.X = x;
-        state.Y = y;
-        state.Z = z;
-
-        var moveEvent = ForkEventFactory.Move(state, _mods);
-        var outcome = await _decisions.EvaluateAsync(moveEvent, cancellationToken);
-        if (outcome.Decision == Decision.Block && outcome.Action is not null)
-        {
-            _applicator.Apply(outcome.Action, World);
-            return new ForkActionResult(false, outcome.Decision, outcome.Message, outcome.Action.Action);
-        }
-
-        return new ForkActionResult(true, Decision.Allow, outcome.Message);
-    }
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(new ForkActionResult(true, Decision.Allow, null));
 
     public async Task<ForkActionResult> TryRespawnAsync(string player, CancellationToken cancellationToken = default)
     {
@@ -165,30 +134,20 @@ public sealed class HelloForkRuntime : IForkRuntimeDetails
             return new ForkActionResult(false, Decision.Block, "unknown player");
         }
 
-        var requestedHealth = state.Alive ? 0 : 100;
-        var validation = _validator.ValidateRespawn(state, requestedHealth);
-        if (!validation.Allowed)
+        var respawnEvent = ForkEventFactory.Respawn(state, 20, _mods);
+        var outcome = await _decisions.EvaluateAsync(respawnEvent, cancellationToken);
+        if (outcome.Decision == Decision.Block)
         {
-            var respawnPreview = ForkEventFactory.Respawn(state, state.Health, _mods);
-            var outcome = await _decisions.EvaluateAsync(respawnPreview, cancellationToken);
-            if (outcome.Decision == Decision.Block)
+            if (outcome.Action is not null)
             {
-                if (outcome.Action is not null)
-                {
-                    _applicator.Apply(outcome.Action, World);
-                }
-
-                return new ForkActionResult(false, outcome.Decision, outcome.Message, outcome.Action?.Action);
+                _applicator.Apply(outcome.Action, World);
             }
+
+            return new ForkActionResult(false, outcome.Decision, outcome.Message, outcome.Action?.Action);
         }
 
-        var health = state.Alive ? state.Health : 100;
-        if (!state.Alive)
-        {
-            state.Health = 100;
-        }
-
-        return new ForkActionResult(true, Decision.Allow, null);
+        state.Health = 20;
+        return new ForkActionResult(true, Decision.Allow, outcome.Message);
     }
 
     public async Task<ForkActionResult> TryChatAsync(
@@ -227,5 +186,50 @@ public sealed class HelloForkRuntime : IForkRuntimeDetails
         await _decisions.EvaluateAsync(leaveEvent, cancellationToken);
         World.RemovePlayer(player);
         return new ForkActionResult(true, Decision.Allow, null);
+    }
+
+    public async Task<ForkActionResult> TryDeathAsync(string player, CancellationToken cancellationToken = default)
+    {
+        if (!World.TryGetPlayer(player, out var state) || state is null)
+        {
+            return new ForkActionResult(false, Decision.Block, "unknown player");
+        }
+
+        _deathCounts.TryGetValue(player, out var count);
+        count++;
+        _deathCounts[player] = count;
+
+        var deathEvent = ForkEventFactory.PlayerDeath(state, _mods, count);
+        var outcome = await _decisions.EvaluateAsync(deathEvent, cancellationToken);
+        state.Health = 0;
+
+        if (outcome.Decision == Decision.Block && outcome.Action is not null)
+        {
+            _applicator.Apply(outcome.Action, World);
+            return new ForkActionResult(false, outcome.Decision, outcome.Message, outcome.Action?.Action);
+        }
+
+        return new ForkActionResult(true, Decision.Allow, outcome.Message);
+    }
+
+    public async Task<ForkActionResult> TryAdvancementAsync(
+        string player,
+        string advancementId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!World.TryGetPlayer(player, out var state) || state is null)
+        {
+            return new ForkActionResult(false, Decision.Block, "unknown player");
+        }
+
+        var advEvent = ForkEventFactory.PlayerAdvancement(state, advancementId, _mods);
+        var outcome = await _decisions.EvaluateAsync(advEvent, cancellationToken);
+        if (outcome.Decision == Decision.Block && outcome.Action is not null)
+        {
+            _applicator.Apply(outcome.Action, World);
+            return new ForkActionResult(false, outcome.Decision, outcome.Message, outcome.Action?.Action);
+        }
+
+        return new ForkActionResult(true, Decision.Allow, outcome.Message);
     }
 }

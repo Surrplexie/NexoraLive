@@ -1,43 +1,41 @@
-# NL Paper plugin stub
+# NL Paper plugin — fork runtime (Phase P)
 
-Implement [**NL Game Integration Spec v1**](../../../docs/NL_INTEGRATION_SPEC.md) in a Paper plugin.
+Full **propose-then-commit** integration for Minecraft Java on NL-hosted Paper servers.
 
-## Approach
+## Build
 
-1. **WebSocket (recommended):** connect to `ws://127.0.0.1:27021/nl/v1` on enable.
-2. **Or file tail:** append to `%LOCALAPPDATA%/NL/minecraft-events.ndjson` (legacy).
-
-## Events to emit
-
-| Bukkit event | NL `event` |
-|--------------|------------|
-| `PlayerJoinEvent` | `playerJoin` |
-| `PlayerQuitEvent` | `playerLeave` |
-| `AsyncPlayerChatEvent` | `playerChat` |
-| `PlayerDeathEvent` | `playerDeath` |
-| `PlayerRespawnEvent` | `respawn` |
-
-Example line:
-
-```json
-{"nl":1,"event":"playerJoin","player":"Steve","ts":1700001000000,"props":{"player.alive":1}}
+```powershell
+mvn -f integrations/minecraft/paper/pom.xml package
 ```
 
-## Actions to handle
+Output: `integrations/minecraft/paper/target/nl-bridge-1.0.0.jar`
 
-Parse inbound WebSocket text frames (NDJSON). On `"action":"kick"`, call `player.kick(Component.text(message))`.
+## Docker (Paper + plugin)
 
-## Starter class
-
-See [`NLBridgePlugin.java`](src/main/java/nl/example/NLBridgePlugin.java) — compile with Paper API in your own Gradle project (not built by NL.sln).
-
-## NL.Server
-
-```bash
-dotnet run --project src/NL.Server -- --game generic \
-  --config samples/configs/minecraft.nle \
-  --source ws://127.0.0.1:27021/nl/v1 \
-  --nl-action auto --join-gate --anti-cheat
+```powershell
+docker build -f docker/fork-minecraft-paper/Dockerfile -t nl-fork-minecraft-paper:latest .
 ```
 
-Or keep using log tail + RCON (`--game minecraft`) until the plugin is ready.
+Set `NL_FORK_WS_URL` and `NL_FORK_STATUS=/data/fork-status.json` when running under the fork orchestrator.
+
+## Manual install
+
+Copy the JAR to your Paper server's `plugins/` folder. Edit `plugins/NLBridge/config.yml`:
+
+```yaml
+websocketUrl: "ws://127.0.0.1:27021/nl/v1?token=YOUR_BUS_TOKEN"
+admitUrl: "http://127.0.0.1:27020/api/v1/session/admit"
+gameId: "minecraft"
+enforceJoinGate: true
+```
+
+## Events
+
+| Bukkit | NL event | Block behavior |
+|--------|----------|----------------|
+| Join (+ admit API) | `playerJoin` | kick |
+| Quit | `playerLeave` | — |
+| Chat | `playerChat` | cancel message |
+| PvP damage | `entityDamage` | cancel damage / kick |
+
+See [docs/NL_FORK_GAME_IMAGES.md](../../../docs/NL_FORK_GAME_IMAGES.md).
