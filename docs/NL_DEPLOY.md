@@ -143,7 +143,17 @@ Demo compose mounts **`nl-demo-data`** at `/data` (`NL_DATA_ROOT`):
 
 Docker images and compose services include built-in healthchecks on `/health`.
 
-## Windows deploy
+# Windows — no Docker (local demo)
+
+```powershell
+powershell -File scripts/deploy-demo-native.ps1
+powershell -File scripts/stop-demo-native.ps1
+```
+
+Opens **http://127.0.0.1:27020/** with auto-started demo session + Python loop bridge.
+Secrets written to `docker/.env` for reuse if you later deploy with Docker on a VPS.
+
+## Windows deploy (Docker + Caddy)
 
 ```powershell
 Copy-Item docker\.env.demo.example docker\.env

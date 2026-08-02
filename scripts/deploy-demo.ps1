@@ -8,6 +8,14 @@ if (-not (Test-Path $envFile)) {
     Write-Error "Missing docker\.env — copy docker\.env.demo.example to docker\.env and set secrets."
 }
 
+$dockerCmd = Get-Command docker -ErrorAction SilentlyContinue
+if (-not $dockerCmd) {
+    Write-Host "Docker not found on PATH." -ForegroundColor Yellow
+    Write-Host "For local Windows demo without Docker, run:" -ForegroundColor Yellow
+    Write-Host "  powershell -File scripts/deploy-demo-native.ps1" -ForegroundColor Cyan
+    exit 1
+}
+
 Get-Content $envFile | ForEach-Object {
     if ($_ -match '^\s*([^#=]+)=(.*)$') {
         $name = $matches[1].Trim()

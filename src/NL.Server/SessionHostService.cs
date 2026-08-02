@@ -24,7 +24,7 @@ public sealed class SessionHostService
 
     public SessionHostState State { get; private set; } = SessionHostState.Idle;
 
-    public int DecisionCount => _runner?.Host?.Decisions.Count ?? 0;
+    public int DecisionCount => _runner?.Host?.LiveDecisionCount ?? 0;
 
     public IReadOnlyList<string> GetLogSnapshot()
     {

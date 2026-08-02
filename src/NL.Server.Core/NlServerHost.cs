@@ -32,6 +32,9 @@ public sealed class NlServerHost
 
     public IReadOnlyList<HostedDecision> Decisions { get; private set; } = Array.Empty<HostedDecision>();
 
+    /// <summary>Increments as each event is evaluated (live sessions never finalize <see cref="Decisions"/>).</summary>
+    public int LiveDecisionCount { get; private set; }
+
     /// <summary>Runs until the source ends or <paramref name="cancellationToken"/> fires.
     /// <paramref name="onDecision"/> is awaited (e.g. Phase 4's moderation audit log) before
     /// the action sink runs, so a logging failure never suppresses a real action.</summary>
@@ -56,6 +59,7 @@ public sealed class NlServerHost
 
             var hosted = new HostedDecision(sessionEvent, result, joinOutcome);
             recorded.Add(hosted);
+            LiveDecisionCount++;
 
             if (onDecision is not null)
             {
