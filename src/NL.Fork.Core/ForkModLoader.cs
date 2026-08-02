@@ -15,6 +15,9 @@ public sealed class ForkModEntry
 
     public string? Description { get; init; }
 
+    /// <summary>Optional SHA-256 of mod manifest bytes for hub verification (Phase N).</summary>
+    public string? Sha256 { get; init; }
+
     /// <summary>Numeric prop overrides applied when building session events.</summary>
     public Dictionary<string, double> Props { get; init; } = new();
 }

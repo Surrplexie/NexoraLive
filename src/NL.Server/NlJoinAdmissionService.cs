@@ -6,6 +6,7 @@ using NL.Moderation;
 using NL.Moderation.Core;
 using NL.Server.Core.Integration;
 using NL.Social;
+using NL.Fork.Catalog;
 
 namespace NL.Server;
 
@@ -54,6 +55,7 @@ public sealed class NlJoinAdmissionService
         SessionProfileFile? profile,
         NlIdentityHost? identity,
         NlSocialHost? social = null,
+        NlForkCatalogHost? catalog = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.PlayerId))
@@ -115,6 +117,32 @@ public sealed class NlJoinAdmissionService
                     ownershipDeny.Reason,
                     standing,
                     ownershipDeny.OwnershipStatus.ToString());
+            }
+        }
+
+        if (profile?.CatalogEnforced == true && catalog?.Settings.Enabled == true)
+        {
+            var gameId = request.GameId ?? profile.GameId ?? profile.Game;
+            var expectedMajor = profile.GameMajorVersion;
+            if (string.IsNullOrWhiteSpace(expectedMajor))
+            {
+                return NlJoinAdmissionResult.FromCatalogDeny(
+                    playerId,
+                    "Session profile missing catalog major version.",
+                    standing);
+            }
+
+            var catalogResult = catalog.Catalog.ValidateClientMajor(
+                gameId,
+                request.MajorVersion ?? expectedMajor,
+                expectedMajor);
+            if (!catalogResult.IsValid)
+            {
+                return NlJoinAdmissionResult.FromCatalogDeny(
+                    playerId,
+                    catalogResult.Error ?? "Catalog validation failed.",
+                    standing,
+                    catalogResult.Entry?.Tier.ToString());
             }
         }
 
@@ -244,6 +272,10 @@ public static class NlSessionServerHelper
             OwnershipRequired = profile.RequireGameOwnership,
             GameId = profile.GameId,
             PlatformAppId = profile.PlatformAppId,
+            CatalogMajorVersion = profile.GameMajorVersion,
+            PartnershipTier = profile.PartnershipTier,
+            NoProgressTransfer = profile.NoProgressTransfer,
+            CatalogLegalNotice = profile.CatalogLegalNotice,
         };
     }
 }

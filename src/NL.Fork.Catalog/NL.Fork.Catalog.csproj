@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>NL.Fork.Catalog</RootNamespace>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NL.Core\NL.Core.csproj" />
+    <ProjectReference Include="..\NL.Fork.Core\NL.Fork.Core.csproj" />
+    <ProjectReference Include="..\NL.Fork.Catalog.Core\NL.Fork.Catalog.Core.csproj" />
+  </ItemGroup>
+
+</Project>

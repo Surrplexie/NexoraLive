@@ -1,11 +1,65 @@
 # NexoraLive (NL)
 
-**Status:** early prototype — usable for local demos, replay validation, and Windows-side tooling.  
-**Not yet:** a finished product, hosted multiplayer platform, or drop-in replacement for game-specific moderation stacks.
+**Status:** active prototype — local demos, replay validation, Windows tooling, and a growing **fork-platform control plane** (identity, social gate, fork catalog, fork runtime).  
+**Not yet:** production hosted fork fleet, full client overlay, or publisher SDK integrations in the wild.
 
-NexoraLive is a streamer-oriented session rules system. You author plain-text `.nle` configs; a shared rule engine evaluates gameplay (or hotkey) events and returns **Allow**, **Block**, or **Warn**. This repository implements that core loop plus the first real integrations around it.
+NexoraLive is a streamer-oriented session rules system. You author plain-text `.nle` configs; a shared rule engine evaluates gameplay (or hotkey) events and returns **Allow**, **Block**, or **Warn**. This repository implements that core loop plus integrations toward **NL Server** (session control) and **NL Fork** (licensed game snapshots on NL infrastructure).
 
-For the long-form NLE walkthrough, see [`NLE_GUIDE.md`](NLE_GUIDE.md). For build vs. plan, see [`ROADMAP.md`](ROADMAP.md).
+For the long-form NLE walkthrough, see [`NLE_GUIDE.md`](NLE_GUIDE.md). For build vs. plan, see [`ROADMAP.md`](ROADMAP.md). For the fork-platform architecture, see [`docs/NL_FORK_PLATFORM.md`](docs/NL_FORK_PLATFORM.md).
+
+---
+
+## NL Server and NL Fork
+
+NL separates **who may join and what rules apply** from **where the game actually runs**. Both are required for streamer community sessions that publisher matchmaking cannot enforce today.
+
+### NL Server (NLS) — control plane
+
+**NL Server** is the session control layer: rules, moderation, join admission, identity, and the session bus that game bridges connect to.
+
+| Responsibility | What it does |
+|----------------|--------------|
+| **Rule enforcement** | Evaluates `.nle` configs via the shared `RuleEngine` (Allow / Block / Warn) |
+| **Join admission** | `JoinEligibilityEngine` — standing, follow/sub, offenses, graylist hold |
+| **Identity** | Platform ownership proof (Steam, Epic, …) before admit |
+| **Social gate** | Live follow/sub/discord checks; live-only session start |
+| **Moderation** | Audit trail, warn/ban/graylist, SP offense history |
+| **Session bus** | WebSocket `/nl/v1` — remote bridges emit events and receive actions |
+
+**Ships today:** `NL.Server` CLI, `NL.SessionHost.Web` (operator dashboard, join gate UI, moderation console), admit API, manifest for remote bridges. See [`docs/NL_SESSION_SERVER.md`](docs/NL_SESSION_SERVER.md).
+
+NL Server does **not** replace a game's executable. It sits **in front of** join and **beside** gameplay via integration bridges (Minecraft log, BeamNG Lua mod, NL Integration Spec v1, hello-fork runtime).
+
+### NL Fork — data plane
+
+**NL Fork** is a **major-version snapshot** of a title running on **NL-controlled infrastructure**. Players use normal licensed clients; server-side mods and NLE configs apply on the fork only — never pushed to viewer PCs.
+
+| Responsibility | What it does |
+|----------------|--------------|
+| **Fork catalog** | Registered `gameId@major` rows (e.g. `gameA@1.0`) with partnership tier and image digest |
+| **Fork runtime** | In-process or containerized game instance; events → session bus → rules → actions |
+| **Server-side mods** | Verified mod hub; hash-checked; baked into fork instance |
+| **Ephemeral sessions** | World/save state discarded when the stream ends; **no progress transfer** to publisher servers |
+| **Major-only versioning** | Catalog rows are `1.0`, `2.0` — not per-patch lines; patches roll into the current major image |
+
+**Ships today:** `NL.Fork.Core`, `NL.Fork.Runtime`, `NL.Fork.Catalog`, `/fork-catalog.html`, mock + hello-fork validation path. See [`docs/NL_FORK_RUNTIME.md`](docs/NL_FORK_RUNTIME.md) and [`docs/NL_FORK_CATALOG.md`](docs/NL_FORK_CATALOG.md).
+
+**Not yet:** `NlForkOrchestrator` (Phase O) — spin up/tear down one forked server per stream session at scale.
+
+### How they work together
+
+```text
+Streamer goes live
+    → selects gameId@major from Fork Catalog
+    → attaches .nle + verified server mods
+    → NL Server validates ownership + social gate + catalog major
+    → Fork instance starts (or bridge connects to existing host)
+    → SP joins via NL admit URL (not native platform invite)
+    → events flow: Fork → session bus → RuleEngine → actions back to Fork
+Stream ends → fork terminated → only .nle, moderation, and metadata persist
+```
+
+Native game invites to NLS addresses **fail by design** — traffic is filtered at the NL join layer. SPs connect only through NL admission after passing standing and ownership checks.
 
 ---
 
@@ -22,6 +76,11 @@ For the long-form NLE walkthrough, see [`NLE_GUIDE.md`](NLE_GUIDE.md). For build
 | **Moderation Console (Windows)** | Audit log + warn / ban / graylist / clear | Basic admin UI |
 | **Anti-cheat (early)** | Session-path anomaly signals (`anomaly*`) evaluated by the same `.nle` engine — see [Anti-cheat direction](#anti-cheat-direction) | Signal prototype; full packet path WIP |
 | **Session Host (Windows)** | One Start/Stop shell for a full session profile | Recommended entry for live |
+| **Session Host Web** | Operator console, join gate, fork catalog, spectator demo, rule editor | Usable (Phases B–N) |
+| **Platform identity** | Game ownership verification at admit (mock + Steam Web API) | Phase L — prototype |
+| **Live social gate** | Follow/sub/discord hydration, live-only NLS, offense archive UI | Phase M — prototype |
+| **Fork catalog** | Major-version registry, partnership tiers, mod hub, game picker UI | Phase N — prototype |
+| **Fork runtime** | Hello-fork + session bus; server-side mod loader | Phase P — prototype |
 | **BeamNG.drive bridge** | Lua mod → NDJSON → rules → localhost UDP + BeamMP kick queue | Freeroam / BeamMP operator path |
 
 **Not implemented yet:** hosted NLServers with in-path packet anti-play, economy / trading cards, mobile clients, cloud hosting, encrypted `.nle` packaging, and most of the broader platform vision. Treat this repo as an **early working guide**: enough to learn the model, validate configs, and dogfood a few real sessions — not a finished operator product.

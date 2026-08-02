@@ -1,0 +1,51 @@
+{
+  "maxMajorsPerGame": 2,
+  "entries": [
+    {
+      "gameId": "gameA",
+      "displayName": "Game A (demo fork)",
+      "majorVersion": "1.0",
+      "imageDigest": "sha256:abc111gamea10",
+      "tier": "AtOwnRisk",
+      "minClientVersion": "1.0.0",
+      "defaultNleTemplate": "configs/fork-hello.nle",
+      "noProgressTransfer": true,
+      "status": "Active",
+      "registeredAtUtc": "2026-01-01T00:00:00Z"
+    },
+    {
+      "gameId": "gameA",
+      "displayName": "Game A (demo fork)",
+      "majorVersion": "2.0",
+      "imageDigest": "sha256:abc222gamea20",
+      "tier": "Platform",
+      "minClientVersion": "2.0.0",
+      "defaultNleTemplate": "configs/fork-hello.nle",
+      "noProgressTransfer": true,
+      "status": "Active",
+      "registeredAtUtc": "2026-06-01T00:00:00Z"
+    },
+    {
+      "gameId": "hello-fork",
+      "displayName": "Hello Fork Runtime",
+      "majorVersion": "1.0",
+      "imageDigest": "sha256:hellofork10",
+      "tier": "Official",
+      "minClientVersion": "1.0.0",
+      "defaultNleTemplate": "configs/fork-hello.nle",
+      "noProgressTransfer": true,
+      "status": "Active",
+      "registeredAtUtc": "2026-01-15T00:00:00Z"
+    }
+  ],
+  "modHub": [
+    {
+      "id": "demo-boost",
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+      "description": "Example server-side damage multiplier (hash of empty string for smoke tests).",
+      "props": {
+        "weapon.damageMultiplier": 2
+      }
+    }
+  ]
+}

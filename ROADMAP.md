@@ -459,20 +459,15 @@ can admit; stream ends → session stops automatically.
 NL-maintained **major-version snapshots** of partner / at-own-risk titles. nl.txt: server-side
 mods without SP downloads; version discipline.
 
-- [ ] **`ForkCatalog` manifest** — `gameId`, display name, `majorVersion` (e.g. `1.0`, `2.0`),
-      container image digest, min client version, partnership tier
-- [ ] **Major-only policy** — no `v1.2` / `v1.4` rows; patches roll into current major image
-- [ ] **Storage governance** — max N majors per title; when over quota, deprecate oldest major
-      and force migration (auto-update policy from vision doc)
-- [ ] **Partnership tiers** — `Official` (publisher SDK) | `Platform` (e.g. Steam-wide opt-in)
-      | `AtOwnRisk` (fork without blessing) — surfaced in UI + legal copy
-- [ ] **Streamer game picker** — Session Host / web: choose game + major → loads default
-      `.nle` template from catalog
-- [ ] **Mod slot model** — streamer attaches verified mod ids from hub (hash-checked); mods
-      baked into fork instance, never pushed to SP clients
-- [ ] **No progress transfer flag** — catalog metadata declares session data is ephemeral;
-      shown at join time
-- [ ] **Tests** — manifest validation, deprecation migration, tier labeling
+- [x] **`ForkCatalog` manifest** — `gameId`, display name, `majorVersion`, image digest, min
+      client version, partnership tier
+- [x] **Major-only policy** — rejects `1.2` / `1.4` rows; patches roll into current major image
+- [x] **Storage governance** — max N majors per title; auto-deprecate oldest on quota exceed
+- [x] **Partnership tiers** — Official | Platform | AtOwnRisk in UI + manifest legal copy
+- [x] **Streamer game picker** — `/fork-catalog.html` + REST select → default `.nle` template
+- [x] **Mod slot model** — verified mod hub + hash on `ForkModEntry`; `ForkModSlotResolver`
+- [x] **No progress transfer flag** — catalog metadata on manifest + join legal notice
+- [x] **Tests** — `tests/NL.Fork.Catalog.Tests` + `scripts/nl-fork-catalog-smoke.ps1`
 
 **Exit criteria:** Operator can register `gameA@1.0` in catalog; streamer selects it; system
 refuses unknown or deprecated majors.

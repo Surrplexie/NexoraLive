@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NL Fork Catalog — Session Host</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="operator-page">
+  <header>
+    <h1>Fork Catalog</h1>
+    <p class="sub">Select game + major version and attach verified server mods (Phase N)</p>
+    <nav class="nav">
+      <a href="/">Watch demo</a>
+      <a href="/editor.html">Rule editor</a>
+      <a href="/operator.html">Operator</a>
+      <a href="/join-gate.html">Join gate</a>
+      <a href="/fork-catalog.html" aria-current="page">Fork catalog</a>
+      <a href="/moderation.html">Moderation</a>
+    </nav>
+  </header>
+
+  <section class="card operator-panel">
+    <h2>Catalog entries</h2>
+    <p class="hint">Major versions only (1.0, 2.0). Deprecated majors are hidden unless noted.</p>
+    <table id="catalog-table">
+      <thead>
+        <tr>
+          <th>Game</th>
+          <th>Major</th>
+          <th>Tier</th>
+          <th>Status</th>
+          <th>Progress</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Selection</h2>
+    <dl id="selection-info"></dl>
+    <div class="grid">
+      <label class="wide">Verified mods (hub)
+        <select id="mod-slots" multiple size="4"></select>
+      </label>
+    </div>
+    <div class="actions">
+      <button type="button" id="apply-selection" class="primary">Apply to session profile</button>
+    </div>
+    <p id="legal-notice" class="status warn"></p>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Catalog settings</h2>
+    <dl id="catalog-settings"></dl>
+  </section>
+
+  <p id="status" class="status muted"></p>
+  <script src="nl-auth.js"></script>
+  <script src="fork-catalog-app.js"></script>
+</body>
+</html>

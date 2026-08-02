@@ -5,6 +5,8 @@ using NL.Server.Core.Security;
 using NL.Identity;
 using NL.Social;
 using NL.Social.Core;
+using NL.Fork.Catalog;
+using NL.Fork.Catalog.Core;
 
 namespace NL.SessionHost.Web;
 
@@ -97,7 +99,11 @@ public sealed class BusHostState
         }
     }
 
-    public async Task<IResult> StartAsync(bool replayOnce, CancellationToken cancellationToken, NlSocialHost? social = null)
+    public async Task<IResult> StartAsync(
+        bool replayOnce,
+        CancellationToken cancellationToken,
+        NlSocialHost? social = null,
+        NlForkCatalogHost? catalog = null)
     {
         if (Sessions.IsRunning)
         {
@@ -124,6 +130,25 @@ public sealed class BusHostState
                     error = "Session cannot start until the streamer is live on a connected channel.",
                     liveStatus = live,
                 });
+            }
+        }
+
+        if (profile.CatalogEnforced && catalog?.Settings.Enabled == true)
+        {
+            var gameId = profile.GameId ?? profile.Game;
+            var major = profile.GameMajorVersion;
+            if (string.IsNullOrWhiteSpace(major))
+            {
+                return Results.BadRequest(new { error = "Catalog-enforced session requires gameMajorVersion on profile." });
+            }
+
+            var validation = catalog.Catalog.ValidateSelection(new ForkCatalogSelection(
+                gameId,
+                major,
+                profile.AttachedModIds));
+            if (!validation.IsValid)
+            {
+                return Results.BadRequest(new { error = validation.Error });
             }
         }
 
@@ -209,6 +234,7 @@ public sealed class BusHostState
         NlAdmitPlayerRequest request,
         NlIdentityHost? identity = null,
         NlSocialHost? social = null,
+        NlForkCatalogHost? catalog = null,
         CancellationToken cancellationToken = default)
     {
         var profile = GetProfile();
@@ -217,7 +243,37 @@ public sealed class BusHostState
             : request.StreamerId.Trim();
         var admission = NlJoinAdmissionService.CreateDefault(streamerId);
         var useSocial = profile.SocialGateEnabled ? social : null;
-        return await admission.EvaluateAsync(request, profile, identity, useSocial, cancellationToken);
+        var useCatalog = profile.CatalogEnforced ? catalog : null;
+        return await admission.EvaluateAsync(request, profile, identity, useSocial, useCatalog, cancellationToken);
+    }
+
+    /// <summary>Phase N — apply catalog game + major to session profile.</summary>
+    public SessionProfileFile ApplyCatalogSelection(
+        ForkCatalogResolveResult resolved,
+        string? samplesRoot = null)
+    {
+        var profile = GetProfile();
+        var entry = resolved.Entry;
+        profile.GameId = entry.GameId;
+        profile.Game = entry.GameId;
+        profile.GameMajorVersion = entry.MajorVersion;
+        profile.CatalogEnforced = true;
+        profile.PartnershipTier = entry.Tier.ToString();
+        profile.NoProgressTransfer = entry.NoProgressTransfer;
+        profile.CatalogLegalNotice = entry.EffectiveLegalNotice;
+        profile.AttachedModIds = resolved.AttachedModIds.ToList();
+
+        if (!string.IsNullOrWhiteSpace(resolved.ResolvedNleTemplate))
+        {
+            profile.ConfigPath = resolved.ResolvedNleTemplate;
+        }
+        else if (!string.IsNullOrWhiteSpace(entry.DefaultNleTemplate) && !string.IsNullOrWhiteSpace(samplesRoot))
+        {
+            profile.ConfigPath = Path.Combine(samplesRoot, entry.DefaultNleTemplate);
+        }
+
+        SaveProfile(profile);
+        return GetProfile();
     }
 
     private static SessionProfileFile CloneProfile(SessionProfileFile p) => new()
@@ -243,6 +299,11 @@ public sealed class BusHostState
         StrictOwnershipUnknown = p.StrictOwnershipUnknown,
         RequireLiveStream = p.RequireLiveStream,
         SocialGateEnabled = p.SocialGateEnabled,
+        CatalogEnforced = p.CatalogEnforced,
+        AttachedModIds = p.AttachedModIds.ToList(),
+        PartnershipTier = p.PartnershipTier,
+        NoProgressTransfer = p.NoProgressTransfer,
+        CatalogLegalNotice = p.CatalogLegalNotice,
     };
 
     private static string ResolveSampleConfig(string name) => NlSampleConfigPaths.Resolve(name);

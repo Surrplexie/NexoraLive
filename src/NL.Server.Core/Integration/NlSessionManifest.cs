@@ -11,6 +11,7 @@ public sealed class NlJoinAdmissionResult
     public required bool Admit { get; init; }
     public SpStanding Standing { get; init; }
     public string? OwnershipStatus { get; init; }
+    public string? PartnershipTier { get; init; }
 
     public static NlJoinAdmissionResult FromJoinResult(JoinResult join, string playerId, SpStanding standing) =>
         new()
@@ -32,6 +33,21 @@ public sealed class NlJoinAdmissionResult
             Standing = standing,
             OwnershipStatus = ownershipStatus,
         };
+
+    public static NlJoinAdmissionResult FromCatalogDeny(
+        string playerId,
+        string reason,
+        SpStanding standing,
+        string? partnershipTier = null) =>
+        new()
+        {
+            Decision = JoinDecision.Deny,
+            Reason = reason,
+            PlayerId = playerId,
+            Admit = false,
+            Standing = standing,
+            PartnershipTier = partnershipTier,
+        };
 }
 
 /// <summary>Connection manifest for remote game bridges (Phase D).</summary>
@@ -50,6 +66,15 @@ public sealed class NlSessionManifest
     public bool OwnershipRequired { get; init; }
     public string? GameId { get; init; }
     public string? PlatformAppId { get; init; }
+
+    /// <summary>Phase N — catalog major + partnership metadata for join UX.</summary>
+    public string? CatalogMajorVersion { get; init; }
+
+    public string? PartnershipTier { get; init; }
+
+    public bool NoProgressTransfer { get; init; }
+
+    public string? CatalogLegalNotice { get; init; }
 }
 
 public static class NlSessionServerDefaults

@@ -18,6 +18,7 @@
     <ProjectReference Include="..\NL.NleEditor.Core\NL.NleEditor.Core.csproj" />
     <ProjectReference Include="..\NL.Identity\NL.Identity.csproj" />
     <ProjectReference Include="..\NL.Social\NL.Social.csproj" />
+    <ProjectReference Include="..\NL.Fork.Catalog\NL.Fork.Catalog.csproj" />
   </ItemGroup>
 
 </Project>

@@ -65,7 +65,7 @@ sequenceDiagram
 |-----------|----------------|-----------|
 | **Identity service** (L) | Platform OAuth, game ownership, anti-alt | Phase D admit API |
 | **Social gate** (M) | Live follow/sub, SP standing, live-only NLS | Phase 2 SP model, Phase 4 moderation |
-| **Fork catalog** (N) | Major-version snapshots, partnership tier, mods | New |
+| **Fork catalog** (N) | Major-version snapshots, partnership tier, mods | Built — `NL.Fork.Catalog`, `/fork-catalog.html` |
 | **Orchestrator** (O) | Create/destroy ephemeral fork instances | Phase D–G Docker, session bus |
 | **Fork runtime** (P) | In-process events + actions, server mods | Phase A integration spec, Phase 3 host |
 | **Partnership layer** (Q) | Official vs at-own-risk, legal gates | New |

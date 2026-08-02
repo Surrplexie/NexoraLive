@@ -68,6 +68,18 @@ public sealed class SessionProfileFile
     /// <summary>Phase M — enable live social gate hydration at admit time.</summary>
     public bool SocialGateEnabled { get; set; } = true;
 
+    /// <summary>Phase N — reject admit/start for unknown or deprecated catalog majors.</summary>
+    public bool CatalogEnforced { get; set; }
+
+    /// <summary>Phase N — verified mod hub ids baked into fork instance.</summary>
+    public List<string> AttachedModIds { get; set; } = [];
+
+    public string? PartnershipTier { get; set; }
+
+    public bool NoProgressTransfer { get; set; } = true;
+
+    public string? CatalogLegalNotice { get; set; }
+
     public NlSessionOptions ToSessionOptions(bool replay = false) => new()
     {
         Game = Game,

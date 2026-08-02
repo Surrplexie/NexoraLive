@@ -2,6 +2,8 @@ using NL.Core;
 using NL.Core.Security;
 using NL.Core.Sp;
 using NL.Fork.Core;
+using NL.Fork.Catalog;
+using NL.Fork.Catalog.Core;
 using NL.Identity;
 using NL.Identity.Core;
 using NL.Moderation;
@@ -35,6 +37,9 @@ var identitySettings = NlIdentitySettings.LoadFromEnvironment();
 var identityHost = new NlIdentityHost(identitySettings);
 var socialSettings = NlSocialSettings.LoadFromEnvironment();
 var socialHost = new NlSocialHost(socialSettings);
+var catalogSettings = NlForkCatalogSettings.LoadFromEnvironment();
+var catalogHost = new NlForkCatalogHost(catalogSettings);
+var samplesRoot = ResolveSamplesRoot();
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls($"http://{bindHost}:{httpPort}");
@@ -52,6 +57,8 @@ builder.Services.AddSingleton(identitySettings);
 builder.Services.AddSingleton(identityHost);
 builder.Services.AddSingleton(socialSettings);
 builder.Services.AddSingleton(socialHost);
+builder.Services.AddSingleton(catalogSettings);
+builder.Services.AddSingleton(catalogHost);
 builder.Services.AddSingleton(demoSettings);
 builder.Services.AddSingleton(spectatorSettings);
 builder.Services.AddSingleton(hardeningSettings);
@@ -87,7 +94,7 @@ app.MapGet("/api/v1/session/manifest", (BusHostState b, HttpContext ctx) =>
 app.MapGet("/api/v1/session", (BusHostState b, HttpContext ctx) =>
     Results.Json(b.GetStatus(NlWebSecurityExtensions.IsAuthorized(ctx))));
 
-app.MapPost("/api/v1/session/admit", async (BusHostState b, NlIdentityHost identity, NlSocialHost social, NlAdmitPlayerRequest body, CancellationToken ct) =>
+app.MapPost("/api/v1/session/admit", async (BusHostState b, NlIdentityHost identity, NlSocialHost social, NlForkCatalogHost catalog, NlAdmitPlayerRequest body, CancellationToken ct) =>
 {
     if (string.IsNullOrWhiteSpace(body.PlayerId))
     {
@@ -96,7 +103,7 @@ app.MapPost("/api/v1/session/admit", async (BusHostState b, NlIdentityHost ident
 
     try
     {
-        return Results.Json(await b.AdmitAsync(body, identity, social, ct));
+        return Results.Json(await b.AdmitAsync(body, identity, social, catalog, ct));
     }
     catch (ArgumentException ex)
     {
@@ -240,6 +247,63 @@ app.MapPost("/api/v1/social/link", (NlSocialHost host, SocialLinkRequest body) =
 app.MapGet("/api/v1/social/links/{playerId}", (NlSocialHost host, string playerId) =>
     Results.Json(host.LinkStore.GetOrDefault(playerId)));
 
+app.MapGet("/api/v1/fork/catalog/settings", (NlForkCatalogSettings s) => Results.Json(s.ToPublicInfo()));
+
+app.MapGet("/api/v1/fork/catalog/entries", (NlForkCatalogHost host, bool? includeDeprecated) =>
+    Results.Json(host.Catalog.ListGames(includeDeprecated ?? false)));
+
+app.MapGet("/api/v1/fork/catalog/mod-hub", (NlForkCatalogHost host) =>
+    Results.Json(host.Catalog.GetManifest().ModHub));
+
+app.MapGet("/api/v1/fork/catalog/entries/{gameId}/{majorVersion}", (NlForkCatalogHost host, string gameId, string majorVersion) =>
+{
+    var entry = host.Catalog.GetEntry(gameId, majorVersion);
+    return entry is null ? Results.NotFound(new { error = $"Unknown entry '{gameId}@{majorVersion}'." }) : Results.Json(entry);
+});
+
+app.MapPost("/api/v1/fork/catalog/register", (NlForkCatalogHost host, ForkCatalogEntry body) =>
+{
+    try
+    {
+        var registered = host.Catalog.RegisterEntry(body);
+        return Results.Json(registered);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/v1/fork/catalog/select", (BusHostState bus, NlForkCatalogHost host, CatalogSelectRequest body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.GameId) || string.IsNullOrWhiteSpace(body.MajorVersion))
+    {
+        return Results.BadRequest(new { error = "gameId and majorVersion required." });
+    }
+
+    try
+    {
+        var selection = new ForkCatalogSelection(body.GameId.Trim(), body.MajorVersion.Trim(), body.ModIds ?? []);
+        var resolved = host.Catalog.ResolveSelection(selection, samplesRoot);
+        var profile = bus.ApplyCatalogSelection(resolved, samplesRoot);
+        return Results.Json(new
+        {
+            profile,
+            entry = resolved.Entry,
+            nleTemplate = resolved.ResolvedNleTemplate,
+            mods = resolved.ResolvedMods,
+        });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
 app.MapPut("/api/v1/session/profile", async (BusHostState b, HttpRequest req) =>
 {
     var profile = await req.ReadFromJsonAsync<SessionProfileFile>();
@@ -258,10 +322,10 @@ app.MapPost("/api/v1/session/bus-defaults", (BusHostState b, string? config) =>
     return Results.Ok(b.GetStatus(includeSecrets: true));
 });
 
-app.MapPost("/api/v1/session/start", async (BusHostState b, NlSocialHost social, HttpRequest req, CancellationToken ct) =>
+app.MapPost("/api/v1/session/start", async (BusHostState b, NlSocialHost social, NlForkCatalogHost catalog, HttpRequest req, CancellationToken ct) =>
 {
     var body = await req.ReadFromJsonAsync<StartSessionRequest>();
-    return await b.StartAsync(body?.ReplayOnce ?? false, ct, social);
+    return await b.StartAsync(body?.ReplayOnce ?? false, ct, social, catalog);
 });
 
 app.MapPost("/api/v1/session/stop", (BusHostState b) => b.Stop());
@@ -502,6 +566,7 @@ app.MapPost("/api/v1/editor/apply", async (
     NlWebEditorStore store,
     BusHostState bus,
     NlSocialHost social,
+    NlForkCatalogHost catalog,
     EditorApplyRequest? body,
     CancellationToken ct) =>
 {
@@ -531,7 +596,7 @@ app.MapPost("/api/v1/editor/apply", async (
         await bus.WaitForIdleAsync(ct);
     }
 
-    var start = await bus.StartAsync(replayOnce: false, ct, social);
+    var start = await bus.StartAsync(replayOnce: false, ct, social, catalog);
     return start;
 });
 
@@ -559,6 +624,7 @@ Console.WriteLine($"Demo loop (Phase G)    → {demoSettings.Enabled}");
 Console.WriteLine($"Spectator UX (Phase H) → triggers={spectatorSettings.TriggersEnabled}, rate={spectatorSettings.TriggerRatePerMinute}/min");
 Console.WriteLine($"Hardening (Phase K)    → {hardeningSettings.Enabled} (admit={hardeningSettings.AdmitRatePerMinute}/min, ws max={hardeningSettings.WebSocketMaxConnections})");
 Console.WriteLine($"Social gate (Phase M)  → {socialSettings.Enabled} mode={socialSettings.Mode}");
+Console.WriteLine($"Fork catalog (Phase N) → {catalogSettings.Enabled} manifest={NlForkCatalogPaths.Manifest}");
 Console.WriteLine($"Web editor (Phase I)   → /editor.html + /api/v1/editor/*");
 if (demoSettings.Enabled)
 {
@@ -576,6 +642,29 @@ else
 }
 
 app.Run();
+
+static string ResolveSamplesRoot()
+{
+    var overrideRoot = Environment.GetEnvironmentVariable("NL_SAMPLES_ROOT");
+    if (!string.IsNullOrWhiteSpace(overrideRoot) && Directory.Exists(overrideRoot))
+    {
+        return Path.GetFullPath(overrideRoot);
+    }
+
+    var dir = AppContext.BaseDirectory;
+    for (var i = 0; i < 8 && !string.IsNullOrEmpty(dir); i++)
+    {
+        var candidate = Path.Combine(dir, "samples");
+        if (Directory.Exists(candidate))
+        {
+            return candidate;
+        }
+
+        dir = Directory.GetParent(dir)?.FullName ?? "";
+    }
+
+    return Path.Combine(Directory.GetCurrentDirectory(), "samples");
+}
 
 static async Task<IResult> IssueModerationAsync(
     ModerationHostState host,
@@ -646,4 +735,11 @@ internal sealed class SocialLinkRequest
     public string? YouTubeChannelId { get; set; }
     public string? KickUserId { get; set; }
     public string? DiscordUserId { get; set; }
+}
+
+internal sealed class CatalogSelectRequest
+{
+    public string? GameId { get; set; }
+    public string? MajorVersion { get; set; }
+    public List<string>? ModIds { get; set; }
 }
