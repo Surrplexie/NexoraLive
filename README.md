@@ -42,9 +42,7 @@ NL Server does **not** replace a game's executable. It sits **in front of** join
 | **Ephemeral sessions** | World/save state discarded when the stream ends; **no progress transfer** to publisher servers |
 | **Major-only versioning** | Catalog rows are `1.0`, `2.0` — not per-patch lines; patches roll into the current major image |
 
-**Ships today:** `NL.Fork.Core`, `NL.Fork.Runtime`, `NL.Fork.Catalog`, `/fork-catalog.html`, mock + hello-fork validation path. See [`docs/NL_FORK_RUNTIME.md`](docs/NL_FORK_RUNTIME.md) and [`docs/NL_FORK_CATALOG.md`](docs/NL_FORK_CATALOG.md).
-
-**Not yet:** `NlForkOrchestrator` (Phase O) — spin up/tear down one forked server per stream session at scale.
+**Ships today:** `NL.Fork.Core`, `NL.Fork.Runtime`, `NL.Fork.Catalog`, `NL.Fork.Orchestrator`, `/fork-catalog.html`, `/fork-orchestrator.html`, mock + hello-fork validation path. See [`docs/NL_FORK_RUNTIME.md`](docs/NL_FORK_RUNTIME.md), [`docs/NL_FORK_CATALOG.md`](docs/NL_FORK_CATALOG.md), and [`docs/NL_FORK_ORCHESTRATOR.md`](docs/NL_FORK_ORCHESTRATOR.md).
 
 ### How they work together
 
@@ -76,14 +74,15 @@ Native game invites to NLS addresses **fail by design** — traffic is filtered 
 | **Moderation Console (Windows)** | Audit log + warn / ban / graylist / clear | Basic admin UI |
 | **Anti-cheat (early)** | Session-path anomaly signals (`anomaly*`) evaluated by the same `.nle` engine — see [Anti-cheat direction](#anti-cheat-direction) | Signal prototype; full packet path WIP |
 | **Session Host (Windows)** | One Start/Stop shell for a full session profile | Recommended entry for live |
-| **Session Host Web** | Operator console, join gate, fork catalog, spectator demo, rule editor | Usable (Phases B–N) |
+| **Session Host Web** | Operator console, join gate, fork catalog, fork orchestrator, spectator demo, rule editor | Usable (Phases B–O) |
 | **Platform identity** | Game ownership verification at admit (mock + Steam Web API) | Phase L — prototype |
 | **Live social gate** | Follow/sub/discord hydration, live-only NLS, offense archive UI | Phase M — prototype |
 | **Fork catalog** | Major-version registry, partnership tiers, mod hub, game picker UI | Phase N — prototype |
+| **Fork orchestrator** | Ephemeral fork provisioning (mock/process/docker), lifecycle + manifest connect | Phase O — prototype |
 | **Fork runtime** | Hello-fork + session bus; server-side mod loader | Phase P — prototype |
 | **BeamNG.drive bridge** | Lua mod → NDJSON → rules → localhost UDP + BeamMP kick queue | Freeroam / BeamMP operator path |
 
-**Not implemented yet:** production fork orchestration at scale, publisher SDK menu integrations, mobile NL Client overlay, cloud fleet ops, encrypted `.nle` packaging, and economy features (SrCs, SPt) from the long-form vision doc. Treat this repo as an **early working guide** — enough to learn the model, validate configs, and dogfood control-plane + hello-fork paths — not a finished operator product or a substitute for publisher-hosted multiplayer.
+**Not implemented yet:** production fork fleet at scale, publisher SDK menu integrations, mobile NL Client overlay, cloud fleet ops, encrypted `.nle` packaging, and economy features (SrCs, SPt) from the long-form vision doc. Treat this repo as an **early working guide** — enough to learn the model, validate configs, and dogfood control-plane + hello-fork paths — not a finished operator product or a substitute for publisher-hosted multiplayer.
 
 ---
 
@@ -327,6 +326,8 @@ Open `http://127.0.0.1:27020` — remote bridge manifest, join admission API, mo
 
 **Fork catalog (Phase N):** enable with `NL_FORK_CATALOG_ENABLED=true`, copy `samples/fork/catalog.json` to your catalog path, open `/fork-catalog.html` to select `gameId@major` and apply the default `.nle` template. See [docs/NL_FORK_CATALOG.md](docs/NL_FORK_CATALOG.md).
 
+**Fork orchestrator (Phase O):** enable with `NL_FORK_ORCHESTRATOR_ENABLED=true` and `NL_FORK_ORCHESTRATOR_MODE=mock` (or `process` / `docker`). Set `forkOrchestratorEnabled: true` on the session profile, then start the session — the orchestrator provisions an ephemeral fork instance and exposes connect fields on the session manifest. See [docs/NL_FORK_ORCHESTRATOR.md](docs/NL_FORK_ORCHESTRATOR.md).
+
 **Identity + social gate (Phases L–M):** see [docs/NL_IDENTITY.md](docs/NL_IDENTITY.md) and [docs/NL_SOCIAL_GATE.md](docs/NL_SOCIAL_GATE.md).
 
 **Public demo (Phase E):** set `NL_PUBLIC_MODE=true` plus `NL_BUS_TOKEN` and `NL_OPERATOR_KEY` before exposing the server. Copy [`.env.example`](.env.example) and see [docs/NL_DEMO_SECURITY.md](docs/NL_DEMO_SECURITY.md).
@@ -483,6 +484,7 @@ Detector vocabulary and wiring: [`docs/ANTICHEAT.md`](docs/ANTICHEAT.md).
 | `src/NL.Social` (+ `.Core`) | Live social gate, follow/sub cache (Phase M) |
 | `src/NL.Fork.Core` | Fork runtime, server-side mods, hello-fork |
 | `src/NL.Fork.Catalog` (+ `.Core`) | Major-version snapshot registry (Phase N) |
+| `src/NL.Fork.Orchestrator` (+ `.Core`) | Ephemeral fork provisioning per session (Phase O) |
 | `src/NL.Fork.Runtime` | Fork runtime CLI |
 | `tests/` | Unit tests |
 | `samples/` | Safe example configs, logs, NDJSON (no real secrets) |
@@ -529,6 +531,7 @@ Detector vocabulary and wiring: [`docs/ANTICHEAT.md`](docs/ANTICHEAT.md).
 | [`docs/NL_DEMO_RUNBOOK.md`](docs/NL_DEMO_RUNBOOK.md) | Operator runbook (deploy, reset, monitor) |
 | [`docs/NL_FORK_PLATFORM.md`](docs/NL_FORK_PLATFORM.md) | Fork platform architecture (Server vs Fork) |
 | [`docs/NL_FORK_CATALOG.md`](docs/NL_FORK_CATALOG.md) | Snapshot registry, partnership tiers (Phase N) |
+| [`docs/NL_FORK_ORCHESTRATOR.md`](docs/NL_FORK_ORCHESTRATOR.md) | Ephemeral fork provisioning (Phase O) |
 | [`docs/NL_FORK_RUNTIME.md`](docs/NL_FORK_RUNTIME.md) | Fork runtime + hello-fork (Phase P) |
 | [`docs/NL_IDENTITY.md`](docs/NL_IDENTITY.md) | Platform identity & ownership (Phase L) |
 | [`docs/NL_SOCIAL_GATE.md`](docs/NL_SOCIAL_GATE.md) | Live social gate & join policy (Phase M) |

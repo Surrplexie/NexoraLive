@@ -24,6 +24,18 @@ public static class NlSecurityRedaction
             JoinGateEnabled = manifest.JoinGateEnabled,
             SessionRunning = manifest.SessionRunning,
             AntiCheatEnabled = manifest.AntiCheatEnabled,
+            OwnershipRequired = manifest.OwnershipRequired,
+            GameId = manifest.GameId,
+            PlatformAppId = manifest.PlatformAppId,
+            CatalogMajorVersion = manifest.CatalogMajorVersion,
+            PartnershipTier = manifest.PartnershipTier,
+            NoProgressTransfer = manifest.NoProgressTransfer,
+            CatalogLegalNotice = manifest.CatalogLegalNotice,
+            ForkConnectEndpoint = manifest.ForkConnectEndpoint,
+            ForkSessionId = manifest.ForkSessionId,
+            ForkProvisioner = manifest.ForkProvisioner,
+            ForkOrchestratorEnabled = manifest.ForkOrchestratorEnabled,
+            ReservedPrivilegedSlots = manifest.ReservedPrivilegedSlots,
         };
     }
 

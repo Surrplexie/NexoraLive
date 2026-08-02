@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>NL.Fork.Orchestrator</RootNamespace>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NL.Core\NL.Core.csproj" />
+    <ProjectReference Include="..\NL.Fork.Catalog\NL.Fork.Catalog.csproj" />
+    <ProjectReference Include="..\NL.Fork.Orchestrator.Core\NL.Fork.Orchestrator.Core.csproj" />
+  </ItemGroup>
+
+</Project>

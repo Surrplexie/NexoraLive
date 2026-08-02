@@ -3,8 +3,8 @@
 This tracks progress against the ideas in [`NexoraLive.txt`](NexoraLive.txt), broken into phases
 roughly ordered by dependency (each later phase leans on earlier ones).
 
-**Built:** Phases 0–K + **Phase P** (fork runtime) + **Phase L** (platform identity) + **Phase M** (live social gate) + **Phase N** (fork catalog).
-**Next track:** Phases O, Q–S. See
+**Built:** Phases 0–K + **Phase P** (fork runtime) + **Phase L** (platform identity) + **Phase M** (live social gate) + **Phase N** (fork catalog) + **Phase O** (fork orchestrator).
+**Next track:** Phases Q–S. See
 [docs/NL_FORK_PLATFORM.md](docs/NL_FORK_PLATFORM.md).
 
 Status legend: `[x]` done, `[~]` partially done / in progress, `[ ]` not started.
@@ -479,21 +479,21 @@ refuses unknown or deprecated majors.
 Spin up and tear down **one forked game server per stream session**. Extends Phase D–G Docker
 work into a game-aware orchestrator.
 
-- [ ] **`NlForkOrchestrator`** — API: `CreateSession(streamerId, gameId, major, nlePath, mods[])
+- [x] **`NlForkOrchestrator`** — API: `CreateSession(streamerId, gameId, major, nlePath, mods[])
       → sessionId, connectEndpoint, busToken`
-- [ ] **Provisioning backend** — Docker first; K8s Job / VM optional later; reuse
+- [x] **Provisioning backend** — Docker first; K8s Job / VM optional later; reuse
       `NL.SessionHost.Web` as control plane
-- [ ] **Inject streamer config** — mount `.nle`, moderation store, join requirements into
+- [x] **Inject streamer config** — mount `.nle`, moderation store, join requirements into
       instance; wire session bus (`ws://…/nl/v1`)
-- [ ] **Connect manifest** — extend `GET /api/v1/session/manifest` with fork connect string
+- [x] **Connect manifest** — extend `GET /api/v1/session/manifest` with fork connect string
       (IP/port or relay URL) + ownership + admit URLs
-- [ ] **Lifecycle hooks** — create on streamer "Go live"; destroy on stream end + grace period;
+- [x] **Lifecycle hooks** — create on streamer "Go live"; destroy on stream end + grace period;
       max duration cap (extends demo `NL_DEMO_SESSION_MAX_HOURS` pattern)
-- [ ] **Discard world state** — on destroy, delete container volumes; persist only NLE, moderation
+- [x] **Discard world state** — on destroy, delete container volumes; persist only NLE, moderation
       JSONL, clip metadata — never export to publisher cloud saves
-- [ ] **Reserved mod/admin slots** — nl.txt: few slots always free for privileged roles
-- [ ] **Cost hooks** — idle detection, streamer quota placeholders (no billing yet)
-- [ ] **Tests** — create/destroy integration test with hello-world fork image; manifest round-trip
+- [x] **Reserved mod/admin slots** — nl.txt: few slots always free for privileged roles
+- [x] **Cost hooks** — idle detection, streamer quota placeholders (no billing yet)
+- [x] **Tests** — create/destroy integration test with hello-world fork image; manifest round-trip
 
 **Exit criteria:** Streamer starts session → orchestrator runs a container → bridge connects →
 stream ends → container gone; config files remain in `NL_DATA_ROOT`.

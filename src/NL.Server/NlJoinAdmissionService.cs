@@ -248,7 +248,8 @@ public static class NlSessionServerHelper
         int httpPort,
         int wsPort,
         int modPort,
-        bool sessionRunning)
+        bool sessionRunning,
+        ForkManifestConnectInfo? forkConnect = null)
     {
         var httpBase = ResolvePublicHttpBase(bindHost, httpPort);
         var wsBase = ResolvePublicWebSocketBase(bindHost, wsPort);
@@ -276,6 +277,14 @@ public static class NlSessionServerHelper
             PartnershipTier = profile.PartnershipTier,
             NoProgressTransfer = profile.NoProgressTransfer,
             CatalogLegalNotice = profile.CatalogLegalNotice,
+            ForkOrchestratorEnabled = profile.ForkOrchestratorEnabled,
+            ForkSessionId = forkConnect?.ForkSessionId ?? profile.ForkSessionId,
+            ForkConnectEndpoint = forkConnect?.ForkConnectEndpoint,
+            ForkProvisioner = forkConnect?.ForkProvisioner,
+            ReservedPrivilegedSlots = forkConnect?.ReservedPrivilegedSlots
+                ?? (profile.ForkReservedPrivilegedSlots > 0
+                    ? profile.ForkReservedPrivilegedSlots
+                    : 2),
         };
     }
 }

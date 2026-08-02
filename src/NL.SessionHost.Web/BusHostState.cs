@@ -1,12 +1,14 @@
 using NL.Core;
+using NL.Fork.Catalog;
+using NL.Fork.Catalog.Core;
+using NL.Fork.Orchestrator;
+using NL.Fork.Orchestrator.Core;
+using NL.Identity;
 using NL.Server;
 using NL.Server.Core.Integration;
 using NL.Server.Core.Security;
-using NL.Identity;
 using NL.Social;
 using NL.Social.Core;
-using NL.Fork.Catalog;
-using NL.Fork.Catalog.Core;
 
 namespace NL.SessionHost.Web;
 
@@ -103,7 +105,8 @@ public sealed class BusHostState
         bool replayOnce,
         CancellationToken cancellationToken,
         NlSocialHost? social = null,
-        NlForkCatalogHost? catalog = null)
+        NlForkCatalogHost? catalog = null,
+        NlForkOrchestratorHost? orchestrator = null)
     {
         if (Sessions.IsRunning)
         {
@@ -191,21 +194,61 @@ public sealed class BusHostState
         }, CancellationToken.None);
 
         await Task.Delay(50, cancellationToken);
-        return Results.Ok(new { state = Sessions.State.ToString(), bus = BusInfo });
+
+        if (profile.ForkOrchestratorEnabled && orchestrator?.Settings.Enabled == true)
+        {
+            var manifest = GetManifest(orchestrator);
+            var gameId = profile.GameId ?? profile.Game;
+            var major = profile.GameMajorVersion ?? "1.0";
+            var create = await orchestrator.Orchestrator.CreateSessionAsync(
+                new CreateForkSessionRequest(
+                    profile.StreamerId,
+                    gameId,
+                    major,
+                    profile.ConfigPath,
+                    profile.AttachedModIds,
+                    ReservedPrivilegedSlots: profile.ForkReservedPrivilegedSlots > 0
+                        ? profile.ForkReservedPrivilegedSlots
+                        : orchestrator.Settings.DefaultReservedPrivilegedSlots),
+                manifest.BridgeConnectUrl,
+                manifest.AdmitUrl,
+                BusToken,
+                cancellationToken);
+
+            if (!create.Success)
+            {
+                Sessions.Stop();
+                return Results.BadRequest(new { error = create.Error ?? "Fork orchestrator create failed." });
+            }
+
+            profile.ForkSessionId = create.Session!.SessionId;
+            SaveProfile(profile);
+        }
+
+        return Results.Ok(new { state = Sessions.State.ToString(), bus = BusInfo, forkSessionId = profile.ForkSessionId });
     }
 
-    public IResult Stop()
+    public IResult Stop(NlForkOrchestratorHost? orchestrator = null)
     {
         Sessions.Stop();
+        if (orchestrator?.Settings.Enabled == true)
+        {
+            var profile = GetProfile();
+            if (profile.ForkOrchestratorEnabled)
+            {
+                _ = orchestrator.Orchestrator.ScheduleGraceDestroyForStreamerAsync(profile.StreamerId);
+            }
+        }
+
         return Results.Ok(new { state = Sessions.State.ToString() });
     }
 
-    public object GetStatus(bool includeSecrets = true) => new
+    public object GetStatus(bool includeSecrets = true, NlForkOrchestratorHost? orchestrator = null) => new
     {
         state = Sessions.State.ToString(),
         decisions = Sessions.DecisionCount,
         bus = includeSecrets ? BusInfo : NlSecurityRedaction.RedactStatusBus(BusInfo, includeSecrets: false),
-        manifest = NlSecurityRedaction.RedactManifest(GetManifest(), includeSecrets),
+        manifest = NlSecurityRedaction.RedactManifest(GetManifest(orchestrator), includeSecrets),
         profile = includeSecrets ? GetProfile() : RedactProfileForPublic(GetProfile()),
         log = includeSecrets ? Sessions.GetLogSnapshot() : Array.Empty<string>(),
     };
@@ -220,11 +263,26 @@ public sealed class BusHostState
         useSessionBus = p.UseSessionBus,
     };
 
-    public NlSessionManifest GetManifest()
+    public NlSessionManifest GetManifest(NlForkOrchestratorHost? orchestrator = null)
     {
         var profile = GetProfile();
+        ForkManifestConnectInfo? forkConnect = null;
+        if (orchestrator?.Settings.Enabled == true && !string.IsNullOrWhiteSpace(profile.ForkSessionId))
+        {
+            var fork = orchestrator.Orchestrator.GetSession(profile.ForkSessionId)
+                ?? orchestrator.Orchestrator.GetActiveForStreamer(profile.StreamerId);
+            if (fork is not null)
+            {
+                forkConnect = new ForkManifestConnectInfo(
+                    fork.SessionId,
+                    fork.ForkConnectEndpoint,
+                    fork.Provisioner.ToString(),
+                    fork.ReservedPrivilegedSlots);
+            }
+        }
+
         return NlSessionServerHelper.CreateManifest(
-            BusInfo, profile, BindHost, HttpPort, WsPort, ModPort, Sessions.IsRunning);
+            BusInfo, profile, BindHost, HttpPort, WsPort, ModPort, Sessions.IsRunning, forkConnect);
     }
 
     public NlJoinAdmissionResult Admit(NlAdmitPlayerRequest request, NlIdentityHost? identity = null) =>
@@ -304,6 +362,11 @@ public sealed class BusHostState
         PartnershipTier = p.PartnershipTier,
         NoProgressTransfer = p.NoProgressTransfer,
         CatalogLegalNotice = p.CatalogLegalNotice,
+        ForkOrchestratorEnabled = p.ForkOrchestratorEnabled,
+        ForkDestroyGraceSeconds = p.ForkDestroyGraceSeconds,
+        ForkMaxSessionHours = p.ForkMaxSessionHours,
+        ForkReservedPrivilegedSlots = p.ForkReservedPrivilegedSlots,
+        ForkSessionId = p.ForkSessionId,
     };
 
     private static string ResolveSampleConfig(string name) => NlSampleConfigPaths.Resolve(name);

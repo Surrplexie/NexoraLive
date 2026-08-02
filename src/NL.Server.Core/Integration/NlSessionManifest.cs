@@ -75,7 +75,25 @@ public sealed class NlSessionManifest
     public bool NoProgressTransfer { get; init; }
 
     public string? CatalogLegalNotice { get; init; }
+
+    /// <summary>Phase O — ephemeral fork connect endpoint (process/docker/mock URI).</summary>
+    public string? ForkConnectEndpoint { get; init; }
+
+    public string? ForkSessionId { get; init; }
+
+    public string? ForkProvisioner { get; init; }
+
+    public bool ForkOrchestratorEnabled { get; init; }
+
+    public int ReservedPrivilegedSlots { get; init; }
 }
+
+/// <summary>Phase O — optional fork instance metadata for session manifest.</summary>
+public sealed record ForkManifestConnectInfo(
+    string? ForkSessionId,
+    string? ForkConnectEndpoint,
+    string? ForkProvisioner,
+    int ReservedPrivilegedSlots = 2);
 
 public static class NlSessionServerDefaults
 {

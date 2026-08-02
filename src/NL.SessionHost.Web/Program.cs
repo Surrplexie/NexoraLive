@@ -4,6 +4,8 @@ using NL.Core.Sp;
 using NL.Fork.Core;
 using NL.Fork.Catalog;
 using NL.Fork.Catalog.Core;
+using NL.Fork.Orchestrator;
+using NL.Fork.Orchestrator.Core;
 using NL.Identity;
 using NL.Identity.Core;
 using NL.Moderation;
@@ -39,6 +41,8 @@ var socialSettings = NlSocialSettings.LoadFromEnvironment();
 var socialHost = new NlSocialHost(socialSettings);
 var catalogSettings = NlForkCatalogSettings.LoadFromEnvironment();
 var catalogHost = new NlForkCatalogHost(catalogSettings);
+var orchestratorSettings = NlForkOrchestratorSettings.LoadFromEnvironment();
+var orchestratorHost = new NlForkOrchestratorHost(orchestratorSettings, catalogHost);
 var samplesRoot = ResolveSamplesRoot();
 
 var builder = WebApplication.CreateBuilder(args);
@@ -59,6 +63,8 @@ builder.Services.AddSingleton(socialSettings);
 builder.Services.AddSingleton(socialHost);
 builder.Services.AddSingleton(catalogSettings);
 builder.Services.AddSingleton(catalogHost);
+builder.Services.AddSingleton(orchestratorSettings);
+builder.Services.AddSingleton(orchestratorHost);
 builder.Services.AddSingleton(demoSettings);
 builder.Services.AddSingleton(spectatorSettings);
 builder.Services.AddSingleton(hardeningSettings);
@@ -76,6 +82,11 @@ if (socialSettings.Enabled && socialSettings.Mode != NlSocialMode.Off)
     builder.Services.AddHostedService<NlLiveOnlyHostedService>();
 }
 
+if (orchestratorSettings.Enabled)
+{
+    builder.Services.AddHostedService<NlForkOrchestratorLifecycleHostedService>();
+}
+
 var app = builder.Build();
 app.UseCors();
 app.UseNlPublicRateLimits();
@@ -88,11 +99,11 @@ app.MapGet("/api/v1/security", (NlSecuritySettings s) => Results.Json(s.ToPublic
 app.MapGet("/api/v1/bus", (BusHostState b, HttpContext ctx) =>
     Results.Json(NlSecurityRedaction.RedactBusInfo(b.BusInfo, NlWebSecurityExtensions.IsAuthorized(ctx))));
 
-app.MapGet("/api/v1/session/manifest", (BusHostState b, HttpContext ctx) =>
-    Results.Json(NlSecurityRedaction.RedactManifest(b.GetManifest(), NlWebSecurityExtensions.IsAuthorized(ctx))));
+app.MapGet("/api/v1/session/manifest", (BusHostState b, NlForkOrchestratorHost orchestrator, HttpContext ctx) =>
+    Results.Json(NlSecurityRedaction.RedactManifest(b.GetManifest(orchestrator), NlWebSecurityExtensions.IsAuthorized(ctx))));
 
-app.MapGet("/api/v1/session", (BusHostState b, HttpContext ctx) =>
-    Results.Json(b.GetStatus(NlWebSecurityExtensions.IsAuthorized(ctx))));
+app.MapGet("/api/v1/session", (BusHostState b, NlForkOrchestratorHost orchestrator, HttpContext ctx) =>
+    Results.Json(b.GetStatus(NlWebSecurityExtensions.IsAuthorized(ctx), orchestrator)));
 
 app.MapPost("/api/v1/session/admit", async (BusHostState b, NlIdentityHost identity, NlSocialHost social, NlForkCatalogHost catalog, NlAdmitPlayerRequest body, CancellationToken ct) =>
 {
@@ -290,6 +301,12 @@ app.MapPost("/api/v1/fork/catalog/select", (BusHostState bus, NlForkCatalogHost 
         var selection = new ForkCatalogSelection(body.GameId.Trim(), body.MajorVersion.Trim(), body.ModIds ?? []);
         var resolved = host.Catalog.ResolveSelection(selection, samplesRoot);
         var profile = bus.ApplyCatalogSelection(resolved, samplesRoot);
+        if (body.EnableOrchestrator == true)
+        {
+            profile.ForkOrchestratorEnabled = true;
+            bus.SaveProfile(profile);
+        }
+
         return Results.Json(new
         {
             profile,
@@ -302,6 +319,64 @@ app.MapPost("/api/v1/fork/catalog/select", (BusHostState bus, NlForkCatalogHost 
     {
         return Results.BadRequest(new { error = ex.Message });
     }
+});
+
+app.MapGet("/api/v1/fork/orchestrator/settings", (NlForkOrchestratorSettings s) => Results.Json(s.ToPublicInfo()));
+
+app.MapGet("/api/v1/fork/orchestrator/sessions", (NlForkOrchestratorHost host) =>
+    Results.Json(host.Orchestrator.ListActive()));
+
+app.MapGet("/api/v1/fork/orchestrator/sessions/{sessionId}", (NlForkOrchestratorHost host, string sessionId) =>
+{
+    var session = host.Orchestrator.GetSession(sessionId);
+    return session is null ? Results.NotFound(new { error = "Session not found." }) : Results.Json(session);
+});
+
+app.MapPost("/api/v1/fork/orchestrator/create", async (
+    BusHostState bus,
+    NlForkOrchestratorHost host,
+    ForkOrchestratorCreateRequest body,
+    CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(body.StreamerId) || string.IsNullOrWhiteSpace(body.NlePath))
+    {
+        return Results.BadRequest(new { error = "streamerId and nlePath required." });
+    }
+
+    var manifest = bus.GetManifest(host);
+    var result = await host.Orchestrator.CreateSessionAsync(
+        new CreateForkSessionRequest(
+            body.StreamerId.Trim(),
+            body.GameId?.Trim() ?? bus.GetProfile().GameId ?? "generic",
+            body.MajorVersion?.Trim() ?? bus.GetProfile().GameMajorVersion ?? "1.0",
+            body.NlePath.Trim(),
+            body.ModIds ?? [],
+            body.DockerImage,
+            ReservedPrivilegedSlots: body.ReservedPrivilegedSlots ?? host.Settings.DefaultReservedPrivilegedSlots),
+        manifest.BridgeConnectUrl,
+        manifest.AdmitUrl,
+        bus.BusToken,
+        ct);
+
+    if (!result.Success)
+    {
+        return Results.BadRequest(new { error = result.Error });
+    }
+
+    var profile = bus.GetProfile();
+    profile.ForkOrchestratorEnabled = true;
+    profile.ForkSessionId = result.Session!.SessionId;
+    bus.SaveProfile(profile);
+    return Results.Json(result.Session);
+});
+
+app.MapPost("/api/v1/fork/orchestrator/destroy/{sessionId}", async (
+    NlForkOrchestratorHost host,
+    string sessionId,
+    CancellationToken ct) =>
+{
+    var result = await host.Orchestrator.DestroySessionAsync(sessionId, ct);
+    return result.Success ? Results.Ok(new { ok = true }) : Results.BadRequest(new { error = result.Error });
 });
 
 app.MapPut("/api/v1/session/profile", async (BusHostState b, HttpRequest req) =>
@@ -322,13 +397,13 @@ app.MapPost("/api/v1/session/bus-defaults", (BusHostState b, string? config) =>
     return Results.Ok(b.GetStatus(includeSecrets: true));
 });
 
-app.MapPost("/api/v1/session/start", async (BusHostState b, NlSocialHost social, NlForkCatalogHost catalog, HttpRequest req, CancellationToken ct) =>
+app.MapPost("/api/v1/session/start", async (BusHostState b, NlSocialHost social, NlForkCatalogHost catalog, NlForkOrchestratorHost orchestrator, HttpRequest req, CancellationToken ct) =>
 {
     var body = await req.ReadFromJsonAsync<StartSessionRequest>();
-    return await b.StartAsync(body?.ReplayOnce ?? false, ct, social, catalog);
+    return await b.StartAsync(body?.ReplayOnce ?? false, ct, social, catalog, orchestrator);
 });
 
-app.MapPost("/api/v1/session/stop", (BusHostState b) => b.Stop());
+app.MapPost("/api/v1/session/stop", (BusHostState b, NlForkOrchestratorHost orchestrator) => b.Stop(orchestrator));
 
 app.MapGet("/api/v1/moderation", (ModerationHostState m) => Results.Json(m.GetStatus()));
 
@@ -567,6 +642,7 @@ app.MapPost("/api/v1/editor/apply", async (
     BusHostState bus,
     NlSocialHost social,
     NlForkCatalogHost catalog,
+    NlForkOrchestratorHost orchestrator,
     EditorApplyRequest? body,
     CancellationToken ct) =>
 {
@@ -592,11 +668,11 @@ app.MapPost("/api/v1/editor/apply", async (
 
     if (bus.Sessions.IsRunning)
     {
-        bus.Stop();
+        bus.Stop(orchestrator);
         await bus.WaitForIdleAsync(ct);
     }
 
-    var start = await bus.StartAsync(replayOnce: false, ct, social, catalog);
+    var start = await bus.StartAsync(replayOnce: false, ct, social, catalog, orchestrator);
     return start;
 });
 
@@ -614,7 +690,7 @@ app.MapPost("/api/v1/editor/reset", (NlWebEditorStore store, NlDemoSettings demo
     });
 });
 
-var manifest = bus.GetManifest();
+var manifest = bus.GetManifest(orchestratorHost);
 Console.WriteLine($"NL Session Server      → {manifest.HttpBaseUrl}");
 Console.WriteLine($"Bridge (remote)        → {manifest.BridgeConnectUrl}");
 Console.WriteLine($"Join admission         → {manifest.AdmitUrl}");
@@ -625,6 +701,7 @@ Console.WriteLine($"Spectator UX (Phase H) → triggers={spectatorSettings.Trigg
 Console.WriteLine($"Hardening (Phase K)    → {hardeningSettings.Enabled} (admit={hardeningSettings.AdmitRatePerMinute}/min, ws max={hardeningSettings.WebSocketMaxConnections})");
 Console.WriteLine($"Social gate (Phase M)  → {socialSettings.Enabled} mode={socialSettings.Mode}");
 Console.WriteLine($"Fork catalog (Phase N) → {catalogSettings.Enabled} manifest={NlForkCatalogPaths.Manifest}");
+Console.WriteLine($"Fork orchestrator (O)  → {orchestratorSettings.Enabled} mode={orchestratorSettings.Mode} provisioner={orchestratorHost.ResolveProvisionerKind()}");
 Console.WriteLine($"Web editor (Phase I)   → /editor.html + /api/v1/editor/*");
 if (demoSettings.Enabled)
 {
@@ -742,4 +819,16 @@ internal sealed class CatalogSelectRequest
     public string? GameId { get; set; }
     public string? MajorVersion { get; set; }
     public List<string>? ModIds { get; set; }
+    public bool? EnableOrchestrator { get; set; }
+}
+
+internal sealed class ForkOrchestratorCreateRequest
+{
+    public string? StreamerId { get; set; }
+    public string? GameId { get; set; }
+    public string? MajorVersion { get; set; }
+    public string? NlePath { get; set; }
+    public List<string>? ModIds { get; set; }
+    public string? DockerImage { get; set; }
+    public int? ReservedPrivilegedSlots { get; set; }
 }

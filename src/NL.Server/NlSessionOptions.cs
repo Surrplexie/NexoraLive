@@ -80,6 +80,21 @@ public sealed class SessionProfileFile
 
     public string? CatalogLegalNotice { get; set; }
 
+    /// <summary>Phase O — provision ephemeral fork instance on session start.</summary>
+    public bool ForkOrchestratorEnabled { get; set; }
+
+    /// <summary>Phase O — override destroy grace (seconds); 0 = orchestrator default.</summary>
+    public int ForkDestroyGraceSeconds { get; set; }
+
+    /// <summary>Phase O — override max fork session hours; 0 = orchestrator default.</summary>
+    public double ForkMaxSessionHours { get; set; }
+
+    /// <summary>Phase O — reserved privileged mod/admin slots (nl.txt).</summary>
+    public int ForkReservedPrivilegedSlots { get; set; }
+
+    /// <summary>Phase O — active ephemeral fork session id (set at runtime).</summary>
+    public string? ForkSessionId { get; set; }
+
     public NlSessionOptions ToSessionOptions(bool replay = false) => new()
     {
         Game = Game,

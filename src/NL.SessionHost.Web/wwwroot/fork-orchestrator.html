@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NL Fork Orchestrator — Session Host</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="operator-page">
+  <header>
+    <h1>Fork Orchestrator</h1>
+    <p class="sub">Ephemeral fork instances per stream session (Phase O)</p>
+    <nav class="nav">
+      <a href="/">Watch demo</a>
+      <a href="/operator.html">Operator</a>
+      <a href="/fork-catalog.html">Fork catalog</a>
+      <a href="/fork-orchestrator.html" aria-current="page">Orchestrator</a>
+      <a href="/moderation.html">Moderation</a>
+    </nav>
+  </header>
+
+  <section class="card operator-panel">
+    <h2>Settings</h2>
+    <dl id="orch-settings"></dl>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Active fork sessions</h2>
+    <table id="sessions-table">
+      <thead>
+        <tr>
+          <th>Session</th>
+          <th>Streamer</th>
+          <th>Game</th>
+          <th>State</th>
+          <th>Provisioner</th>
+          <th>Connect</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Session manifest (fork fields)</h2>
+    <pre id="manifest-preview" class="code-block"></pre>
+  </section>
+
+  <p id="status" class="status muted"></p>
+  <script src="nl-auth.js"></script>
+  <script src="fork-orchestrator-app.js"></script>
+</body>
+</html>
