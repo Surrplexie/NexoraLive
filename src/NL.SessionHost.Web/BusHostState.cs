@@ -3,6 +3,7 @@ using NL.Fork.Catalog;
 using NL.Fork.Catalog.Core;
 using NL.Fork.Orchestrator;
 using NL.Fork.Orchestrator.Core;
+using NL.Partnership;
 using NL.Identity;
 using NL.Server;
 using NL.Server.Core.Integration;
@@ -293,6 +294,7 @@ public sealed class BusHostState
         NlIdentityHost? identity = null,
         NlSocialHost? social = null,
         NlForkCatalogHost? catalog = null,
+        NlPartnershipHost? partnership = null,
         CancellationToken cancellationToken = default)
     {
         var profile = GetProfile();
@@ -302,7 +304,8 @@ public sealed class BusHostState
         var admission = NlJoinAdmissionService.CreateDefault(streamerId);
         var useSocial = profile.SocialGateEnabled ? social : null;
         var useCatalog = profile.CatalogEnforced ? catalog : null;
-        return await admission.EvaluateAsync(request, profile, identity, useSocial, useCatalog, cancellationToken);
+        var usePartnership = profile.PartnershipGateEnabled ? partnership : null;
+        return await admission.EvaluateAsync(request, profile, identity, useSocial, useCatalog, usePartnership, cancellationToken);
     }
 
     /// <summary>Phase N — apply catalog game + major to session profile.</summary>
@@ -367,6 +370,7 @@ public sealed class BusHostState
         ForkMaxSessionHours = p.ForkMaxSessionHours,
         ForkReservedPrivilegedSlots = p.ForkReservedPrivilegedSlots,
         ForkSessionId = p.ForkSessionId,
+        PartnershipGateEnabled = p.PartnershipGateEnabled,
     };
 
     private static string ResolveSampleConfig(string name) => NlSampleConfigPaths.Resolve(name);

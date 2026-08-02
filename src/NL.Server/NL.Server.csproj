@@ -20,6 +20,7 @@
     <ProjectReference Include="..\NL.Social\NL.Social.csproj" />
     <ProjectReference Include="..\NL.Fork.Catalog\NL.Fork.Catalog.csproj" />
     <ProjectReference Include="..\NL.Fork.Orchestrator\NL.Fork.Orchestrator.csproj" />
+    <ProjectReference Include="..\NL.Partnership\NL.Partnership.csproj" />
   </ItemGroup>
 
 </Project>

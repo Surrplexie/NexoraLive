@@ -95,6 +95,9 @@ public sealed class SessionProfileFile
     /// <summary>Phase O — active ephemeral fork session id (set at runtime).</summary>
     public string? ForkSessionId { get; set; }
 
+    /// <summary>Phase Q — enforce partnership legal gate at admit (default on).</summary>
+    public bool PartnershipGateEnabled { get; set; } = true;
+
     public NlSessionOptions ToSessionOptions(bool replay = false) => new()
     {
         Game = Game,

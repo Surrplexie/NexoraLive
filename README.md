@@ -74,11 +74,12 @@ Native game invites to NLS addresses **fail by design** — traffic is filtered 
 | **Moderation Console (Windows)** | Audit log + warn / ban / graylist / clear | Basic admin UI |
 | **Anti-cheat (early)** | Session-path anomaly signals (`anomaly*`) evaluated by the same `.nle` engine — see [Anti-cheat direction](#anti-cheat-direction) | Signal prototype; full packet path WIP |
 | **Session Host (Windows)** | One Start/Stop shell for a full session profile | Recommended entry for live |
-| **Session Host Web** | Operator console, join gate, fork catalog, fork orchestrator, spectator demo, rule editor | Usable (Phases B–O) |
+| **Session Host Web** | Operator console, join gate, fork catalog, fork orchestrator, partnerships, spectator demo, rule editor | Usable (Phases B–Q) |
 | **Platform identity** | Game ownership verification at admit (mock + Steam Web API) | Phase L — prototype |
 | **Live social gate** | Follow/sub/discord hydration, live-only NLS, offense archive UI | Phase M — prototype |
 | **Fork catalog** | Major-version registry, partnership tiers, mod hub, game picker UI | Phase N — prototype |
 | **Fork orchestrator** | Ephemeral fork provisioning (mock/process/docker), lifecycle + manifest connect | Phase O — prototype |
+| **Publisher partnerships** | At-own-risk ack gate, Play on NL SDK spec, ban sync, platform opt-in | Phase Q — prototype |
 | **Fork runtime** | Hello-fork + session bus; server-side mod loader | Phase P — prototype |
 | **BeamNG.drive bridge** | Lua mod → NDJSON → rules → localhost UDP + BeamMP kick queue | Freeroam / BeamMP operator path |
 
@@ -485,6 +486,7 @@ Detector vocabulary and wiring: [`docs/ANTICHEAT.md`](docs/ANTICHEAT.md).
 | `src/NL.Fork.Core` | Fork runtime, server-side mods, hello-fork |
 | `src/NL.Fork.Catalog` (+ `.Core`) | Major-version snapshot registry (Phase N) |
 | `src/NL.Fork.Orchestrator` (+ `.Core`) | Ephemeral fork provisioning per session (Phase O) |
+| `src/NL.Partnership` (+ `.Core`) | Publisher/platform legal gate, SDK spec, ban sync (Phase Q) |
 | `src/NL.Fork.Runtime` | Fork runtime CLI |
 | `tests/` | Unit tests |
 | `samples/` | Safe example configs, logs, NDJSON (no real secrets) |
@@ -532,6 +534,7 @@ Detector vocabulary and wiring: [`docs/ANTICHEAT.md`](docs/ANTICHEAT.md).
 | [`docs/NL_FORK_PLATFORM.md`](docs/NL_FORK_PLATFORM.md) | Fork platform architecture (Server vs Fork) |
 | [`docs/NL_FORK_CATALOG.md`](docs/NL_FORK_CATALOG.md) | Snapshot registry, partnership tiers (Phase N) |
 | [`docs/NL_FORK_ORCHESTRATOR.md`](docs/NL_FORK_ORCHESTRATOR.md) | Ephemeral fork provisioning (Phase O) |
+| [`docs/NL_PARTNERSHIP.md`](docs/NL_PARTNERSHIP.md) | Publisher partnerships, at-own-risk gate (Phase Q) |
 | [`docs/NL_FORK_RUNTIME.md`](docs/NL_FORK_RUNTIME.md) | Fork runtime + hello-fork (Phase P) |
 | [`docs/NL_IDENTITY.md`](docs/NL_IDENTITY.md) | Platform identity & ownership (Phase L) |
 | [`docs/NL_SOCIAL_GATE.md`](docs/NL_SOCIAL_GATE.md) | Live social gate & join policy (Phase M) |

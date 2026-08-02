@@ -7,6 +7,8 @@ using NL.Moderation.Core;
 using NL.Server.Core.Integration;
 using NL.Social;
 using NL.Fork.Catalog;
+using NL.Partnership;
+using NL.Fork.Catalog.Core;
 
 namespace NL.Server;
 
@@ -56,6 +58,7 @@ public sealed class NlJoinAdmissionService
         NlIdentityHost? identity,
         NlSocialHost? social = null,
         NlForkCatalogHost? catalog = null,
+        NlPartnershipHost? partnership = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.PlayerId))
@@ -120,6 +123,10 @@ public sealed class NlJoinAdmissionService
             }
         }
 
+        var resolvedTier = PartnershipTier.AtOwnRisk;
+        string? legalOverride = profile?.CatalogLegalNotice;
+        ForkCatalogEntry? catalogEntry = null;
+
         if (profile?.CatalogEnforced == true && catalog?.Settings.Enabled == true)
         {
             var gameId = request.GameId ?? profile.GameId ?? profile.Game;
@@ -144,9 +151,57 @@ public sealed class NlJoinAdmissionService
                     standing,
                     catalogResult.Entry?.Tier.ToString());
             }
+
+            catalogEntry = catalogResult.Entry;
+            resolvedTier = catalogEntry?.Tier ?? resolvedTier;
+            legalOverride = catalogEntry?.EffectiveLegalNotice ?? legalOverride;
+        }
+        else if (!string.IsNullOrWhiteSpace(profile?.PartnershipTier)
+            && Enum.TryParse<PartnershipTier>(profile.PartnershipTier, true, out var profileTier))
+        {
+            resolvedTier = profileTier;
         }
 
-        return NlJoinAdmissionResult.FromJoinResult(join, playerId, standing);
+        if (partnership?.Settings.Enabled == true
+            && partnership.Settings.RequireGateAtAdmit
+            && profile?.PartnershipGateEnabled != false)
+        {
+            var gateGameId = request.GameId ?? profile?.GameId ?? profile?.Game ?? "generic";
+            var gate = partnership.Gate.EvaluateAdmit(
+                playerId,
+                gateGameId,
+                resolvedTier,
+                request.PlatformUserId,
+                request.Platform ?? profile?.OwnershipPlatform,
+                request.AppId ?? profile?.PlatformAppId,
+                request.AtOwnRiskAcknowledged,
+                legalOverride,
+                _clock());
+
+            if (!gate.Allowed)
+            {
+                var legalUrl = gate.Legal is not null
+                    ? $"/api/v1/partnership/legal/{Uri.EscapeDataString(gateGameId)}"
+                    : null;
+                return NlJoinAdmissionResult.FromPartnershipDeny(
+                    playerId,
+                    gate.DenyReason ?? "Partnership gate denied.",
+                    standing,
+                    gate.Tier.ToString(),
+                    gate.RequiresAcknowledgment,
+                    legalUrl,
+                    gate.Legal?.DisclaimerVersion);
+            }
+
+            resolvedTier = gate.Tier;
+            var publisherId = partnership.Publishers.List()
+                .FirstOrDefault(p => p.Titles.Any(t =>
+                    string.Equals(t.GameId, gateGameId, StringComparison.OrdinalIgnoreCase)))
+                ?.PublisherId;
+            partnership.Metrics.RecordJoin(gateGameId, publisherId);
+        }
+
+        return NlJoinAdmissionResult.FromJoinResult(join, playerId, standing, resolvedTier.ToString());
     }
 
     public ModerationService Moderation => _moderation;
@@ -277,6 +332,11 @@ public static class NlSessionServerHelper
             PartnershipTier = profile.PartnershipTier,
             NoProgressTransfer = profile.NoProgressTransfer,
             CatalogLegalNotice = profile.CatalogLegalNotice,
+            RequiresAtOwnRiskAcknowledgment = IsAtOwnRiskTier(profile.PartnershipTier),
+            PartnershipLegalUrl = !string.IsNullOrWhiteSpace(profile.GameId)
+                ? $"{httpBase}/api/v1/partnership/legal/{Uri.EscapeDataString(profile.GameId)}"
+                : null,
+            PartnershipDisclaimerVersion = NL.Partnership.Core.PartnershipLegalTemplates.DisclaimerVersion,
             ForkOrchestratorEnabled = profile.ForkOrchestratorEnabled,
             ForkSessionId = forkConnect?.ForkSessionId ?? profile.ForkSessionId,
             ForkConnectEndpoint = forkConnect?.ForkConnectEndpoint,
@@ -287,6 +347,10 @@ public static class NlSessionServerHelper
                     : 2),
         };
     }
+
+    private static bool IsAtOwnRiskTier(string? tier) =>
+        string.IsNullOrWhiteSpace(tier)
+        || string.Equals(tier, "AtOwnRisk", StringComparison.OrdinalIgnoreCase);
 }
 
 public sealed class NlAdmitPlayerRequest
@@ -320,4 +384,7 @@ public sealed class NlAdmitPlayerRequest
     public string? SocialPlatform { get; set; }
 
     public string? SocialUserId { get; set; }
+
+    /// <summary>Phase Q — SP confirmed at-own-risk disclaimer for this admit attempt.</summary>
+    public bool AtOwnRiskAcknowledged { get; set; }
 }

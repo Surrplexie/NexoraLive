@@ -13,7 +13,14 @@ public sealed class NlJoinAdmissionResult
     public string? OwnershipStatus { get; init; }
     public string? PartnershipTier { get; init; }
 
-    public static NlJoinAdmissionResult FromJoinResult(JoinResult join, string playerId, SpStanding standing) =>
+    /// <summary>Phase Q — SP must acknowledge at-own-risk disclaimer before admit.</summary>
+    public bool RequiresAtOwnRiskAcknowledgment { get; init; }
+
+    public string? PartnershipLegalUrl { get; init; }
+
+    public string? PartnershipDisclaimerVersion { get; init; }
+
+    public static NlJoinAdmissionResult FromJoinResult(JoinResult join, string playerId, SpStanding standing, string? partnershipTier = null) =>
         new()
         {
             Decision = join.Decision,
@@ -21,6 +28,7 @@ public sealed class NlJoinAdmissionResult
             PlayerId = playerId,
             Admit = join.Decision == JoinDecision.Allow,
             Standing = standing,
+            PartnershipTier = partnershipTier,
         };
 
     public static NlJoinAdmissionResult FromOwnershipDeny(string playerId, string reason, SpStanding standing, string ownershipStatus) =>
@@ -47,6 +55,27 @@ public sealed class NlJoinAdmissionResult
             Admit = false,
             Standing = standing,
             PartnershipTier = partnershipTier,
+        };
+
+    public static NlJoinAdmissionResult FromPartnershipDeny(
+        string playerId,
+        string reason,
+        SpStanding standing,
+        string? partnershipTier,
+        bool requiresAcknowledgment,
+        string? legalUrl = null,
+        string? disclaimerVersion = null) =>
+        new()
+        {
+            Decision = requiresAcknowledgment ? JoinDecision.Hold : JoinDecision.Deny,
+            Reason = reason,
+            PlayerId = playerId,
+            Admit = false,
+            Standing = standing,
+            PartnershipTier = partnershipTier,
+            RequiresAtOwnRiskAcknowledgment = requiresAcknowledgment,
+            PartnershipLegalUrl = legalUrl,
+            PartnershipDisclaimerVersion = disclaimerVersion,
         };
 }
 
@@ -76,7 +105,12 @@ public sealed class NlSessionManifest
 
     public string? CatalogLegalNotice { get; init; }
 
-    /// <summary>Phase O — ephemeral fork connect endpoint (process/docker/mock URI).</summary>
+    /// <summary>Phase Q — at-own-risk titles require one-time SP acknowledgment.</summary>
+    public bool RequiresAtOwnRiskAcknowledgment { get; init; }
+
+    public string? PartnershipLegalUrl { get; init; }
+
+    public string? PartnershipDisclaimerVersion { get; init; }
     public string? ForkConnectEndpoint { get; init; }
 
     public string? ForkSessionId { get; init; }

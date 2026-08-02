@@ -1,0 +1,17 @@
+{
+  "publishers": [
+    {
+      "publisherId": "demo-publisher",
+      "displayName": "Demo Publisher Studio",
+      "contactEmail": "partnerships@example.com",
+      "registeredAtUtc": "2026-01-01T00:00:00Z",
+      "titles": [
+        {
+          "gameId": "hello-fork",
+          "tier": "Official",
+          "status": "OptedIn"
+        }
+      ]
+    }
+  ]
+}

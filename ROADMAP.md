@@ -3,8 +3,8 @@
 This tracks progress against the ideas in [`NexoraLive.txt`](NexoraLive.txt), broken into phases
 roughly ordered by dependency (each later phase leans on earlier ones).
 
-**Built:** Phases 0–K + **Phase P** (fork runtime) + **Phase L** (platform identity) + **Phase M** (live social gate) + **Phase N** (fork catalog) + **Phase O** (fork orchestrator).
-**Next track:** Phases Q–S. See
+**Built:** Phases 0–K + **Phase P** (fork runtime) + **Phase L** (platform identity) + **Phase M** (live social gate) + **Phase N** (fork catalog) + **Phase O** (fork orchestrator) + **Phase Q** (partnerships).
+**Next track:** Phases R–S. See
 [docs/NL_FORK_PLATFORM.md](docs/NL_FORK_PLATFORM.md).
 
 Status legend: `[x]` done, `[~]` partially done / in progress, `[ ]` not started.
@@ -526,15 +526,15 @@ RCON/UDP hack. **Met** via `HelloForkRuntimeTests.TryShootAsync_BlockRule_DoesNo
 
 Legal and product layer for **official** vs **use at own risk** integrations.
 
-- [ ] **Publisher integration spec** — "Play on NL" SDK: ownership token, fork auth, disclaimer
-- [ ] **Platform-wide framework** — e.g. Steam: opt-in flag on app id → NL can host fork
-- [ ] **In-game entry point stub** — menu button spec (publisher implements); NL client deep-link
-- [ ] **EULA / ToS templates** — session disclaimer, no progress transfer, no NL sale of DLC
-- [ ] **At-own-risk flow** — explicit user acknowledgment before first join on unpartnered title
-- [ ] **Publisher dashboard placeholder** — opt titles in/out, view session counts (no revenue share
+- [x] **Publisher integration spec** — "Play on NL" SDK: ownership token, fork auth, disclaimer
+- [x] **Platform-wide framework** — e.g. Steam: opt-in flag on app id → NL can host fork
+- [x] **In-game entry point stub** — menu button spec (publisher implements); NL client deep-link
+- [x] **EULA / ToS templates** — session disclaimer, no progress transfer, no NL sale of DLC
+- [x] **At-own-risk flow** — explicit user acknowledgment before first join on unpartnered title
+- [x] **Publisher dashboard placeholder** — opt titles in/out, view session counts (no revenue share
       tooling — NL does not sell game content)
-- [ ] **Ban sync webhooks** — publisher → NL deny list where partnered
-- [ ] **Docs** — `docs/NL_PARTNERSHIP.md` for publishers and platforms
+- [x] **Ban sync webhooks** — publisher → NL deny list where partnered
+- [x] **Docs** — `docs/NL_PARTNERSHIP.md` for publishers and platforms
 
 **Exit criteria:** Catalog tier drives UI copy + legal gate; partnered title skips at-own-risk
 banner; unpartnered requires acknowledgment once per user per title.

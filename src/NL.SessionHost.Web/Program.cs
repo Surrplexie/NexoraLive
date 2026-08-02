@@ -3,6 +3,8 @@ using NL.Core.Security;
 using NL.Core.Sp;
 using NL.Fork.Core;
 using NL.Fork.Catalog;
+using NL.Partnership;
+using NL.Partnership.Core;
 using NL.Fork.Catalog.Core;
 using NL.Fork.Orchestrator;
 using NL.Fork.Orchestrator.Core;
@@ -43,6 +45,8 @@ var catalogSettings = NlForkCatalogSettings.LoadFromEnvironment();
 var catalogHost = new NlForkCatalogHost(catalogSettings);
 var orchestratorSettings = NlForkOrchestratorSettings.LoadFromEnvironment();
 var orchestratorHost = new NlForkOrchestratorHost(orchestratorSettings, catalogHost);
+var partnershipSettings = NlPartnershipSettings.LoadFromEnvironment();
+var partnershipHost = new NlPartnershipHost(partnershipSettings);
 var samplesRoot = ResolveSamplesRoot();
 
 var builder = WebApplication.CreateBuilder(args);
@@ -65,6 +69,8 @@ builder.Services.AddSingleton(catalogSettings);
 builder.Services.AddSingleton(catalogHost);
 builder.Services.AddSingleton(orchestratorSettings);
 builder.Services.AddSingleton(orchestratorHost);
+builder.Services.AddSingleton(partnershipSettings);
+builder.Services.AddSingleton(partnershipHost);
 builder.Services.AddSingleton(demoSettings);
 builder.Services.AddSingleton(spectatorSettings);
 builder.Services.AddSingleton(hardeningSettings);
@@ -105,7 +111,7 @@ app.MapGet("/api/v1/session/manifest", (BusHostState b, NlForkOrchestratorHost o
 app.MapGet("/api/v1/session", (BusHostState b, NlForkOrchestratorHost orchestrator, HttpContext ctx) =>
     Results.Json(b.GetStatus(NlWebSecurityExtensions.IsAuthorized(ctx), orchestrator)));
 
-app.MapPost("/api/v1/session/admit", async (BusHostState b, NlIdentityHost identity, NlSocialHost social, NlForkCatalogHost catalog, NlAdmitPlayerRequest body, CancellationToken ct) =>
+app.MapPost("/api/v1/session/admit", async (BusHostState b, NlIdentityHost identity, NlSocialHost social, NlForkCatalogHost catalog, NlPartnershipHost partnership, NlAdmitPlayerRequest body, CancellationToken ct) =>
 {
     if (string.IsNullOrWhiteSpace(body.PlayerId))
     {
@@ -114,7 +120,7 @@ app.MapPost("/api/v1/session/admit", async (BusHostState b, NlIdentityHost ident
 
     try
     {
-        return Results.Json(await b.AdmitAsync(body, identity, social, catalog, ct));
+        return Results.Json(await b.AdmitAsync(body, identity, social, catalog, partnership, ct));
     }
     catch (ArgumentException ex)
     {
@@ -377,6 +383,143 @@ app.MapPost("/api/v1/fork/orchestrator/destroy/{sessionId}", async (
 {
     var result = await host.Orchestrator.DestroySessionAsync(sessionId, ct);
     return result.Success ? Results.Ok(new { ok = true }) : Results.BadRequest(new { error = result.Error });
+});
+
+app.MapGet("/api/v1/partnership/settings", (NlPartnershipSettings s) => Results.Json(s.ToPublicInfo()));
+
+app.MapGet("/api/v1/partnership/legal/{gameId}", (NlPartnershipHost host, NlForkCatalogHost catalog, string gameId) =>
+{
+    var entry = catalog.Catalog.GetEntry(gameId, "1.0") ?? catalog.Catalog.ListGames(true).FirstOrDefault(e =>
+        string.Equals(e.GameId, gameId, StringComparison.OrdinalIgnoreCase));
+    var tier = entry?.Tier ?? PartnershipTier.AtOwnRisk;
+    var legal = host.Gate.GetLegal(gameId, tier, entry?.EffectiveLegalNotice);
+    return Results.Json(legal);
+});
+
+app.MapGet("/api/v1/partnership/acknowledgment/{playerId}/{gameId}", (NlPartnershipHost host, string playerId, string gameId) =>
+{
+    var ack = host.Acknowledgments.Get(playerId, gameId);
+    return ack is null ? Results.NotFound(new { acknowledged = false }) : Results.Json(ack);
+});
+
+app.MapPost("/api/v1/partnership/acknowledge", (NlPartnershipHost host, NlForkCatalogHost catalog, PartnershipAcknowledgeRequest body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.PlayerId) || string.IsNullOrWhiteSpace(body.GameId))
+    {
+        return Results.BadRequest(new { error = "playerId and gameId required." });
+    }
+
+    var entry = catalog.Catalog.ListGames(true).FirstOrDefault(e =>
+        string.Equals(e.GameId, body.GameId, StringComparison.OrdinalIgnoreCase));
+    var tier = entry?.Tier ?? PartnershipTier.AtOwnRisk;
+    var ack = host.Gate.RecordAcknowledgment(body.PlayerId.Trim(), body.GameId.Trim(), tier);
+    return Results.Json(ack);
+});
+
+app.MapGet("/api/v1/partnership/publishers", (NlPartnershipHost host) =>
+    Results.Json(host.Publishers.List()));
+
+app.MapPost("/api/v1/partnership/publishers/register", (NlPartnershipHost host, PublisherRegistration body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.PublisherId) || string.IsNullOrWhiteSpace(body.DisplayName))
+    {
+        return Results.BadRequest(new { error = "publisherId and displayName required." });
+    }
+
+    return Results.Json(host.Publishers.Save(body));
+});
+
+app.MapPut("/api/v1/partnership/publishers/{publisherId}/titles/{gameId}", (
+    NlPartnershipHost host,
+    string publisherId,
+    string gameId,
+    PublisherTitleStatusRequest body) =>
+{
+    try
+    {
+        var pub = host.Publishers.SetTitleStatus(publisherId, gameId, body.Status);
+        return Results.Json(pub);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/api/v1/partnership/platform-opt-in", (NlPartnershipHost host) =>
+    Results.Json(host.PlatformOptIn.List()));
+
+app.MapPost("/api/v1/partnership/platform-opt-in", (NlPartnershipHost host, PlatformOptInEntry body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.Platform) || string.IsNullOrWhiteSpace(body.AppId) || string.IsNullOrWhiteSpace(body.GameId))
+    {
+        return Results.BadRequest(new { error = "platform, appId, and gameId required." });
+    }
+
+    host.PlatformOptIn.Save(body);
+    return Results.Json(body);
+});
+
+app.MapPost("/api/v1/partnership/ban-sync", (NlPartnershipHost host, NlPartnershipSettings settings, HttpRequest req, BanSyncWebhookRequest body) =>
+{
+    if (!string.IsNullOrWhiteSpace(settings.WebhookSecret))
+    {
+        var header = req.Headers["X-NL-Partnership-Secret"].FirstOrDefault()
+            ?? req.Headers["Authorization"].FirstOrDefault()?.Replace("Bearer ", "", StringComparison.OrdinalIgnoreCase);
+        if (!string.Equals(header, settings.WebhookSecret, StringComparison.Ordinal))
+        {
+            return Results.Unauthorized();
+        }
+    }
+
+    try
+    {
+        host.BanSync.Apply(body);
+        return Results.Ok(new { ok = true });
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/api/v1/partnership/dashboard/{publisherId}", (NlPartnershipHost host, string publisherId) =>
+{
+    try
+    {
+        return Results.Json(host.Dashboard.GetSnapshot(publisherId));
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/api/v1/partnership/sdk/spec", (BusHostState bus) =>
+{
+    var httpBase = bus.GetManifest().HttpBaseUrl;
+    return Results.Json(PlayOnNlSdkSpecProvider.Create(httpBase));
+});
+
+app.MapPost("/api/v1/partnership/sdk/ownership-token", (PartnershipOwnershipTokenRequest body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.PlatformUserId) || string.IsNullOrWhiteSpace(body.GameId))
+    {
+        return Results.BadRequest(new { error = "platformUserId and gameId required." });
+    }
+
+    var exp = DateTimeOffset.UtcNow.AddMinutes(15);
+    return Results.Json(new
+    {
+        token = Convert.ToBase64String(Guid.NewGuid().ToByteArray()),
+        sub = body.PlatformUserId,
+        game_id = body.GameId,
+        app_id = body.AppId,
+        platform_user_id = body.PlatformUserId,
+        platform = body.Platform ?? "steam",
+        exp = exp.ToUnixTimeSeconds(),
+        note = "Stub ownership token for Play on NL SDK integration (Phase Q).",
+    });
 });
 
 app.MapPut("/api/v1/session/profile", async (BusHostState b, HttpRequest req) =>
@@ -702,6 +845,7 @@ Console.WriteLine($"Hardening (Phase K)    → {hardeningSettings.Enabled} (admi
 Console.WriteLine($"Social gate (Phase M)  → {socialSettings.Enabled} mode={socialSettings.Mode}");
 Console.WriteLine($"Fork catalog (Phase N) → {catalogSettings.Enabled} manifest={NlForkCatalogPaths.Manifest}");
 Console.WriteLine($"Fork orchestrator (O)  → {orchestratorSettings.Enabled} mode={orchestratorSettings.Mode} provisioner={orchestratorHost.ResolveProvisionerKind()}");
+Console.WriteLine($"Partnership (Phase Q)  → {partnershipSettings.Enabled} gate={partnershipSettings.RequireGateAtAdmit}");
 Console.WriteLine($"Web editor (Phase I)   → /editor.html + /api/v1/editor/*");
 if (demoSettings.Enabled)
 {
@@ -831,4 +975,23 @@ internal sealed class ForkOrchestratorCreateRequest
     public List<string>? ModIds { get; set; }
     public string? DockerImage { get; set; }
     public int? ReservedPrivilegedSlots { get; set; }
+}
+
+internal sealed class PartnershipAcknowledgeRequest
+{
+    public string? PlayerId { get; set; }
+    public string? GameId { get; set; }
+}
+
+internal sealed class PublisherTitleStatusRequest
+{
+    public PublisherTitleStatus Status { get; set; } = PublisherTitleStatus.OptedIn;
+}
+
+internal sealed class PartnershipOwnershipTokenRequest
+{
+    public string? PlatformUserId { get; set; }
+    public string? GameId { get; set; }
+    public string? AppId { get; set; }
+    public string? Platform { get; set; }
 }
