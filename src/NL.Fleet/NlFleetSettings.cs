@@ -91,6 +91,8 @@ public sealed class NlFleetHost
         Runbook = new FleetIncidentRunbookService(Incidents);
         Compliance = new FleetComplianceService(settings.Retention);
         Slo = new FleetSloEvaluator();
+        Validation = new FleetStagingValidationService();
+        ValidationStore = new JsonFleetValidationStore();
     }
 
     public NlFleetSettings Settings { get; }
@@ -114,4 +116,8 @@ public sealed class NlFleetHost
     public FleetComplianceService Compliance { get; }
 
     public FleetSloEvaluator Slo { get; }
+
+    public FleetStagingValidationService Validation { get; }
+
+    public JsonFleetValidationStore ValidationStore { get; }
 }

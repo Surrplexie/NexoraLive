@@ -231,6 +231,7 @@ public sealed class NlForkOrchestratorService
             NlForkProvisionerMode.Mock => ForkProvisionerKind.Mock,
             NlForkProvisionerMode.Process => ForkProvisionerKind.Process,
             NlForkProvisionerMode.Docker => ForkProvisionerKind.Docker,
+            NlForkProvisionerMode.Kubernetes => ForkProvisionerKind.Kubernetes,
             _ => ResolveAutoProvisioner(),
         };
     }

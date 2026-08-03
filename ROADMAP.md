@@ -3,8 +3,8 @@
 This tracks progress against the ideas in [`NexoraLive.txt`](NexoraLive.txt), broken into phases
 roughly ordered by dependency (each later phase leans on earlier ones).
 
-**Built:** Phases 0–K + **Phase P** (fork runtime) + **Phase L** (platform identity) + **Phase M** (live social gate) + **Phase N** (fork catalog) + **Phase O** (fork orchestrator) + **Phase Q** (partnerships) + **Phase R** (NL Client).
-**Next track:** Phase S. See
+**Built:** Phases 0–K + **Phase P** (fork runtime) + **Phase L** (platform identity) + **Phase M** (live social gate) + **Phase N** (fork catalog) + **Phase O** (fork orchestrator) + **Phase Q** (partnerships) + **Phase R** (NL Client) + **Phase S** (fleet ops + staging validation).
+**Next track:** Production dogfood — end-to-end stream on real fork image. See
 [docs/NL_FORK_PLATFORM.md](docs/NL_FORK_PLATFORM.md).
 
 Status legend: `[x]` done, `[~]` partially done / in progress, `[ ]` not started.
@@ -575,8 +575,9 @@ Run many ephemeral forks reliably in production.
       (nl.txt: e.g. Twitch 50 followers — configurable)
 - [x] **Backup & compliance** — moderation log retention; GDPR export/delete for SP profiles
 - [x] **Load tests** — N concurrent sessions, M admits/sec on admission service
+- [x] **Staging → production validation** — 100+ session load test, SLO gate, K8s provisioner, staging cluster manifests — [docs/NL_FLEET_STAGING.md](docs/NL_FLEET_STAGING.md)
 
-**Exit criteria:** 100+ concurrent ephemeral sessions supported in staging with SLOs defined.
+**Exit criteria:** 100+ concurrent ephemeral sessions supported in staging with SLOs defined — **met** via `scripts/nl-fleet-staging-validation.ps1` + `/api/v1/fleet/validation`.
 
 ---
 

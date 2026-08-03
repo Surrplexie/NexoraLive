@@ -538,7 +538,40 @@ app.MapGet("/api/v1/fleet/slos", (NlFleetHost fleet, NlForkOrchestratorHost orch
     var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
     var activeNls = bus.Sessions.IsRunning ? 1 : 0;
     var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
-    return Results.Json(fleet.Slo.Evaluate(snap));
+    return Results.Json(fleet.Slo.Evaluate(snap, loadTest: null, fleet.Metrics, fleet.Incidents));
+});
+
+app.MapGet("/api/v1/fleet/validation", (NlFleetHost fleet, NlForkOrchestratorHost orchestrator, BusHostState bus) =>
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    var last = fleet.ValidationStore.GetLast();
+    var report = fleet.Validation.Evaluate(
+        fleet.Settings,
+        orchestrator.Settings.Mode.ToString(),
+        snap,
+        fleet.Metrics,
+        fleet.Incidents,
+        last?.LastLoadTest);
+    return Results.Json(report);
+});
+
+app.MapPost("/api/v1/fleet/validation/run", (NlFleetHost fleet, NlForkOrchestratorHost orchestrator, BusHostState bus) =>
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    var last = fleet.ValidationStore.GetLast();
+    var report = fleet.Validation.Evaluate(
+        fleet.Settings,
+        orchestrator.Settings.Mode.ToString(),
+        snap,
+        fleet.Metrics,
+        fleet.Incidents,
+        last?.LastLoadTest);
+    fleet.ValidationStore.Save(report);
+    return Results.Json(report);
 });
 
 app.MapGet("/api/v1/fleet/incidents", (NlFleetHost fleet, int? count) =>
@@ -592,20 +625,44 @@ app.MapDelete("/api/v1/fleet/compliance/sp/{playerId}", (NlFleetHost fleet, stri
     }
 });
 
-app.MapPost("/api/v1/fleet/load-test/report", (NlFleetHost fleet, FleetLoadTestReportRequest body) =>
+app.MapPost("/api/v1/fleet/load-test/report", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    FleetLoadTestReportRequest body) =>
 {
-    var snap = fleet.Metrics.BuildSnapshot(body.ActiveForkSessions, body.ActiveNlsSessions);
+    var activeForks = body.ActiveForkSessions > 0
+        ? body.ActiveForkSessions
+        : (orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0);
+    var activeNls = body.ActiveNlsSessions > 0 ? body.ActiveNlsSessions : (bus.Sessions.IsRunning ? 1 : 0);
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    var forkP99 = body.ForkCreateP99Ms > 0 ? body.ForkCreateP99Ms : fleet.Metrics.GetForkCreateP99Ms();
+    var slos = fleet.Slo.Evaluate(snap, null, fleet.Metrics, fleet.Incidents);
     var load = new FleetLoadTestResult(
         body.ConcurrentSessionsTarget,
         body.AdmitsPerSecondTarget,
         body.AdmitsSucceeded,
         body.AdmitsFailed,
         body.ElapsedSeconds,
-        []);
+        forkP99,
+        slos);
+    load = load with
+    {
+        Slos = fleet.Slo.Evaluate(snap, load, fleet.Metrics, fleet.Incidents),
+    };
+    var report = fleet.Validation.Evaluate(
+        fleet.Settings,
+        orchestrator.Settings.Mode.ToString(),
+        snap,
+        fleet.Metrics,
+        fleet.Incidents,
+        load);
+    fleet.ValidationStore.Save(report);
     return Results.Json(new
     {
         loadTest = load,
-        slos = fleet.Slo.Evaluate(snap, load),
+        slos = load.Slos,
+        validation = report,
     });
 });
 
@@ -926,7 +983,7 @@ app.MapGet("/api/v1/ops/status", (
         ? fleet.Metrics.BuildSnapshot(activeForks, activeNls)
         : null;
     var slos = fleetObs is not null
-        ? fleet.Slo.Evaluate(fleetObs)
+        ? fleet.Slo.Evaluate(fleetObs, loadTest: null, fleet.Metrics, fleet.Incidents)
         : null;
     var warm = fleet.Settings.Enabled
         ? fleet.Autoscale.Evaluate(activeForks, activeNls > 0, null)
@@ -1362,6 +1419,7 @@ internal sealed class FleetLoadTestReportRequest
     public double ElapsedSeconds { get; set; }
     public int ActiveForkSessions { get; set; }
     public int ActiveNlsSessions { get; set; }
+    public double ForkCreateP99Ms { get; set; }
 }
 
 internal sealed class PartnershipAcknowledgeRequest

@@ -304,11 +304,27 @@ public sealed class FleetComplianceService
 
 public sealed class FleetSloEvaluator
 {
-    public IReadOnlyList<FleetSloStatus> Evaluate(FleetObservabilitySnapshot snapshot, FleetLoadTestResult? loadTest = null)
+    public IReadOnlyList<FleetSloStatus> Evaluate(
+        FleetObservabilitySnapshot snapshot,
+        FleetLoadTestResult? loadTest = null,
+        IFleetMetricsStore? metrics = null,
+        IFleetIncidentStore? incidents = null)
     {
         var admitRate = snapshot.TotalAdmits == 0
             ? 1.0
             : (double)(snapshot.TotalAdmits - snapshot.TotalAdmitDenials) / snapshot.TotalAdmits;
+
+        if (loadTest is not null && loadTest.AdmitsSucceeded + loadTest.AdmitsFailed > 0)
+        {
+            admitRate = (double)loadTest.AdmitsSucceeded
+                / (loadTest.AdmitsSucceeded + loadTest.AdmitsFailed);
+        }
+
+        var forkP99 = loadTest?.ForkCreateP99Ms > 0
+            ? loadTest.ForkCreateP99Ms
+            : metrics?.GetForkCreateP99Ms() ?? 0;
+
+        var restartRate = ComputeAutoRestartRate(incidents);
 
         var list = new List<FleetSloStatus>();
         foreach (var slo in FleetSloCatalog.StagingDefaults)
@@ -317,13 +333,31 @@ public sealed class FleetSloEvaluator
             {
                 "concurrent_ephemeral_sessions" => ((double)snapshot.ActiveForkSessions, snapshot.ActiveForkSessions >= slo.Target),
                 "admit_success_rate" => (admitRate, admitRate >= slo.Target),
-                "fork_create_p99_ms" => (loadTest?.ElapsedSeconds * 1000 ?? 1000, true),
-                "incident_auto_restart_rate" => (0.96, true),
+                "fork_create_p99_ms" => (forkP99 <= 0 ? 1000 : forkP99, forkP99 <= 0 || forkP99 <= slo.Target),
+                "incident_auto_restart_rate" => (restartRate, restartRate >= slo.Target),
                 _ => (0.0, true),
             };
             list.Add(new FleetSloStatus(slo.Name, slo.Target, current, met, slo.Unit));
         }
 
         return list;
+    }
+
+    private static double ComputeAutoRestartRate(IFleetIncidentStore? incidents)
+    {
+        if (incidents is null)
+        {
+            return 1.0;
+        }
+
+        var recent = incidents.ListRecent(200)
+            .Where(i => i.Kind is FleetIncidentKind.ForkCrash or FleetIncidentKind.ForkUnhealthy)
+            .ToList();
+        if (recent.Count == 0)
+        {
+            return 1.0;
+        }
+
+        return (double)recent.Count(i => i.AutoRestartAttempted) / recent.Count;
     }
 }

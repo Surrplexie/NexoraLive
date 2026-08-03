@@ -46,6 +46,37 @@ public sealed class JsonFleetMetricsStore : IFleetMetricsStore
         }
     }
 
+    public void RecordForkCreateLatency(double elapsedMs)
+    {
+        lock (_lock)
+        {
+            _state.RecentForkCreateLatenciesMs ??= [];
+            _state.RecentForkCreateLatenciesMs.Add(elapsedMs);
+            if (_state.RecentForkCreateLatenciesMs.Count > 500)
+            {
+                _state.RecentForkCreateLatenciesMs.RemoveRange(0, _state.RecentForkCreateLatenciesMs.Count - 500);
+            }
+
+            Persist();
+        }
+    }
+
+    public double GetForkCreateP99Ms()
+    {
+        lock (_lock)
+        {
+            var latencies = _state.RecentForkCreateLatenciesMs;
+            if (latencies is null || latencies.Count == 0)
+            {
+                return 0;
+            }
+
+            var sorted = latencies.OrderBy(x => x).ToList();
+            var idx = (int)Math.Ceiling(sorted.Count * 0.99) - 1;
+            return sorted[Math.Clamp(idx, 0, sorted.Count - 1)];
+        }
+    }
+
     public void RecordDecision(int count = 1)
     {
         lock (_lock)
@@ -128,6 +159,7 @@ public sealed class JsonFleetMetricsStore : IFleetMetricsStore
         _state.RecentForkCreates ??= [];
         _state.RecentAdmits ??= [];
         _state.RecentSessions ??= [];
+        _state.RecentForkCreateLatenciesMs ??= [];
     }
 
     private void Persist()
@@ -156,6 +188,8 @@ public sealed class JsonFleetMetricsStore : IFleetMetricsStore
         public List<TimestampedEvent> RecentAdmits { get; set; } = [];
 
         public List<FleetSessionMetricSample> RecentSessions { get; set; } = [];
+
+        public List<double> RecentForkCreateLatenciesMs { get; set; } = [];
     }
 
     private sealed record TimestampedEvent(DateTimeOffset AtUtc, string? StreamerId);

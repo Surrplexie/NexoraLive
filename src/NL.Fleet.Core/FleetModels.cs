@@ -120,4 +120,19 @@ public sealed record FleetLoadTestResult(
     int AdmitsSucceeded,
     int AdmitsFailed,
     double ElapsedSeconds,
+    double ForkCreateP99Ms,
     IReadOnlyList<FleetSloStatus> Slos);
+
+public sealed record FleetValidationCheck(
+    string Id,
+    string Description,
+    bool Passed,
+    string? Detail = null);
+
+public sealed record FleetValidationReport(
+    bool ProductionReady,
+    bool StagingPassed,
+    IReadOnlyList<FleetValidationCheck> Checks,
+    IReadOnlyList<FleetSloStatus> Slos,
+    FleetLoadTestResult? LastLoadTest,
+    DateTimeOffset EvaluatedAtUtc);

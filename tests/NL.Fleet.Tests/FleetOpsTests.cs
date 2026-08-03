@@ -77,7 +77,7 @@ public class FleetOpsTests
     {
         var host = CreateHost();
         var snap = new FleetObservabilitySnapshot(100, 50, 1000, 5, 500, 10, [], DateTimeOffset.UtcNow);
-        var slos = host.Slo.Evaluate(snap);
+        var slos = host.Slo.Evaluate(snap, null, host.Metrics, host.Incidents);
         var concurrent = slos.First(s => s.Name == "concurrent_ephemeral_sessions");
         Assert.True(concurrent.Met);
         Assert.Equal(100, concurrent.Current);

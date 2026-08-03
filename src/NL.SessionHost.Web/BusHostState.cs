@@ -314,6 +314,7 @@ public sealed class BusHostState
 
         var gameId = profile.GameId ?? profile.Game;
         var major = profile.GameMajorVersion ?? "1.0";
+        var forkSw = System.Diagnostics.Stopwatch.StartNew();
         var create = await orchestrator.Orchestrator.CreateSessionAsync(
             new CreateForkSessionRequest(
                 streamerId,
@@ -334,7 +335,9 @@ public sealed class BusHostState
             return new ForkProvisionResult(false, create.Error, null, null);
         }
 
+        forkSw.Stop();
         fleet?.Metrics.RecordForkCreate(streamerId, regionId);
+        fleet?.Metrics.RecordForkCreateLatency(forkSw.Elapsed.TotalMilliseconds);
         return new ForkProvisionResult(true, null, create.Session!.SessionId, regionId);
     }
 

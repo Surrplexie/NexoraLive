@@ -7,6 +7,9 @@
   const obsEl = document.getElementById('observability');
   const autoscaleEl = document.getElementById('autoscale');
   const manifestEl = document.getElementById('manifest-preview');
+  const validationSummary = document.getElementById('validation-summary');
+  const validationBody = document.querySelector('#validation-table tbody');
+  const runValidationBtn = document.getElementById('run-validation');
 
   function setStatus(msg, kind) {
     statusEl.textContent = msg;
@@ -66,6 +69,27 @@
     });
   }
 
+  function renderValidation(report) {
+    if (!report) return;
+    validationSummary.textContent = (report.stagingPassed ? 'Staging: PASS' : 'Staging: FAIL')
+      + ' | Production ready: ' + (report.productionReady ? 'yes' : 'no');
+    validationSummary.className = 'status ' + (report.stagingPassed ? 'ok' : 'error');
+    validationBody.innerHTML = '';
+    (report.checks || []).forEach(function (c) {
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + c.description + '</td>' +
+        '<td>' + (c.passed ? '✓' : '✗') + '</td>' +
+        '<td>' + (c.detail || '') + '</td>';
+      validationBody.appendChild(tr);
+    });
+  }
+
+  async function loadValidation() {
+    var report = await api('/api/v1/fleet/validation');
+    renderValidation(report);
+  }
+
   async function refresh() {
     var settings = await api('/api/v1/fleet/settings');
     renderSettings(settings);
@@ -86,7 +110,19 @@
       fleetTurnUri: manifest.fleetTurnUri,
       forkSessionId: manifest.forkSessionId,
     }, null, 2);
+    await loadValidation().catch(function () {});
   }
+
+  runValidationBtn.addEventListener('click', function () {
+    setStatus('Running validation…');
+    fetch('/api/v1/fleet/validation/run', { method: 'POST', headers: NlAuth.headers() })
+      .then(function (r) { return r.json(); })
+      .then(function (report) {
+        renderValidation(report);
+        setStatus('Validation saved.');
+      })
+      .catch(function (e) { setStatus(e.message, 'error'); });
+  });
 
   refresh().catch(function (e) { setStatus(e.message, 'error'); });
   setInterval(function () { refresh().catch(function () {}); }, 10000);

@@ -25,6 +25,7 @@ game with **Enable orchestrator** — then **Start session** from Operator conso
 | Mock | `mock` | Writes `fork-status.json` in workspace (no external process) |
 | Process | `process` | Runs `NL.Fork.Runtime` via `dotnet` |
 | Docker | `docker` | `docker run nl-fork-hello:latest` with workspace volume |
+| Kubernetes | `kubernetes` / `k8s` | Job + ConfigMap per session via `kubectl` |
 | Auto | `auto` (default) | Process if runtime DLL built, else Mock |
 
 Docker is optional; mock + process cover local dev without Docker installed.
@@ -71,6 +72,8 @@ NL_FORK_DESTROY_GRACE_SEC=30
 NL_FORK_SESSION_MAX_HOURS=12
 NL_FORK_RESERVED_PRIVILEGED_SLOTS=2
 NL_FORK_DOCKER_IMAGE=nl-fork-hello:latest
+NL_FORK_K8S_NAMESPACE=nl-fork
+NL_FORK_K8S_KUBECONFIG=
 NL_FORK_ORCHESTRATOR_ROOT=/data/fork-orchestrator
 ```
 

@@ -8,6 +8,7 @@ public enum NlForkProvisionerMode
     Mock,
     Process,
     Docker,
+    Kubernetes,
     Auto,
 }
 
@@ -27,6 +28,10 @@ public sealed class NlForkOrchestratorSettings
     public int DefaultReservedPrivilegedSlots { get; init; } = 2;
 
     public string DefaultDockerImage { get; init; } = "nl-fork-hello:latest";
+
+    public string KubernetesNamespace { get; init; } = "nl-fork";
+
+    public string? KubernetesKubeconfig { get; init; }
 
     public int IdleDetectionMinutes { get; init; } = 15;
 
@@ -49,6 +54,7 @@ public sealed class NlForkOrchestratorSettings
             "mock" => NlForkProvisionerMode.Mock,
             "process" => NlForkProvisionerMode.Process,
             "docker" => NlForkProvisionerMode.Docker,
+            "kubernetes" or "k8s" => NlForkProvisionerMode.Kubernetes,
             _ => NlForkProvisionerMode.Auto,
         };
 
@@ -70,6 +76,8 @@ public sealed class NlForkOrchestratorSettings
             ? Math.Max(0, idle)
             : 15;
 
+        var k8sNs = Environment.GetEnvironmentVariable("NL_FORK_K8S_NAMESPACE") ?? "nl-fork";
+
         return new NlForkOrchestratorSettings
         {
             Enabled = enabled,
@@ -78,6 +86,8 @@ public sealed class NlForkOrchestratorSettings
             MaxSessionHours = maxHours,
             DefaultReservedPrivilegedSlots = reserved,
             DefaultDockerImage = dockerImage,
+            KubernetesNamespace = k8sNs,
+            KubernetesKubeconfig = Environment.GetEnvironmentVariable("NL_FORK_K8S_KUBECONFIG"),
             IdleDetectionMinutes = idleMinutes,
         };
     }
@@ -90,6 +100,7 @@ public sealed class NlForkOrchestratorSettings
         maxSessionHours = MaxSessionHours,
         reservedPrivilegedSlots = DefaultReservedPrivilegedSlots,
         dockerImage = DefaultDockerImage,
+        kubernetesNamespace = KubernetesNamespace,
         storePath = NlForkOrchestratorPaths.Root,
     };
 }
@@ -132,6 +143,7 @@ public sealed class NlForkOrchestratorHost
             [ForkProvisionerKind.Mock] = new MockForkProvisioner(),
             [ForkProvisionerKind.Process] = new ProcessForkProvisioner(runtimeProjectPath, log),
             [ForkProvisionerKind.Docker] = new DockerForkProvisioner(log),
+            [ForkProvisionerKind.Kubernetes] = new KubernetesForkProvisioner(settings, log),
         };
 
         return map;

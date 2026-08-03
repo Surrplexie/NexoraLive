@@ -19,6 +19,17 @@
   </header>
 
   <section class="card operator-panel">
+    <h2>Staging validation</h2>
+    <p class="sub">Production readiness gate — see <code>docs/NL_FLEET_STAGING.md</code></p>
+    <p id="validation-summary"></p>
+    <table id="validation-table">
+      <thead><tr><th>Check</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <button type="button" id="run-validation">Run validation</button>
+  </section>
+
+  <section class="card operator-panel">
     <h2>Settings &amp; SLOs</h2>
     <dl id="fleet-settings"></dl>
     <table id="slo-table">

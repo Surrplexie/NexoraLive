@@ -6,6 +6,10 @@ public interface IFleetMetricsStore
 
     void RecordForkCreate(string streamerId, string regionId);
 
+    void RecordForkCreateLatency(double elapsedMs);
+
+    double GetForkCreateP99Ms();
+
     void RecordDecision(int count = 1);
 
     void RecordSessionSample(FleetSessionMetricSample sample);
@@ -29,4 +33,11 @@ public interface IFleetStreamerRequirementsStore
     FleetStreamerRequirements GetOrDefault(string streamerId);
 
     void Save(FleetStreamerRequirements requirements);
+}
+
+public interface IFleetValidationStore
+{
+    FleetValidationReport? GetLast();
+
+    void Save(FleetValidationReport report);
 }

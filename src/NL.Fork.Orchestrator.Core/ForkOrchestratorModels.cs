@@ -5,6 +5,7 @@ public enum ForkProvisionerKind
     Mock,
     Process,
     Docker,
+    Kubernetes,
 }
 
 public enum ForkSessionState

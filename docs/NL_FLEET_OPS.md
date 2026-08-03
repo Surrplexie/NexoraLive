@@ -99,6 +99,8 @@ Report load test results: `POST /api/v1/fleet/load-test/report`
 
 Run smoke: `scripts/nl-fleet-load-test.ps1`
 
+**Staging validation:** [docs/NL_FLEET_STAGING.md](NL_FLEET_STAGING.md) — `scripts/nl-fleet-staging-validation.ps1`, K8s manifests in `deploy/k8s/staging/`, validation API at `/api/v1/fleet/validation`.
+
 ## Environment variables
 
 See [`.env.example`](../.env.example) — `NL_FLEET_*` block.
