@@ -18,6 +18,7 @@ function profileFromForm() {
   return {
     streamerId: document.getElementById("streamer").value.trim() || "default-streamer",
     game: document.getElementById("game").value,
+    gameId: document.getElementById("game-id").value.trim() || null,
     configPath: document.getElementById("config").value.trim(),
     sourcePath: document.getElementById("source").value.trim(),
     rconEndpoint: document.getElementById("rcon").value.trim() || null,
@@ -26,6 +27,7 @@ function profileFromForm() {
     antiCheat: document.getElementById("anti-cheat").checked,
     joinGate: document.getElementById("join-gate").checked,
     anomalyAutoMod: document.getElementById("anomaly-auto-mod").checked,
+    forkOrchestratorEnabled: document.getElementById("fork-orchestrator").checked,
     useDefaultDataPaths: true,
   };
 }
@@ -42,6 +44,8 @@ function applyProfile(p) {
   document.getElementById("anti-cheat").checked = p.antiCheat !== false;
   document.getElementById("join-gate").checked = !!p.joinGate;
   document.getElementById("anomaly-auto-mod").checked = !!p.anomalyAutoMod;
+  document.getElementById("fork-orchestrator").checked = !!p.forkOrchestratorEnabled;
+  document.getElementById("game-id").value = p.gameId || "";
 }
 
 function renderBus(bus) {
@@ -66,6 +70,9 @@ function renderManifest(m) {
     <dt>Admit URL</dt><dd>${m.admitUrl}</dd>
     <dt>Join gate</dt><dd>${m.joinGateEnabled ? "ON" : "off"}</dd>
     <dt>Session running</dt><dd>${m.sessionRunning ? "yes" : "no"}</dd>
+    <dt>Fork orchestrator</dt><dd>${m.forkOrchestratorEnabled ? "ON" : "off"}</dd>
+    <dt>Fork session</dt><dd>${m.forkSessionId || "—"}</dd>
+    <dt>Fork connect</dt><dd>${m.forkConnectEndpoint || "—"}</dd>
     <dt>Moderation</dt><dd>${m.moderationUrl}</dd>`;
 }
 
@@ -125,6 +132,12 @@ document.getElementById("save-profile")?.addEventListener("click", async () => {
     body: JSON.stringify(profileFromForm()),
   });
   renderStatus(data);
+});
+
+document.getElementById("load-dogfood-profile")?.addEventListener("click", async () => {
+  const data = await api("/api/v1/dogfood/setup", { method: "POST" });
+  renderStatus(data);
+  document.getElementById("status").textContent = "Dogfood profile loaded — click Start session.";
 });
 
 document.getElementById("bus-defaults")?.addEventListener("click", async () => {

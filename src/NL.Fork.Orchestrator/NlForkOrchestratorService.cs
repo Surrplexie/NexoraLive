@@ -180,6 +180,11 @@ public sealed class NlForkOrchestratorService
             return new ForkOrchestratorDestroyResult(true);
         }
 
+        if (session.State == ForkSessionState.Stopping && session.GraceDestroyAtUtc is not null)
+        {
+            return new ForkOrchestratorDestroyResult(true);
+        }
+
         if (_settings.DestroyGraceSeconds <= 0)
         {
             return await DestroySessionCoreAsync(session, cancellationToken);

@@ -1,0 +1,22 @@
+{
+  "streamerId": "dogfood-streamer",
+  "game": "generic",
+  "gameId": "hello-fork",
+  "gameMajorVersion": "1.0",
+  "configPath": "samples/configs/fork-hello.nle",
+  "useSessionBus": true,
+  "joinGate": false,
+  "antiCheat": true,
+  "anomalyAutoMod": false,
+  "socialGateEnabled": false,
+  "requireLiveStream": false,
+  "catalogEnforced": false,
+  "partnershipGateEnabled": false,
+  "forkOrchestratorEnabled": true,
+  "requireGameOwnership": true,
+  "platformAppId": "440",
+  "ownershipPlatform": "steam",
+  "strictOwnershipUnknown": false,
+  "useDefaultDataPaths": true,
+  "forkReservedPrivilegedSlots": 2
+}

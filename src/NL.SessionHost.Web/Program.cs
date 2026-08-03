@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using NL.Core;
 using NL.Core.Security;
 using NL.Core.Sp;
@@ -57,6 +58,10 @@ var samplesRoot = ResolveSamplesRoot();
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls($"http://{bindHost}:{httpPort}");
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
 
 var bus = new BusHostState(bindHost, httpPort, wsPort, busToken, modPort);
 var moderation = new ModerationHostState(moderationLog, spStore);
@@ -871,6 +876,37 @@ app.MapPost("/api/v1/client/mobile/action", async (ModerationHostState mod, NlCl
     {
         return Results.BadRequest(new { error = ex.Message });
     }
+});
+
+app.MapPost("/api/v1/dogfood/setup", (BusHostState bus, NlForkOrchestratorHost orchestrator, NlFleetHost fleet) =>
+{
+    try
+    {
+        var root = DogfoodSetup.FindRepoRoot();
+        DogfoodSetup.EnsureMockOwnership(root);
+        var profile = DogfoodSetup.BuildProfile(root);
+        bus.SaveProfile(profile);
+        NlSessionBusHelper.ApplyBusSource(profile, bus.BusInfo);
+        bus.SaveProfile(profile);
+        return Results.Ok(bus.GetStatus(includeSecrets: true, orchestrator, fleet));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/api/v1/dogfood/status", (BusHostState bus, NlForkOrchestratorHost orchestrator) =>
+{
+    var profile = bus.GetProfile();
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    return Results.Json(new DogfoodStatus(
+        bus.Sessions.IsRunning,
+        profile.ForkOrchestratorEnabled,
+        profile.ForkSessionId,
+        activeForks,
+        profile.StreamerId,
+        File.Exists(NlIdentityPaths.MockOwnershipConfig)));
 });
 
 app.MapPut("/api/v1/session/profile", async (BusHostState b, HttpRequest req) =>

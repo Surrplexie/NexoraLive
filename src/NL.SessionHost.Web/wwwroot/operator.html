@@ -16,7 +16,8 @@
       <a href="/operator.html" aria-current="page">Operator</a>
       <a href="/join-gate.html">Join gate</a>
       <a href="/fork-catalog.html">Fork catalog</a>
-      <a href="/moderation.html">Moderation</a>
+      <a href="/nl-client.html">NL Client</a>
+      <a href="/dogfood.html">Dogfood</a>
     </nav>
   </header>
 
@@ -72,8 +73,13 @@
       <label><input type="checkbox" id="join-gate" /> Join gate</label>
       <label><input type="checkbox" id="anomaly-auto-mod" /> Anomaly auto-mod</label>
       <label><input type="checkbox" id="replay-once" /> Replay once</label>
+      <label><input type="checkbox" id="fork-orchestrator" /> Fork orchestrator (Phase O)</label>
+    </div>
+    <div class="grid">
+      <label>Game id <input id="game-id" placeholder="hello-fork" /></label>
     </div>
     <div class="actions">
+      <button type="button" id="load-dogfood-profile">Load dogfood profile</button>
       <button type="button" id="bus-defaults">Load bus defaults</button>
       <button type="button" id="save-profile">Save profile</button>
       <button type="button" id="start" class="primary">Start session</button>

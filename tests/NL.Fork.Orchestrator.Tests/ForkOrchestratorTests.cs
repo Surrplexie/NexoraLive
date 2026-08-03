@@ -144,4 +144,45 @@ public class ForkOrchestratorTests
         Assert.True(schedule.Success);
         Assert.Null(svc.GetActiveForStreamer("grace"));
     }
+
+    [Fact]
+    public async Task GraceDestroy_DoesNotRescheduleWhenAlreadyStopping()
+    {
+        var root = TempRoot();
+        var nle = TempNle();
+        var settings = new NlForkOrchestratorSettings
+        {
+            Enabled = true,
+            Mode = NlForkProvisionerMode.Mock,
+            DestroyGraceSeconds = 30,
+        };
+        var store = new JsonForkSessionStore(Path.Combine(root, "store.json"));
+        var audit = new JsonlForkOrchestratorAuditStore(Path.Combine(root, "audit.jsonl"));
+        var provisioners = new Dictionary<ForkProvisionerKind, IForkProvisioner>
+        {
+            [ForkProvisionerKind.Mock] = new MockForkProvisioner(),
+        };
+        var svc = new NlForkOrchestratorService(settings, store, audit, provisioners);
+
+        var create = await svc.CreateSessionAsync(
+            new CreateForkSessionRequest("grace", "gameA", "1.0", nle, []),
+            "ws://127.0.0.1/nl/v1",
+            "http://127.0.0.1/admit",
+            "tok");
+        Assert.True(create.Success);
+
+        var first = await svc.ScheduleGraceDestroyForStreamerAsync("grace");
+        Assert.True(first.Success);
+        var sessionId = create.Session!.SessionId;
+        var session = svc.GetSession(sessionId);
+        Assert.NotNull(session);
+        var firstGrace = session!.GraceDestroyAtUtc;
+        Assert.NotNull(firstGrace);
+
+        await Task.Delay(50);
+        var second = await svc.ScheduleGraceDestroyForStreamerAsync("grace");
+        Assert.True(second.Success);
+        session = svc.GetSession(sessionId);
+        Assert.Equal(firstGrace, session!.GraceDestroyAtUtc);
+    }
 }

@@ -5,7 +5,7 @@ roughly ordered by dependency (each later phase leans on earlier ones).
 
 **Built:** Phases 0–K + **Phase P** (fork runtime) + **Phase L** (platform identity) + **Phase M** (live social gate) + **Phase N** (fork catalog) + **Phase O** (fork orchestrator) + **Phase Q** (partnerships) + **Phase R** (NL Client) + **Phase S** (fleet ops + staging validation).
 **Next track:** Production dogfood — end-to-end stream on real fork image. See
-[docs/NL_FORK_PLATFORM.md](docs/NL_FORK_PLATFORM.md).
+[docs/NL_DOGFOOD_FLOW.md](docs/NL_DOGFOOD_FLOW.md) and [docs/NL_FORK_PLATFORM.md](docs/NL_FORK_PLATFORM.md).
 
 Status legend: `[x]` done, `[~]` partially done / in progress, `[ ]` not started.
 

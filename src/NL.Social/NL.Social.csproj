@@ -1,16 +1,32 @@
-<Project Sdk="Microsoft.NET.Sdk">
-
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <RootNamespace>NL.Social</RootNamespace>
-    <LangVersion>latest</LangVersion>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\NL.Core\NL.Core.csproj" />
-    <ProjectReference Include="..\NL.Social.Core\NL.Social.Core.csproj" />
-  </ItemGroup>
-
-</Project>
+<Project Sdk="Microsoft.NET.Sdk">
+
+
+
+  <PropertyGroup>
+
+    <TargetFramework>net8.0</TargetFramework>
+
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <Nullable>enable</Nullable>
+
+    <RootNamespace>NL.Social</RootNamespace>
+
+    <LangVersion>latest</LangVersion>
+
+  </PropertyGroup>
+
+
+
+  <ItemGroup>
+
+    <ProjectReference Include="..\NL.Core\NL.Core.csproj" />
+
+    <ProjectReference Include="..\NL.Social.Core\NL.Social.Core.csproj" />
+
+  </ItemGroup>
+
+
+
+</Project>
+

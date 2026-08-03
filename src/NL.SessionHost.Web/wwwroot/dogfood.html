@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NL Dogfood Flow</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="operator-page">
+  <header>
+    <h1>Dogfood Flow</h1>
+    <p class="sub">Operator → client join → teardown (end-to-end fork platform)</p>
+    <nav class="nav">
+      <a href="/operator.html">Operator</a>
+      <a href="/nl-client.html">NL Client</a>
+      <a href="/identity-link.html">Identity</a>
+      <a href="/fork-orchestrator.html">Orchestrator</a>
+      <a href="/dogfood.html" aria-current="page">Dogfood</a>
+    </nav>
+  </header>
+
+  <section class="card operator-panel">
+    <h2>1 — Setup profile</h2>
+    <p class="hint">Loads dogfood-streamer profile, fork-hello.nle, mock Steam ownership matrix.</p>
+    <button type="button" id="btn-setup" class="primary">Run setup</button>
+    <pre id="setup-result" class="code-block"></pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>2 — Start session (operator)</h2>
+    <p class="hint">Starts NLS + provisions mock fork via orchestrator.</p>
+    <button type="button" id="btn-start">Start session</button>
+    <button type="button" id="btn-open-operator">Open operator console</button>
+    <pre id="start-result" class="code-block"></pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>3 — SP join (NL Client)</h2>
+    <p class="hint">Player <code>sp-dogfood-1</code>, Steam64 <code>76561198000000001</code>, streamer <code>dogfood-streamer</code>.</p>
+    <button type="button" id="btn-join">Run join flow (API)</button>
+    <button type="button" id="btn-open-client">Open NL Client UI</button>
+    <pre id="join-result" class="code-block"></pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>4 — Teardown</h2>
+    <p class="hint">Stop session → fork grace destroy (~30s).</p>
+    <button type="button" id="btn-stop">Stop session</button>
+    <button type="button" id="btn-refresh-status">Refresh status</button>
+    <pre id="teardown-result" class="code-block"></pre>
+  </section>
+
+  <p id="status" class="status muted"></p>
+  <script src="nl-auth.js"></script>
+  <script src="dogfood-app.js"></script>
+</body>
+</html>
