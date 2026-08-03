@@ -10,7 +10,9 @@
   }
 
   async function api(path, opts) {
-    const res = await fetch(path, Object.assign({ headers: NlAuth.headers() }, opts || {}));
+    const res = await fetch(path, Object.assign({
+      headers: Object.assign({ 'Content-Type': 'application/json' }, window.NlAuth.authHeaders(), (opts && opts.headers) || {}),
+    }, opts || {}));
     const text = await res.text();
     let body;
     try { body = JSON.parse(text); } catch { body = text; }
