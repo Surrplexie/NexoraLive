@@ -43,6 +43,10 @@ public sealed class NlFleetSettings
             ? Math.Max(1, rate)
             : 30;
 
+        var forkPerHour = int.TryParse(Environment.GetEnvironmentVariable("NL_FLEET_MAX_FORK_CREATES_PER_HOUR"), out var perHour)
+            ? Math.Max(1, perHour)
+            : 6;
+
         var retentionDays = int.TryParse(Environment.GetEnvironmentVariable("NL_FLEET_MOD_RETENTION_DAYS"), out var days)
             ? Math.Max(30, days)
             : 730;
@@ -52,7 +56,7 @@ public sealed class NlFleetSettings
             Enabled = enabled,
             DefaultRegion = Environment.GetEnvironmentVariable("NL_FLEET_DEFAULT_REGION") ?? "us-east",
             Autoscale = new FleetAutoscalePolicy(minWarm, maxSessions, true, 15),
-            Abuse = new FleetAbusePolicy(6, minFollowers, forkPerMin),
+            Abuse = new FleetAbusePolicy(forkPerHour, minFollowers, forkPerMin),
             Retention = new FleetModerationRetentionPolicy(retentionDays, true, true),
             Relay = new FleetRelayConfig(
                 Environment.GetEnvironmentVariable("NL_FLEET_RELAY_WS_TEMPLATE")

@@ -66,20 +66,20 @@ Expect `provisioner=Process` and `forkConnect=process://localhost/{pid}` in the 
 
 Requires **Docker Desktop** running.
 
-**Terminal 1** — docker orchestrator:
+**Terminal 1** — start session host (one command):
 
 ```powershell
 cd C:\Users\surrp\Documents\GitHub\NexoraLive
-
-$env:NL_FLEET_ENABLED = "true"
-$env:NL_FLEET_MIN_TWITCH_FOLLOWERS = "0"
-$env:NL_FORK_ORCHESTRATOR_ENABLED = "true"
-$env:NL_FORK_ORCHESTRATOR_MODE = "docker"
-$env:NL_IDENTITY_ENABLED = "true"
-$env:NL_OWNERSHIP_MODE = "mock"
-
-dotnet run --project src/NL.SessionHost.Web
+powershell -File scripts/nl-session-host-docker-dogfood.ps1
 ```
+
+Or inline:
+
+```powershell
+cd C:\Users\surrp\Documents\GitHub\NexoraLive; $env:NL_FLEET_ENABLED="true"; $env:NL_FLEET_MIN_TWITCH_FOLLOWERS="0"; $env:NL_FLEET_MAX_FORK_CREATES_PER_HOUR="999"; $env:NL_FORK_ORCHESTRATOR_ENABLED="true"; $env:NL_FORK_ORCHESTRATOR_MODE="docker"; $env:NL_IDENTITY_ENABLED="true"; $env:NL_OWNERSHIP_MODE="mock"; dotnet run --project src/NL.SessionHost.Web -c Release --no-build
+```
+
+Wait for `Now listening on: http://127.0.0.1:27020`.
 
 **Terminal 2** — builds `nl-fork-hello:latest` (unless `-SkipImageBuild`) and runs the flow:
 
@@ -253,6 +253,8 @@ Invoke-RestMethod http://127.0.0.1:27020/api/v1/dogfood/status
 | Fork container exits immediately | URLs must reach host from container — provisioner rewrites to `host.docker.internal` automatically |
 | Minecraft port conflict | Stop other containers using host port 25565 |
 | Stale fork blocks start | Script auto-resets; or `POST /api/v1/session/stop` then destroy via fork orchestrator UI |
+| Fork create hourly quota exceeded | Dogfood default is 6/hour — set `NL_FLEET_MAX_FORK_CREATES_PER_HOUR=999` on session host, restart, or delete `%LOCALAPPDATA%\NL\fleet\metrics.json` before restart |
+| MSB3027 build / file locked | Stop running `NL.SessionHost.Web` first (Task Manager or close Terminal 1), then rebuild |
 | Streamer offline in client | Start session first — `isLive` follows running session |
 
 ## Next after dogfood
