@@ -92,6 +92,20 @@ Step "Health check" {
     Invoke-Nl GET "/health" | Out-Null
 }
 
+Step "Reset stale session/fork state" {
+    try { Invoke-Nl POST "/api/v1/session/stop" | Out-Null } catch { }
+    Start-Sleep -Seconds 1
+    $sessions = @(Invoke-Nl GET "/api/v1/fork/orchestrator/sessions")
+    foreach ($s in $sessions) {
+        if ($s.sessionId) {
+            try { Invoke-Nl POST ("/api/v1/fork/orchestrator/destroy/{0}" -f $s.sessionId) | Out-Null } catch { }
+        }
+    }
+    if (@($sessions).Count -gt 0) {
+        Start-Sleep -Seconds 2
+    }
+}
+
 Step "Dogfood setup (profile + mock ownership)" {
     $setup = Invoke-Nl POST "/api/v1/dogfood/setup" @{ gameId = $GameId }
     $sid = if ($setup.profile) { $setup.profile.streamerId } else { $setup.streamerId }

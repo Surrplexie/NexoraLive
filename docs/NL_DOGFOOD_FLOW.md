@@ -250,7 +250,9 @@ Invoke-RestMethod http://127.0.0.1:27020/api/v1/dogfood/status
 | Session won't start — config missing | Run **Load dogfood profile** or `POST /api/v1/dogfood/setup` |
 | Fork not created | `NL_FORK_ORCHESTRATOR_ENABLED=true` and profile `forkOrchestratorEnabled: true` |
 | Docker provision fails | Docker Desktop running; image built (`nl-fork-hello:latest` or `nl-fork-minecraft:latest`) |
+| Fork container exits immediately | URLs must reach host from container — provisioner rewrites to `host.docker.internal` automatically |
 | Minecraft port conflict | Stop other containers using host port 25565 |
+| Stale fork blocks start | Script auto-resets; or `POST /api/v1/session/stop` then destroy via fork orchestrator UI |
 | Streamer offline in client | Start session first — `isLive` follows running session |
 
 ## Next after dogfood
