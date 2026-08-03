@@ -208,26 +208,31 @@ app.MapPost("/api/v1/identity/link", (NlIdentityHost host, NlIdentitySettings se
     }
 });
 
-app.MapDelete("/api/v1/identity/link", (NlIdentityHost host, NlIdentitySettings settings, LinkPlatformRequest body) =>
+app.MapDelete("/api/v1/identity/link", (
+    NlIdentityHost host,
+    NlIdentitySettings settings,
+    string accountId,
+    string platform,
+    string externalUserId) =>
 {
     if (!settings.Enabled)
     {
         return Results.Json(new { error = "Identity service disabled." }, statusCode: 503);
     }
 
-    if (string.IsNullOrWhiteSpace(body.AccountId) || string.IsNullOrWhiteSpace(body.ExternalUserId))
+    if (string.IsNullOrWhiteSpace(accountId) || string.IsNullOrWhiteSpace(externalUserId))
     {
         return Results.BadRequest(new { error = "accountId and externalUserId required." });
     }
 
-    if (!NlPlatformNames.TryParse(body.Platform, out var platform))
+    if (!NlPlatformNames.TryParse(platform, out var parsedPlatform))
     {
         return Results.BadRequest(new { error = "Invalid platform." });
     }
 
     try
     {
-        host.Identity.UnlinkPlatform(body.AccountId.Trim(), platform, body.ExternalUserId.Trim());
+        host.Identity.UnlinkPlatform(accountId.Trim(), parsedPlatform, externalUserId.Trim());
         return Results.Ok(new { ok = true });
     }
     catch (InvalidOperationException ex)

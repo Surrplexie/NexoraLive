@@ -73,7 +73,7 @@ Response includes `ownershipStatus` on denial.
 | GET | `/api/v1/identity/settings` | Public mode + OAuth URLs |
 | POST | `/api/v1/identity/accounts` | Create NL account |
 | POST | `/api/v1/identity/link` | Link Steam/Epic/… manually |
-| DELETE | `/api/v1/identity/link` | Unlink platform |
+| DELETE | `/api/v1/identity/link?accountId=…&platform=…&externalUserId=…` | Unlink platform |
 | GET | `/api/v1/identity/accounts/{id}` | Account + links |
 | GET | `/api/v1/identity/accounts/by-platform/{platform}/{externalUserId}` | Reverse lookup |
 | GET | `/api/v1/identity/audit` | Recent audit events |
