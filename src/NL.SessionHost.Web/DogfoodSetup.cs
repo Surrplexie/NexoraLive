@@ -12,7 +12,7 @@ public static class DogfoodSetup
         WriteIndented = true,
     };
 
-    public static SessionProfileFile BuildProfile(string repoRoot)
+    public static SessionProfileFile BuildProfile(string repoRoot, string? gameId = null)
     {
         var samplePath = Path.Combine(repoRoot, "samples", "dogfood", "session-profile-dogfood.json");
         if (!File.Exists(samplePath))
@@ -27,7 +27,14 @@ public static class DogfoodSetup
         profile.StreamerId = string.IsNullOrWhiteSpace(profile.StreamerId)
             ? "dogfood-streamer"
             : profile.StreamerId.Trim();
-        profile.GameId ??= "hello-fork";
+
+        var resolvedGameId = string.IsNullOrWhiteSpace(gameId)
+            ? (string.IsNullOrWhiteSpace(profile.GameId) ? "hello-fork" : profile.GameId.Trim())
+            : gameId.Trim();
+
+        var (configFile, bridgeGame) = ResolveDogfoodGame(resolvedGameId);
+        profile.GameId = resolvedGameId;
+        profile.Game = bridgeGame;
         profile.GameMajorVersion ??= "1.0";
         profile.PlatformAppId ??= "440";
         profile.ForkOrchestratorEnabled = true;
@@ -36,13 +43,24 @@ public static class DogfoodSetup
         profile.JoinGate = false;
         profile.RequireGameOwnership = true;
 
-        profile.ConfigPath = NlSampleConfigPaths.Resolve("fork-hello.nle");
+        profile.ConfigPath = NlSampleConfigPaths.Resolve(configFile);
         if (!File.Exists(profile.ConfigPath))
         {
-            throw new FileNotFoundException("fork-hello.nle not found.", profile.ConfigPath);
+            throw new FileNotFoundException($"{configFile} not found.", profile.ConfigPath);
         }
 
         return profile;
+    }
+
+    private static (string ConfigFile, string BridgeGame) ResolveDogfoodGame(string gameId)
+    {
+        var id = gameId.Trim().ToLowerInvariant();
+        return id switch
+        {
+            "minecraft" or "minecraft-java" or "minecraft-paper" => ("minecraft.nle", "minecraft"),
+            "beamng" or "beamng-drive" => ("beamng.nle", "beamng"),
+            _ => ("fork-hello.nle", "generic"),
+        };
     }
 
     public static void EnsureMockOwnership(string repoRoot)
@@ -79,6 +97,8 @@ public static class DogfoodSetup
         return Directory.GetCurrentDirectory();
     }
 }
+
+public sealed record DogfoodSetupRequest(string? GameId);
 
 public sealed record DogfoodStatus(
     bool SessionRunning,

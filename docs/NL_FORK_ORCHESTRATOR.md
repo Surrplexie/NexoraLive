@@ -30,6 +30,9 @@ game with **Enable orchestrator** — then **Start session** from Operator conso
 
 Docker is optional; mock + process cover local dev without Docker installed.
 
+Docker containers reach the session host via `host.docker.internal` (override with `NL_FORK_DOCKER_HOST`).
+The provisioner rewrites `127.0.0.1` / `localhost` in bridge and admit URLs automatically.
+
 ## Lifecycle
 
 1. **Create** — on session start when `forkOrchestratorEnabled` is true

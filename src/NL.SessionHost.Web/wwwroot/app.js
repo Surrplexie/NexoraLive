@@ -88,15 +88,8 @@ function renderStatus(data) {
   document.getElementById("status").textContent = `State: ${data.state} · Decisions: ${data.decisions}`;
   document.getElementById("decisions").textContent = `(decisions: ${data.decisions})`;
   document.getElementById("log").textContent = (data.log || []).join("\n");
-  if (data.profile?.configPath !== undefined) {
+  if (data.profile) {
     applyProfile(data.profile);
-  } else if (data.profile) {
-    document.getElementById("streamer").value = data.profile.streamerId || "";
-    document.getElementById("game").value = data.profile.game || "generic";
-    document.getElementById("join-gate").checked = !!data.profile.joinGate;
-    document.getElementById("anti-cheat").checked = data.profile.antiCheat !== false;
-    document.getElementById("anomaly-auto-mod").checked = !!data.profile.anomalyAutoMod;
-    document.getElementById("use-bus").checked = data.profile.useSessionBus !== false;
   }
   if (data.bus) renderBus(data.bus);
   if (data.manifest) renderManifest(data.manifest);

@@ -4,8 +4,12 @@ param(
     [string]$StreamerId = "dogfood-streamer",
     [string]$PlayerId = "sp-dogfood-1",
     [string]$Steam64 = "76561198000000001",
+    [string]$GameId = "hello-fork",
+    [string]$MajorVersion = "1.0",
     [ValidateSet("mock", "process", "docker", "auto")]
     [string]$ExpectProvisioner = "mock",
+    [switch]$SkipImageBuild,
+    [switch]$VerifyRuleEvents,
     [int]$TeardownGraceSec = 30,
     [int]$TeardownPollTimeoutSec = 75
 )
@@ -48,8 +52,20 @@ function Step([string]$Name, [scriptblock]$Action) {
     Write-Host ("OK: {0}" -f $Name) -ForegroundColor Green
 }
 
+function Get-DockerImageBuild([string]$Id) {
+    switch ($Id.Trim().ToLowerInvariant()) {
+        "minecraft" { return @{ Dockerfile = "docker/fork-minecraft/Dockerfile"; Tag = "nl-fork-minecraft:latest" } }
+        "minecraft-paper" { return @{ Dockerfile = "docker/fork-minecraft-paper/Dockerfile"; Tag = "nl-fork-minecraft-paper:latest" } }
+        "beamng" { return @{ Dockerfile = "docker/fork-beamng/Dockerfile"; Tag = "nl-fork-beamng:latest" } }
+        default { return @{ Dockerfile = "docker/fork-hello/Dockerfile"; Tag = "nl-fork-hello:latest" } }
+    }
+}
+
+$shouldVerifyRules = $VerifyRuleEvents.IsPresent -or ($GameId -eq "minecraft")
+
 Write-Host "=== NL dogfood flow ===" -ForegroundColor Cyan
 Write-Host ("Target: {0}" -f $BaseUrl)
+Write-Host ("Game: {0}" -f $GameId) -ForegroundColor DarkGray
 Write-Host ("Expect provisioner: {0}" -f $ExpectProvisioner) -ForegroundColor DarkGray
 
 if ($ExpectProvisioner -eq "process") {
@@ -63,21 +79,36 @@ if ($ExpectProvisioner -eq "process") {
     }
 }
 
+if ($ExpectProvisioner -eq "docker" -and -not $SkipImageBuild) {
+    $img = Get-DockerImageBuild $GameId
+    Write-Host ("Building Docker image {0} ..." -f $img.Tag) -ForegroundColor DarkGray
+    docker build -f $img.Dockerfile -t $img.Tag .
+    if ($LASTEXITCODE -ne 0) {
+        throw ("docker build failed for {0}" -f $img.Tag)
+    }
+}
+
 Step "Health check" {
     Invoke-Nl GET "/health" | Out-Null
 }
 
 Step "Dogfood setup (profile + mock ownership)" {
-    $setup = Invoke-Nl POST "/api/v1/dogfood/setup"
+    $setup = Invoke-Nl POST "/api/v1/dogfood/setup" @{ gameId = $GameId }
     $sid = if ($setup.profile) { $setup.profile.streamerId } else { $setup.streamerId }
     if ($sid -ne $StreamerId) {
         throw ("Expected streamer {0}, got {1}" -f $StreamerId, $sid)
+    }
+    if ($setup.profile -and $setup.profile.gameId -and $setup.profile.gameId -ne $GameId) {
+        throw ("Expected gameId {0}, got {1}" -f $GameId, $setup.profile.gameId)
+    }
+    if (-not $setup.profile.forkOrchestratorEnabled) {
+        throw "Dogfood profile must have forkOrchestratorEnabled=true."
     }
 }
 
 Step "Start session + fork provision" {
     Invoke-Nl POST "/api/v1/session/start" @{ replayOnce = $false } | Out-Null
-    Start-Sleep -Seconds 1
+    Start-Sleep -Seconds 2
     $status = Invoke-Nl GET "/api/v1/dogfood/status"
     if (-not $status.sessionRunning) {
         throw "Session not running after start."
@@ -101,6 +132,9 @@ Step "Start session + fork provision" {
     if ($fork.forkConnectEndpoint) {
         Write-Host ("  forkConnect={0}" -f $fork.forkConnectEndpoint) -ForegroundColor DarkGray
     }
+    if ($ExpectProvisioner -eq "docker" -and $fork.forkConnectEndpoint -notmatch '^(docker|minecraft)://') {
+        throw ("Expected docker:// or minecraft:// connect URL, got {0}" -f $fork.forkConnectEndpoint)
+    }
 }
 
 Step "NL Client join flow" {
@@ -109,8 +143,8 @@ Step "NL Client join flow" {
         streamerId = $StreamerId
         platformUserId = $Steam64
         platform = "steam"
-        gameId = "hello-fork"
-        majorVersion = "1.0"
+        gameId = $GameId
+        majorVersion = $MajorVersion
         atOwnRiskAcknowledged = $true
         mode = "Player"
     }
@@ -122,6 +156,25 @@ Step "NL Client join flow" {
         throw "Join succeeded but launch params missing."
     }
     Write-Host ("  forkConnect={0}" -f $join.launch.forkConnectEndpoint) -ForegroundColor DarkGray
+}
+
+if ($shouldVerifyRules) {
+    Step "Verify fork rule events (demo loop)" {
+        Write-Host "  waiting for fork demo loop to emit rule decisions..." -ForegroundColor DarkGray
+        Start-Sleep -Seconds 10
+        $deadline = (Get-Date).AddSeconds(30)
+        $decisions = 0
+        while ((Get-Date) -lt $deadline) {
+            $demo = Invoke-Nl GET "/api/v1/demo/status"
+            $decisions = [int]$demo.decisions
+            if ($decisions -gt 0) {
+                Write-Host ("  decisions={0}" -f $decisions) -ForegroundColor DarkGray
+                return
+            }
+            Start-Sleep -Seconds 3
+        }
+        throw ("Expected rule decisions > 0 from fork demo loop; got {0}" -f $decisions)
+    }
 }
 
 Step "Teardown (stop session)" {

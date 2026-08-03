@@ -62,6 +62,81 @@ powershell -File scripts/nl-dogfood-flow-process.ps1
 
 Expect `provisioner=Process` and `forkConnect=process://localhost/{pid}` in the start step.
 
+### Docker-mode dogfood (hello-fork, Phase 1.1)
+
+Requires **Docker Desktop** running.
+
+**Terminal 1** — docker orchestrator:
+
+```powershell
+cd C:\Users\surrp\Documents\GitHub\NexoraLive
+
+$env:NL_FLEET_ENABLED = "true"
+$env:NL_FLEET_MIN_TWITCH_FOLLOWERS = "0"
+$env:NL_FORK_ORCHESTRATOR_ENABLED = "true"
+$env:NL_FORK_ORCHESTRATOR_MODE = "docker"
+$env:NL_IDENTITY_ENABLED = "true"
+$env:NL_OWNERSHIP_MODE = "mock"
+
+dotnet run --project src/NL.SessionHost.Web
+```
+
+**Terminal 2** — builds `nl-fork-hello:latest` (unless `-SkipImageBuild`) and runs the flow:
+
+```powershell
+powershell -File scripts/nl-dogfood-flow-docker.ps1
+# or: powershell -File scripts/nl-dogfood-flow.ps1 -ExpectProvisioner docker
+```
+
+Expect `provisioner=Docker` and `forkConnect=docker://nl-fork-{sessionId}`.
+
+### Docker-mode dogfood (minecraft sidecar, Phase 1.2)
+
+Same Terminal 1 env as hello-fork docker (`NL_FORK_ORCHESTRATOR_MODE=docker`).
+
+**Terminal 2**:
+
+```powershell
+powershell -File scripts/nl-dogfood-flow-docker-minecraft.ps1
+```
+
+Builds `nl-fork-minecraft:latest`, loads `minecraft.nle`, and verifies at least one rule decision from the fork demo loop (`playerJoin` warn, caps chat block, etc.).
+
+Expect `forkConnect=minecraft://127.0.0.1:25565`.
+
+---
+
+## Operator checklist (manual browser flow)
+
+Use this when driving the flow from **operator.html** instead of the automated script.
+
+### Before start
+
+1. Session host env: `NL_FORK_ORCHESTRATOR_ENABLED=true` and mode set (`mock` / `process` / `docker`).
+2. Open **http://127.0.0.1:27020/operator.html**
+3. Click **Load dogfood profile** — confirm:
+   - Streamer: `dogfood-streamer`
+   - Config: path to `fork-hello.nle` (or `minecraft.nle` for minecraft dogfood)
+   - **Fork orchestrator** checkbox **checked** (required — without it no fork is provisioned)
+   - Game id: `hello-fork` (or `minecraft` for Phase 1.2)
+4. Click **Load bus defaults** if source path is empty.
+
+### Start and verify
+
+5. Click **Start session**
+6. Confirm manifest shows:
+   - `sessionRunning: yes`
+   - `forkOrchestratorEnabled: true`
+   - `forkSessionId` set
+   - `forkConnectEndpoint` set (`mock://…`, `process://…`, `docker://…`, or `minecraft://…`)
+7. Optional: **http://127.0.0.1:27020/fork-orchestrator.html** — 1 active fork session.
+
+### Common mistake
+
+| Symptom | Cause | Fix |
+|---------|--------|-----|
+| Session runs but no fork | Fork orchestrator unchecked on profile | **Load dogfood profile** again (sets checkbox) or check **Fork orchestrator** manually before Start |
+
 ---
 
 ## Manual browser flow (same path)
@@ -174,10 +249,14 @@ Invoke-RestMethod http://127.0.0.1:27020/api/v1/dogfood/status
 | Join denied — at-own-risk | Dogfood profile disables partnership gate; check **At-own-risk** if using catalog tier |
 | Session won't start — config missing | Run **Load dogfood profile** or `POST /api/v1/dogfood/setup` |
 | Fork not created | `NL_FORK_ORCHESTRATOR_ENABLED=true` and profile `forkOrchestratorEnabled: true` |
+| Docker provision fails | Docker Desktop running; image built (`nl-fork-hello:latest` or `nl-fork-minecraft:latest`) |
+| Minecraft port conflict | Stop other containers using host port 25565 |
 | Streamer offline in client | Start session first — `isLive` follows running session |
 
 ## Next after dogfood
 
 - Switch `NL_FORK_ORCHESTRATOR_MODE=process` or `docker` for real fork runtime
+- Docker hello-fork: `scripts/nl-dogfood-flow-docker.ps1`
+- Docker minecraft sidecar: `scripts/nl-dogfood-flow-docker-minecraft.ps1`
 - Enable `requireGameOwnership` + Steam OpenID via `/identity-link.html`
 - Run staging validation: `scripts/nl-fleet-staging-validation.ps1`

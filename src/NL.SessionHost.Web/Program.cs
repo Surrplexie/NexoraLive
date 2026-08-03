@@ -934,13 +934,19 @@ app.MapPost("/api/v1/client/mobile/action", async (ModerationHostState mod, NlCl
     }
 });
 
-app.MapPost("/api/v1/dogfood/setup", (BusHostState bus, NlForkOrchestratorHost orchestrator, NlFleetHost fleet) =>
+app.MapPost("/api/v1/dogfood/setup", async (BusHostState bus, NlForkOrchestratorHost orchestrator, NlFleetHost fleet, HttpRequest req) =>
 {
     try
     {
+        DogfoodSetupRequest? body = null;
+        if (req.ContentLength is > 0)
+        {
+            body = await req.ReadFromJsonAsync<DogfoodSetupRequest>();
+        }
+
         var root = DogfoodSetup.FindRepoRoot();
         DogfoodSetup.EnsureMockOwnership(root);
-        var profile = DogfoodSetup.BuildProfile(root);
+        var profile = DogfoodSetup.BuildProfile(root, body?.GameId);
         bus.SaveProfile(profile);
         NlSessionBusHelper.ApplyBusSource(profile, bus.BusInfo);
         bus.SaveProfile(profile);

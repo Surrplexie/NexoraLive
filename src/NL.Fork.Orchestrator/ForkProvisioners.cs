@@ -171,14 +171,20 @@ public sealed class DockerForkProvisioner : IForkProvisioner
             ? $"-p {port}:{port} "
             : "";
 
+        var dockerHost = Environment.GetEnvironmentVariable("NL_FORK_DOCKER_HOST") ?? "host.docker.internal";
+        var bridgeUrl = RewriteLocalHostForDocker(request.BridgeWebSocketUrl, dockerHost);
+        var admitUrl = RewriteLocalHostForDocker(request.AdmitUrl, dockerHost);
+        var extraHosts = BuildExtraHostsArg(dockerHost);
+
         var args =
             $"run -d --rm --name {name} " +
+            extraHosts +
             portMap +
             $"-v \"{ws}:/data\" " +
-            $"-e NL_FORK_WS_URL={request.BridgeWebSocketUrl} " +
+            $"-e NL_FORK_WS_URL=\"{bridgeUrl}\" " +
             $"-e NL_FORK_MODS=/data/mods.json " +
             $"-e NL_FORK_STATUS=/data/fork-status.json " +
-            $"-e NL_FORK_ADMIT_URL={request.AdmitUrl} " +
+            $"-e NL_FORK_ADMIT_URL=\"{admitUrl}\" " +
             $"-e NL_FORK_GAME={gameArg} " +
             $"-e NL_DATA_ROOT=/data " +
             $"{image} --game {gameArg} --loop --interval 8";
@@ -196,6 +202,28 @@ public sealed class DockerForkProvisioner : IForkProvisioner
             true,
             ContainerOrProcessId: containerId,
             ForkConnectEndpoint: connect);
+    }
+
+    private static string BuildExtraHostsArg(string dockerHost)
+    {
+        if (string.Equals(dockerHost, "host.docker.internal", StringComparison.OrdinalIgnoreCase))
+        {
+            return "--add-host=host.docker.internal:host-gateway ";
+        }
+
+        return "";
+    }
+
+    public static string RewriteLocalHostForDocker(string url, string dockerHost)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return url;
+        }
+
+        return url
+            .Replace("127.0.0.1", dockerHost, StringComparison.Ordinal)
+            .Replace("://localhost", "://" + dockerHost, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string BuildConnectEndpoint(ForkGameProfile profile, string containerName, int? port)

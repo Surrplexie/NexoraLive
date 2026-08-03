@@ -185,4 +185,18 @@ public class ForkOrchestratorTests
         session = svc.GetSession(sessionId);
         Assert.Equal(firstGrace, session!.GraceDestroyAtUtc);
     }
+
+    [Fact]
+    public void DockerProvisioner_RewritesLocalHostForContainerBridge()
+    {
+        var ws = DockerForkProvisioner.RewriteLocalHostForDocker(
+            "ws://127.0.0.1:27021/nl/v1?token=abc",
+            "host.docker.internal");
+        Assert.Equal("ws://host.docker.internal:27021/nl/v1?token=abc", ws);
+
+        var admit = DockerForkProvisioner.RewriteLocalHostForDocker(
+            "http://localhost:27020/api/v1/session/admit",
+            "host.docker.internal");
+        Assert.Equal("http://host.docker.internal:27020/api/v1/session/admit", admit);
+    }
 }
