@@ -9,7 +9,7 @@
 <body class="operator-page">
   <header>
     <h1>Fork Catalog</h1>
-    <p class="sub">Select game + major version and attach verified server mods (Phase N)</p>
+    <p class="sub">Pick a game — NL pins the latest stable major automatically (Phase N)</p>
     <nav class="nav">
       <a href="/">Watch demo</a>
       <a href="/editor.html">Rule editor</a>
@@ -22,8 +22,8 @@
   </header>
 
   <section class="card operator-panel">
-    <h2>Catalog entries</h2>
-    <p class="hint">Major versions only (1.0, 2.0). Deprecated majors are hidden unless noted.</p>
+    <h2>Latest stable games</h2>
+    <p class="hint">Everyone plays on the newest stable major by default — one row per game, no version library required.</p>
     <table id="catalog-table">
       <thead>
         <tr>
@@ -32,6 +32,24 @@
           <th>Tier</th>
           <th>Status</th>
           <th>Progress</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section class="card operator-panel" id="beta-section" hidden>
+    <h2>Beta — custom major pin</h2>
+    <p class="hint">Pinning an older or alternate major is a paid/beta feature. Requires streamer entitlement (<code>allowCustomMajorVersion</code>).</p>
+    <table id="beta-catalog-table">
+      <thead>
+        <tr>
+          <th>Game</th>
+          <th>Major</th>
+          <th>Tier</th>
+          <th>Status</th>
+          <th>Access</th>
           <th></th>
         </tr>
       </thead>

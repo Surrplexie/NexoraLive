@@ -89,7 +89,8 @@ public sealed record FleetStreamerRequirements(
     string StreamerId,
     int MinTwitchFollowers,
     int MinYouTubeSubscribers,
-    bool EnforceOnForkCreate);
+    bool EnforceOnForkCreate,
+    bool AllowCustomMajorVersion = false);
 
 public sealed record FleetComplianceExport(
     string PlayerId,

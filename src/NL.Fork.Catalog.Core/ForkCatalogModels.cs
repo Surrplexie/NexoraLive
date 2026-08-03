@@ -14,7 +14,8 @@ public sealed record ForkCatalogEntry(
     DateTimeOffset? RegisteredAtUtc = null,
     DateTimeOffset? DeprecatedAtUtc = null,
     string? LegalNotice = null,
-    string? DockerImage = null)
+    string? DockerImage = null,
+    bool IsDefaultStable = false)
 {
     public string CatalogKey => ForkCatalogKey.Create(GameId, MajorVersion);
 

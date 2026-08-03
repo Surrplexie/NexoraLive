@@ -47,4 +47,17 @@ public static class ForkMajorVersion
 
         return normalized;
     }
+
+    /// <summary>Compare normalized majors numerically (1.0 &lt; 2.0).</summary>
+    public static int Compare(string? left, string? right)
+    {
+        if (!TryNormalize(left, out var normalizedLeft) || !TryNormalize(right, out var normalizedRight))
+        {
+            return string.Compare(left, right, StringComparison.OrdinalIgnoreCase);
+        }
+
+        var leftMajor = int.Parse(normalizedLeft.Split('.')[0], System.Globalization.CultureInfo.InvariantCulture);
+        var rightMajor = int.Parse(normalizedRight.Split('.')[0], System.Globalization.CultureInfo.InvariantCulture);
+        return leftMajor.CompareTo(rightMajor);
+    }
 }

@@ -406,7 +406,21 @@ app.MapPost("/api/v1/social/link", (NlSocialHost host, SocialLinkRequest body) =
 app.MapGet("/api/v1/social/links/{playerId}", (NlSocialHost host, string playerId) =>
     Results.Json(host.LinkStore.GetOrDefault(playerId)));
 
-app.MapGet("/api/v1/fork/catalog/settings", (NlForkCatalogSettings s) => Results.Json(s.ToPublicInfo()));
+app.MapGet("/api/v1/fork/catalog/settings", (NlForkCatalogHost host) => Results.Json(host.Settings.ToPublicInfo()));
+
+app.MapGet("/api/v1/fork/catalog/version-policy", (BusHostState bus, NlForkCatalogHost host, NlFleetHost fleet, string? streamerId) =>
+{
+    var sid = string.IsNullOrWhiteSpace(streamerId) ? bus.GetProfile().StreamerId : streamerId.Trim();
+    var requirements = fleet.StreamerRequirements.GetOrDefault(sid);
+    return Results.Json(new
+    {
+        defaultToLatestStable = host.VersionPolicy.DefaultToLatestStable,
+        customMajorVersionBetaEnabled = host.VersionPolicy.CustomMajorVersionBetaEnabled,
+        allowCustomMajorForStreamer = requirements.AllowCustomMajorVersion,
+        streamerId = sid,
+        latestStableByGame = host.VersionPolicy.BuildLatestStableIndex(),
+    });
+});
 
 app.MapGet("/api/v1/fork/catalog/entries", (NlForkCatalogHost host, bool? includeDeprecated) =>
     Results.Json(host.Catalog.ListGames(includeDeprecated ?? false)));
@@ -437,18 +451,27 @@ app.MapPost("/api/v1/fork/catalog/register", (NlForkCatalogHost host, ForkCatalo
     }
 });
 
-app.MapPost("/api/v1/fork/catalog/select", (BusHostState bus, NlForkCatalogHost host, CatalogSelectRequest body) =>
+app.MapPost("/api/v1/fork/catalog/select", (BusHostState bus, NlForkCatalogHost host, NlFleetHost fleet, CatalogSelectRequest body) =>
 {
-    if (string.IsNullOrWhiteSpace(body.GameId) || string.IsNullOrWhiteSpace(body.MajorVersion))
+    if (string.IsNullOrWhiteSpace(body.GameId))
     {
-        return Results.BadRequest(new { error = "gameId and majorVersion required." });
+        return Results.BadRequest(new { error = "gameId required." });
     }
 
     try
     {
-        var selection = new ForkCatalogSelection(body.GameId.Trim(), body.MajorVersion.Trim(), body.ModIds ?? []);
+        var profile = bus.GetProfile();
+        var streamerId = string.IsNullOrWhiteSpace(profile.StreamerId)
+            ? NL.Core.NlPaths.DefaultStreamerId
+            : profile.StreamerId;
+        var requirements = fleet.StreamerRequirements.GetOrDefault(streamerId);
+        var selection = host.VersionPolicy.ResolveSelection(
+            body.GameId.Trim(),
+            body.MajorVersion,
+            body.ModIds ?? [],
+            requirements.AllowCustomMajorVersion);
         var resolved = host.Catalog.ResolveSelection(selection, samplesRoot);
-        var profile = bus.ApplyCatalogSelection(resolved, samplesRoot);
+        profile = bus.ApplyCatalogSelection(resolved, samplesRoot);
         if (body.EnableOrchestrator == true)
         {
             profile.ForkOrchestratorEnabled = true;
@@ -461,7 +484,13 @@ app.MapPost("/api/v1/fork/catalog/select", (BusHostState bus, NlForkCatalogHost 
             entry = resolved.Entry,
             nleTemplate = resolved.ResolvedNleTemplate,
             mods = resolved.ResolvedMods,
+            resolvedMajorVersion = selection.MajorVersion,
+            latestStable = host.VersionPolicy.IsLatestStable(selection.GameId, selection.MajorVersion),
         });
+    }
+    catch (ForkCatalogVersionAccessException ex)
+    {
+        return Results.Json(new { error = ex.Message, code = "custom_major_entitlement_required" }, statusCode: 403);
     }
     catch (InvalidOperationException ex)
     {
@@ -482,6 +511,7 @@ app.MapGet("/api/v1/fork/orchestrator/sessions/{sessionId}", (NlForkOrchestrator
 
 app.MapPost("/api/v1/fork/orchestrator/create", async (
     BusHostState bus,
+    NlForkCatalogHost catalogHost,
     NlForkOrchestratorHost host,
     NlFleetHost fleet,
     ForkOrchestratorCreateRequest body,
@@ -496,12 +526,38 @@ app.MapPost("/api/v1/fork/orchestrator/create", async (
     profile.StreamerId = body.StreamerId.Trim();
     profile.ConfigPath = body.NlePath.Trim();
     profile.GameId = body.GameId?.Trim() ?? profile.GameId ?? "generic";
-    profile.GameMajorVersion = body.MajorVersion?.Trim() ?? profile.GameMajorVersion ?? "1.0";
     profile.AttachedModIds = body.ModIds ?? [];
     profile.ForkReservedPrivilegedSlots = body.ReservedPrivilegedSlots ?? host.Settings.DefaultReservedPrivilegedSlots;
     if (!string.IsNullOrWhiteSpace(body.PreferredRegion))
     {
         profile.FleetPreferredRegion = body.PreferredRegion.Trim();
+    }
+
+    try
+    {
+        if (catalogHost.Settings.Enabled)
+        {
+            var requirements = fleet.StreamerRequirements.GetOrDefault(profile.StreamerId);
+            var selection = catalogHost.VersionPolicy.ResolveSelection(
+                profile.GameId,
+                body.MajorVersion ?? profile.GameMajorVersion,
+                profile.AttachedModIds,
+                requirements.AllowCustomMajorVersion);
+            profile.GameId = selection.GameId;
+            profile.GameMajorVersion = selection.MajorVersion;
+        }
+        else
+        {
+            profile.GameMajorVersion = body.MajorVersion?.Trim() ?? profile.GameMajorVersion ?? "1.0";
+        }
+    }
+    catch (ForkCatalogVersionAccessException ex)
+    {
+        return Results.Json(new { error = ex.Message, code = "custom_major_entitlement_required" }, statusCode: 403);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
     }
 
     var result = await bus.ProvisionForkSessionAsync(profile, host, fleet, body.TwitchFollowers, ct);

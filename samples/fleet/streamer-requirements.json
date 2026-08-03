@@ -3,6 +3,14 @@
     "streamerId": "demo-streamer",
     "minTwitchFollowers": 50,
     "minYouTubeSubscribers": 0,
-    "enforceOnForkCreate": true
+    "enforceOnForkCreate": true,
+    "allowCustomMajorVersion": false
+  },
+  {
+    "streamerId": "dogfood-streamer",
+    "minTwitchFollowers": 0,
+    "minYouTubeSubscribers": 0,
+    "enforceOnForkCreate": false,
+    "allowCustomMajorVersion": false
   }
 ]

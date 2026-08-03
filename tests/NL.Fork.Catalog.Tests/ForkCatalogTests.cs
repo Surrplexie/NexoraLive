@@ -27,6 +27,14 @@ public class ForkMajorVersionTests
     {
         Assert.False(ForkMajorVersion.TryNormalize(input, out _));
     }
+
+    [Fact]
+    public void Compare_OrdersMajorsNumerically()
+    {
+        Assert.True(ForkMajorVersion.Compare("1.0", "2.0") < 0);
+        Assert.True(ForkMajorVersion.Compare("2.0", "1.0") > 0);
+        Assert.Equal(0, ForkMajorVersion.Compare("2.0", "2"));
+    }
 }
 
 public class ForkCatalogValidatorTests
@@ -120,6 +128,69 @@ public class ForkCatalogGovernanceTests
 
         Assert.Equal(ForkCatalogEntryStatus.Deprecated, v1.Status);
         Assert.Equal(ForkCatalogEntryStatus.Active, v3.Status);
+    }
+}
+
+public class ForkCatalogVersionPolicyTests
+{
+    private static ForkCatalogVersionPolicy CreatePolicy(bool customMajorBeta = true)
+    {
+        var path = Path.Combine(Path.GetTempPath(), "nl-catalog-policy-" + Guid.NewGuid().ToString("N"), "catalog.json");
+        var repo = new JsonForkCatalogRepository(path);
+        repo.Save(new ForkCatalogManifest
+        {
+            Entries =
+            [
+                new ForkCatalogEntry("gameA", "Game A", "1.0", "sha256:a", PartnershipTier.AtOwnRisk),
+                new ForkCatalogEntry("gameA", "Game A", "2.0", "sha256:b", PartnershipTier.Platform, IsDefaultStable: true),
+            ],
+        });
+
+        var catalog = new ForkCatalogService(
+            repo,
+            new ForkCatalogValidator(repo),
+            new ForkCatalogGovernance(repo),
+            new ForkModSlotResolver(repo));
+        var settings = new NlForkCatalogSettings
+        {
+            Enabled = true,
+            DefaultToLatestStable = true,
+            CustomMajorVersionBetaEnabled = customMajorBeta,
+        };
+        return new ForkCatalogVersionPolicy(catalog, settings);
+    }
+
+    [Fact]
+    public void ResolveLatestStableEntry_PrefersMarkedDefault()
+    {
+        var policy = CreatePolicy();
+        var latest = policy.ResolveLatestStableEntry("gameA");
+        Assert.NotNull(latest);
+        Assert.Equal("2.0", latest!.MajorVersion);
+    }
+
+    [Fact]
+    public void ResolveSelection_OmitsMajor_UsesLatestStable()
+    {
+        var policy = CreatePolicy();
+        var selection = policy.ResolveSelection("gameA", null, [], allowCustomMajorForStreamer: false);
+        Assert.Equal("2.0", selection.MajorVersion);
+    }
+
+    [Fact]
+    public void ResolveSelection_NonStable_RequiresEntitlement()
+    {
+        var policy = CreatePolicy();
+        Assert.Throws<ForkCatalogVersionAccessException>(() =>
+            policy.ResolveSelection("gameA", "1.0", [], allowCustomMajorForStreamer: false));
+    }
+
+    [Fact]
+    public void ResolveSelection_NonStable_AllowedWhenEntitled()
+    {
+        var policy = CreatePolicy();
+        var selection = policy.ResolveSelection("gameA", "1.0", [], allowCustomMajorForStreamer: true);
+        Assert.Equal("1.0", selection.MajorVersion);
     }
 }
 

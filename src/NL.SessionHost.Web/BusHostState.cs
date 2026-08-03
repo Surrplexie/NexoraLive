@@ -146,7 +146,15 @@ public sealed class BusHostState
             var major = profile.GameMajorVersion;
             if (string.IsNullOrWhiteSpace(major))
             {
-                return Results.BadRequest(new { error = "Catalog-enforced session requires gameMajorVersion on profile." });
+                var latest = catalog.Catalog.ResolveLatestStableEntry(gameId);
+                if (latest is null)
+                {
+                    return Results.BadRequest(new { error = "Catalog-enforced session requires a catalog game with an active stable major." });
+                }
+
+                major = latest.MajorVersion;
+                profile.GameMajorVersion = major;
+                SaveProfile(profile);
             }
 
             var validation = catalog.Catalog.ValidateSelection(new ForkCatalogSelection(

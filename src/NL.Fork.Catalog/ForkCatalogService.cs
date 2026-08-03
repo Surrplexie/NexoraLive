@@ -46,6 +46,33 @@ public sealed class ForkCatalogService
             && string.Equals(e.MajorVersion, major, StringComparison.OrdinalIgnoreCase));
     }
 
+    /// <summary>
+    /// Latest stable major for a game — explicit <see cref="ForkCatalogEntry.IsDefaultStable"/>
+    /// rows win; otherwise highest active major.
+    /// </summary>
+    public ForkCatalogEntry? ResolveLatestStableEntry(string gameId)
+    {
+        var active = ListGames(includeDeprecated: false)
+            .Where(e => string.Equals(e.GameId, gameId, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (active.Count == 0)
+        {
+            return null;
+        }
+
+        var markedStable = active.Where(e => e.IsDefaultStable).ToList();
+        if (markedStable.Count > 0)
+        {
+            return markedStable
+                .OrderByDescending(e => e.MajorVersion, Comparer<string>.Create(ForkMajorVersion.Compare))
+                .First();
+        }
+
+        return active
+            .OrderByDescending(e => e.MajorVersion, Comparer<string>.Create(ForkMajorVersion.Compare))
+            .First();
+    }
+
     public ForkCatalogValidationResult ValidateSelection(ForkCatalogSelection selection) =>
         _validator.ValidateSelection(selection);
 

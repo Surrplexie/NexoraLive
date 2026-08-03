@@ -24,6 +24,34 @@ Select `gameA@1.0` → **Apply to session profile** → start session from Opera
 
 Patch releases roll into the current major container image — catalog rows are **never** per-patch.
 
+## Latest stable default (free tier)
+
+By default every streamer and player uses the **latest stable major** for a game — no version
+library, no per-player major picker. NL resolves stable automatically when you pick a game:
+
+1. Rows marked `isDefaultStable: true` win (highest among marked rows)
+2. Otherwise the **highest active major** for that `gameId`
+
+Clients inherit the session major from the manifest; SPs do not choose a fork major at join.
+
+### Custom major pin (beta / paid)
+
+Pinning an **older or alternate** major (e.g. `gameA@1.0` when `2.0` is stable) is a **beta
+feature** intended for paid streamers:
+
+| Gate | Control |
+|------|---------|
+| Host flag | `NL_FORK_CATALOG_CUSTOM_MAJOR_BETA=true` |
+| Streamer entitlement | `allowCustomMajorVersion: true` in `streamer-requirements.json` |
+
+Free streamers see only latest-stable rows in the Fork catalog UI. Entitled streamers unlock
+the **Beta — custom major pin** section.
+
+`POST /api/v1/fork/catalog/select` accepts `{ gameId }` only (major omitted → latest stable).
+Non-stable majors return **403** without entitlement.
+
+`GET /api/v1/fork/catalog/version-policy` exposes latest-stable index + entitlement for the UI.
+
 ## Partnership tiers
 
 | Tier | UI label | Legal copy |
@@ -54,6 +82,7 @@ pushed to SP clients.
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/v1/fork/catalog/settings` | Public catalog config |
+| GET | `/api/v1/fork/catalog/version-policy` | Latest-stable index + custom-major entitlement |
 | GET | `/api/v1/fork/catalog/entries` | Active catalog rows |
 | GET | `/api/v1/fork/catalog/mod-hub` | Verified mod hub |
 | GET | `/api/v1/fork/catalog/entries/{gameId}/{major}` | Single entry |
@@ -76,6 +105,7 @@ pushed to SP clients.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `NL_FORK_CATALOG_ENABLED` | off | Enforce catalog at start/admit |
+| `NL_FORK_CATALOG_CUSTOM_MAJOR_BETA` | off | Allow entitled streamers to pin non-stable majors |
 | `NL_FORK_CATALOG_ROOT` | `%LOCALAPPDATA%/NL/fork-catalog` | Store root |
 | `NL_FORK_CATALOG_MANIFEST` | `{root}/catalog.json` | Manifest path |
 | `NL_FORK_CATALOG_MAX_MAJORS` | `3` | Quota per gameId |
