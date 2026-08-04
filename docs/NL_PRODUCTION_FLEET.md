@@ -116,6 +116,6 @@ Script: [`scripts/nl-production-validate.ps1`](../scripts/nl-production-validate
 - [x] 100-session production validation script
 - [ ] VPS with real domain (operator deploy step)
 
-Next: **Phase 6** — general availability (multi-game catalog, SLA, compliance).
+Next: **Phase 6 complete** — see [NL_GENERAL_AVAILABILITY.md](NL_GENERAL_AVAILABILITY.md).
 
 See also: [NL_PUBLIC_BETA.md](NL_PUBLIC_BETA.md) · [NL_STAGING_HOSTED.md](NL_STAGING_HOSTED.md) · [NL_FLEET_OPS.md](NL_FLEET_OPS.md)

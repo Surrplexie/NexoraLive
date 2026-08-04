@@ -72,6 +72,6 @@ Checks:
 - [x] Operator runbook
 - [ ] VPS with real domain + live Steam (operator deploy)
 
-Next: **Phase 6** — general availability (multi-game catalog, SLA, compliance).
+Next: **Phase 6** — general availability ([NL_GENERAL_AVAILABILITY.md](NL_GENERAL_AVAILABILITY.md)).
 
 See also: [NL_BETA_RUNBOOK.md](NL_BETA_RUNBOOK.md) · [NL_PRODUCTION_FLEET.md](NL_PRODUCTION_FLEET.md)

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NexoraLive — General Availability</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>NexoraLive</h1>
+    <p class="sub">General availability — multi-game catalog, production SLA, open streamer signup</p>
+    <nav class="nav">
+      <a href="/nl-client.html">NL Client</a>
+      <a href="/identity-link.html">Link Steam</a>
+      <a href="/fork-catalog.html">Game catalog</a>
+      <a href="/ga.html" aria-current="page">Streamer signup</a>
+      <a href="/ga-ops.html">GA ops</a>
+    </nav>
+  </header>
+
+  <section class="card">
+    <h2>Streamer registration</h2>
+    <p id="ga-status" class="sub">Loading GA status...</p>
+    <form id="signup-form">
+      <label>Display name <input id="display-name" required /></label>
+      <label>Email or contact <input id="contact" type="email" required /></label>
+      <label>Twitch handle (optional) <input id="twitch" placeholder="yourchannel" /></label>
+      <label>Preferred game <select id="game">
+        <option value="hello-fork">Hello Fork</option>
+        <option value="minecraft">Minecraft Java</option>
+        <option value="beamng">BeamNG.drive</option>
+      </select></label>
+      <button type="submit">Register as streamer</button>
+    </form>
+    <p id="signup-result"></p>
+  </section>
+
+  <section class="card">
+    <h2>Supported games</h2>
+    <ul id="catalog-list"></ul>
+  </section>
+
+  <script src="ga-app.js"></script>
+</body>
+</html>

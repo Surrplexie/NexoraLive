@@ -315,9 +315,14 @@ public sealed class BusHostState
             }
 
             var beta = fleet.Beta.CheckStreamer(streamerId);
-            if (!beta.Allowed)
+            if (!beta.Allowed && !(fleet.GaSettings.Enabled && fleet.GaSettings.OpenSignup))
             {
                 return new ForkProvisionResult(false, beta.DenyReason, null, null);
+            }
+
+            if (fleet.GaSettings.Enabled && !fleet.GaSettings.OpenSignup && !fleet.Ga.IsStreamerAllowed(streamerId))
+            {
+                return new ForkProvisionResult(false, "Streamer is not registered for general availability. Sign up at /ga.html", null, null);
             }
 
             var placement = fleet.Regions.Place(

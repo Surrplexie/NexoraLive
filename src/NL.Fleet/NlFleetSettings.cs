@@ -75,6 +75,7 @@ public sealed class NlFleetSettings
         relay = new { Relay.RelayWebSocketTemplate, Relay.TurnUri, Relay.MaskRawHostIps },
         storePath = NlFleetPaths.Root,
         slos = FleetSloCatalog.StagingDefaults,
+        productionSlos = FleetSloCatalog.ProductionDefaults,
     };
 }
 
@@ -101,6 +102,11 @@ public sealed class NlFleetHost
         BetaWaitlist = new JsonBetaWaitlistStore();
         Beta = new BetaProgramService(BetaSettings, BetaWaitlist);
         BetaValidation = new BetaValidationService();
+        GaSettings = NlGaSettings.LoadFromEnvironment();
+        GaStreamers = new JsonGaStreamerStore();
+        Ga = new GaProgramService(GaSettings, GaStreamers);
+        GaCatalog = new GaCatalogService();
+        GaValidation = new GaValidationService();
     }
 
     public NlFleetSettings Settings { get; }
@@ -136,4 +142,14 @@ public sealed class NlFleetHost
     public BetaProgramService Beta { get; }
 
     public BetaValidationService BetaValidation { get; }
+
+    public NlGaSettings GaSettings { get; }
+
+    public JsonGaStreamerStore GaStreamers { get; }
+
+    public GaProgramService Ga { get; }
+
+    public GaCatalogService GaCatalog { get; }
+
+    public GaValidationService GaValidation { get; }
 }

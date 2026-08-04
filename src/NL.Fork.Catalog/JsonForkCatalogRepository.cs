@@ -9,6 +9,7 @@ public sealed class JsonForkCatalogRepository : IForkCatalogRepository
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
+        PropertyNameCaseInsensitive = true,
         Converters = { new JsonStringEnumConverter() },
     };
 

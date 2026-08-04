@@ -28,6 +28,8 @@ public static class NlFleetPaths
 
     public static string BetaWaitlist => Path.Combine(Root, "beta-waitlist.json");
 
+    public static string GaStreamers => Path.Combine(Root, "ga-streamers.json");
+
     public static string LoadTestReport => Path.Combine(Root, "load-test-last.json");
 
     public static void EnsureRoot()

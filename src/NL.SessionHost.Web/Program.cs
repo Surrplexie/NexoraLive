@@ -743,6 +743,110 @@ app.MapPost("/api/v1/beta/validation/run", (
     NlSecuritySettings security) =>
     Results.Json(BuildBetaValidationReport(fleet, orchestrator, bus, identity, security)));
 
+app.MapGet("/api/v1/ga/settings", (NlFleetHost fleet) => Results.Json(fleet.GaSettings.ToPublicInfo()));
+
+app.MapGet("/api/v1/ga/status", (NlFleetHost fleet, NlForkCatalogHost catalog) =>
+{
+    var gameIds = catalog.Settings.Enabled
+        ? catalog.Catalog.ListGames()
+            .Select(e => e.GameId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList()
+        : (IReadOnlyList<string>)[];
+    return Results.Json(fleet.Ga.GetStatus(gameIds.Count));
+});
+
+app.MapGet("/api/v1/ga/catalog", (NlForkCatalogHost catalog) =>
+{
+    if (!catalog.Settings.Enabled)
+    {
+        return Results.Json(new { enabled = false, games = Array.Empty<object>() });
+    }
+
+    var games = catalog.Catalog.ListGames()
+        .GroupBy(e => e.GameId, StringComparer.OrdinalIgnoreCase)
+        .Select(g =>
+        {
+            var stable = catalog.Catalog.ResolveLatestStableEntry(g.Key);
+            return new
+            {
+                gameId = g.Key,
+                displayName = stable?.DisplayName ?? g.First().DisplayName,
+                majorVersion = stable?.MajorVersion,
+                tier = stable?.Tier.ToString(),
+                dockerImage = stable?.DockerImage,
+                status = stable?.Status.ToString(),
+            };
+        })
+        .OrderBy(g => g.gameId)
+        .ToList();
+    return Results.Json(new { enabled = true, games });
+});
+
+app.MapPost("/api/v1/ga/streamers/register", (NlFleetHost fleet, GaStreamerRegisterRequest body) =>
+{
+    try
+    {
+        var entry = fleet.Ga.Register(
+            body.DisplayName ?? "",
+            body.Contact ?? "",
+            body.TwitchHandle,
+            body.PreferredGameId,
+            body.StreamerId);
+        return Results.Json(entry);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/api/v1/ga/streamers", (NlFleetHost fleet, HttpContext ctx) =>
+{
+    if (!NlWebSecurityExtensions.IsAuthorized(ctx))
+    {
+        return Results.Unauthorized();
+    }
+
+    return Results.Json(fleet.Ga.ListStreamers());
+});
+
+app.MapGet("/api/v1/ga/sla", (NlFleetHost fleet, NlForkOrchestratorHost orchestrator, BusHostState bus) =>
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    var slos = fleet.Slo.EvaluateProduction(
+        snap,
+        fleet.ValidationStore.GetLast()?.LastLoadTest,
+        fleet.Metrics,
+        fleet.Incidents);
+    return Results.Json(new
+    {
+        tier = fleet.GaSettings.SlaTier,
+        definitions = FleetSloCatalog.ProductionDefaults,
+        status = slos,
+    });
+});
+
+app.MapGet("/api/v1/ga/validation", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog) =>
+    Results.Json(BuildGaValidationReport(fleet, orchestrator, bus, identity, security, catalog)));
+
+app.MapPost("/api/v1/ga/validation/run", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog) =>
+    Results.Json(BuildGaValidationReport(fleet, orchestrator, bus, identity, security, catalog)));
+
 app.MapPost("/api/v1/fleet/compliance/export/{playerId}", (NlFleetHost fleet, ModerationHostState mod, string playerId) =>
 {
     try
@@ -1446,6 +1550,50 @@ static BetaValidationReport BuildBetaValidationReport(
         production.ProductionReady);
 }
 
+static GaValidationReport BuildGaValidationReport(
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog)
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    var production = fleet.Validation.Evaluate(
+        fleet.Settings,
+        orchestrator.Settings.Mode.ToString(),
+        snap,
+        fleet.Metrics,
+        fleet.Incidents,
+        fleet.ValidationStore.GetLast()?.LastLoadTest);
+    var activeGameIds = catalog.Settings.Enabled
+        ? catalog.Catalog.ListGames()
+            .Select(e => e.GameId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList()
+        : (IReadOnlyList<string>)[];
+    var catalogCheck = fleet.GaCatalog.Evaluate(catalog.Settings.Enabled, activeGameIds, fleet.GaSettings);
+    var productionSlos = fleet.Slo.EvaluateProduction(
+        snap,
+        fleet.ValidationStore.GetLast()?.LastLoadTest,
+        fleet.Metrics,
+        fleet.Incidents);
+    return fleet.GaValidation.Evaluate(
+        fleet.GaSettings,
+        fleet.BetaSettings,
+        !string.IsNullOrEmpty(security.OperatorKey),
+        security.PublicMode,
+        identity.Mode.ToString(),
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY")),
+        production.ProductionReady,
+        catalog.Settings.Enabled,
+        catalogCheck,
+        fleet.Compliance.RetentionPolicy,
+        productionSlos);
+}
+
 static string ResolveIdentityPublicBase(HttpContext ctx, NlIdentitySettings settings)
 {
     if (!string.IsNullOrWhiteSpace(settings.PublicBaseUrl))
@@ -1667,5 +1815,14 @@ internal sealed class BetaWaitlistSignupRequest
 
 internal sealed class BetaWaitlistApproveRequest
 {
+    public string? StreamerId { get; set; }
+}
+
+internal sealed class GaStreamerRegisterRequest
+{
+    public string? DisplayName { get; set; }
+    public string? Contact { get; set; }
+    public string? TwitchHandle { get; set; }
+    public string? PreferredGameId { get; set; }
     public string? StreamerId { get; set; }
 }

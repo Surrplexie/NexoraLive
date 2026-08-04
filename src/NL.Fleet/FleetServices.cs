@@ -16,6 +16,14 @@ public static class FleetSloCatalog
         int.TryParse(Environment.GetEnvironmentVariable("NL_FLEET_FORK_CREATE_P99_MS"), out var ms)
             ? Math.Max(1000, ms)
             : 5000;
+
+    public static IReadOnlyList<FleetSloDefinition> ProductionDefaults { get; } =
+    [
+        new("concurrent_ephemeral_sessions", 128, "sessions", "Support 128+ concurrent fork sessions in production."),
+        new("admit_success_rate", 0.995, "ratio", "Production admit success rate ≥99.5%."),
+        new("fork_create_p99_ms", ResolveForkCreateP99Target(), "ms", "Production fork create p99 latency."),
+        new("incident_auto_restart_rate", 0.98, "ratio", "Production fork auto-restart rate ≥98%."),
+    ];
 }
 
 public sealed class FleetRegionService
@@ -333,6 +341,45 @@ public sealed class FleetSloEvaluator
 
         var list = new List<FleetSloStatus>();
         foreach (var slo in FleetSloCatalog.StagingDefaults)
+        {
+            var (current, met) = slo.Name switch
+            {
+                "concurrent_ephemeral_sessions" => ((double)snapshot.ActiveForkSessions, snapshot.ActiveForkSessions >= slo.Target),
+                "admit_success_rate" => (admitRate, admitRate >= slo.Target),
+                "fork_create_p99_ms" => (forkP99 <= 0 ? 1000 : forkP99, forkP99 <= 0 || forkP99 <= slo.Target),
+                "incident_auto_restart_rate" => (restartRate, restartRate >= slo.Target),
+                _ => (0.0, true),
+            };
+            list.Add(new FleetSloStatus(slo.Name, slo.Target, current, met, slo.Unit));
+        }
+
+        return list;
+    }
+
+    public IReadOnlyList<FleetSloStatus> EvaluateProduction(
+        FleetObservabilitySnapshot snapshot,
+        FleetLoadTestResult? loadTest = null,
+        IFleetMetricsStore? metrics = null,
+        IFleetIncidentStore? incidents = null)
+    {
+        var admitRate = snapshot.TotalAdmits == 0
+            ? 1.0
+            : (double)(snapshot.TotalAdmits - snapshot.TotalAdmitDenials) / snapshot.TotalAdmits;
+
+        if (loadTest is not null && loadTest.AdmitsSucceeded + loadTest.AdmitsFailed > 0)
+        {
+            admitRate = (double)loadTest.AdmitsSucceeded
+                / (loadTest.AdmitsSucceeded + loadTest.AdmitsFailed);
+        }
+
+        var forkP99 = loadTest?.ForkCreateP99Ms > 0
+            ? loadTest.ForkCreateP99Ms
+            : metrics?.GetForkCreateP99Ms() ?? 0;
+
+        var restartRate = ComputeAutoRestartRate(incidents);
+
+        var list = new List<FleetSloStatus>();
+        foreach (var slo in FleetSloCatalog.ProductionDefaults)
         {
             var (current, met) = slo.Name switch
             {
