@@ -17,12 +17,16 @@ dotnet run --project src/NL.SessionHost.Web
 powershell -File scripts/nl-fleet-staging-validation.ps1 -ConcurrentSessions 100
 ```
 
-Or use the **staging docker stack** (session host + relay stub + coturn):
+Or use the **staging docker stack** (session host + HTTPS edge + relay stub + coturn):
 
 ```powershell
-docker compose -f docker/docker-compose.staging-fleet.yml up --build
-powershell -File scripts/nl-fleet-staging-validation.ps1 -BaseUrl http://127.0.0.1:27020
+powershell -File scripts/nl-staging-stack-up.ps1 -Validate
+# or manually:
+docker compose -f docker/docker-compose.staging-fleet.yml up --build -d
+powershell -File scripts/nl-staging-validate.ps1
 ```
+
+See [NL_STAGING_HOSTED.md](NL_STAGING_HOSTED.md) for Phase 3 hosted staging (VPS, HTTPS, secrets).
 
 ## Staging SLOs
 

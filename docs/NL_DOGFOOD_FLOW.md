@@ -9,19 +9,17 @@ One full end-to-end pass through the NL fork platform: streamer starts session w
 
 ## One-command automated dogfood
 
-**Terminal 1** — start session host:
+**Terminal 1** — start session host (one command):
 
 ```powershell
 cd C:\Users\surrp\Documents\GitHub\NexoraLive
+powershell -File scripts/nl-session-host-docker-dogfood.ps1 -NoBuild
+```
 
-$env:NL_FLEET_ENABLED = "true"
-$env:NL_FLEET_MIN_TWITCH_FOLLOWERS = "0"
-$env:NL_FORK_ORCHESTRATOR_ENABLED = "true"
-$env:NL_FORK_ORCHESTRATOR_MODE = "mock"
-$env:NL_IDENTITY_ENABLED = "true"
-$env:NL_OWNERSHIP_MODE = "mock"
+Or inline (same env vars):
 
-dotnet run --project src/NL.SessionHost.Web
+```powershell
+cd C:\Users\surrp\Documents\GitHub\NexoraLive; $env:NL_FLEET_ENABLED="true"; $env:NL_FLEET_MIN_TWITCH_FOLLOWERS="0"; $env:NL_FLEET_MAX_FORK_CREATES_PER_HOUR="999"; $env:NL_FORK_ORCHESTRATOR_ENABLED="true"; $env:NL_FORK_ORCHESTRATOR_MODE="docker"; $env:NL_IDENTITY_ENABLED="true"; $env:NL_OWNERSHIP_MODE="mock"; $env:NL_PUBLIC_BASE_URL="http://127.0.0.1:27020"; dotnet run --project src/NL.SessionHost.Web -c Release --no-build
 ```
 
 Wait for `Now listening on: http://127.0.0.1:27020`.
@@ -66,20 +64,21 @@ Expect `provisioner=Process` and `forkConnect=process://localhost/{pid}` in the 
 
 Requires **Docker Desktop** running.
 
-**Terminal 1** — start session host (one command):
+**Terminal 1** — docker orchestrator:
 
 ```powershell
 cd C:\Users\surrp\Documents\GitHub\NexoraLive
-powershell -File scripts/nl-session-host-docker-dogfood.ps1
+
+$env:NL_FLEET_ENABLED = "true"
+$env:NL_FLEET_MIN_TWITCH_FOLLOWERS = "0"
+$env:NL_FLEET_MAX_FORK_CREATES_PER_HOUR = "999"
+$env:NL_FORK_ORCHESTRATOR_ENABLED = "true"
+$env:NL_FORK_ORCHESTRATOR_MODE = "docker"
+$env:NL_IDENTITY_ENABLED = "true"
+$env:NL_OWNERSHIP_MODE = "mock"
+
+dotnet run --project src/NL.SessionHost.Web
 ```
-
-Or inline:
-
-```powershell
-cd C:\Users\surrp\Documents\GitHub\NexoraLive; $env:NL_FLEET_ENABLED="true"; $env:NL_FLEET_MIN_TWITCH_FOLLOWERS="0"; $env:NL_FLEET_MAX_FORK_CREATES_PER_HOUR="999"; $env:NL_FORK_ORCHESTRATOR_ENABLED="true"; $env:NL_FORK_ORCHESTRATOR_MODE="docker"; $env:NL_IDENTITY_ENABLED="true"; $env:NL_OWNERSHIP_MODE="mock"; dotnet run --project src/NL.SessionHost.Web -c Release --no-build
-```
-
-Wait for `Now listening on: http://127.0.0.1:27020`.
 
 **Terminal 2** — builds `nl-fork-hello:latest` (unless `-SkipImageBuild`) and runs the flow:
 

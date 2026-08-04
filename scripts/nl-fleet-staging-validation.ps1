@@ -17,7 +17,10 @@ Set-Location $Root
 if ([string]::IsNullOrWhiteSpace($NlePath)) {
     $NlePath = Join-Path $Root "samples\configs\fork-hello.nle"
 }
-$NlePath = (Resolve-Path $NlePath).Path
+# Host-local runs resolve to an absolute path; Docker staging uses in-container paths (e.g. /app/...).
+if ($NlePath -notmatch '^/') {
+    $NlePath = (Resolve-Path $NlePath).Path
+}
 
 Write-Host "=== NL Phase S staging fleet validation ===" -ForegroundColor Cyan
 Write-Host "Target: $BaseUrl  sessions=$ConcurrentSessions  admitBurst=$AdmitBurst"
@@ -96,7 +99,8 @@ function Start-SessionHostIfNeeded {
         Write-Host ("  cd {0}" -f $Root) -ForegroundColor Gray
         Write-Host '  $env:NL_FLEET_ENABLED = "true"' -ForegroundColor Gray
         Write-Host '  $env:NL_FLEET_MIN_TWITCH_FOLLOWERS = "0"' -ForegroundColor Gray
-        Write-Host '  $env:NL_FLEET_FORK_CREATE_RATE_PER_MIN = "120"' -ForegroundColor Gray
+        Write-Host '  $env:NL_FLEET_FORK_CREATE_RATE_PER_MIN = "200"' -ForegroundColor Gray
+        Write-Host '  $env:NL_FLEET_MAX_FORK_CREATES_PER_HOUR = "9999"' -ForegroundColor Gray
         Write-Host '  $env:NL_FORK_ORCHESTRATOR_ENABLED = "true"' -ForegroundColor Gray
         Write-Host '  $env:NL_FORK_ORCHESTRATOR_MODE = "mock"' -ForegroundColor Gray
         Write-Host "  dotnet run --project src/NL.SessionHost.Web" -ForegroundColor Gray
@@ -126,7 +130,8 @@ function Start-SessionHostIfNeeded {
         Set-Location $ProjectRoot
         $env:NL_FLEET_ENABLED = "true"
         $env:NL_FLEET_MIN_TWITCH_FOLLOWERS = "0"
-        $env:NL_FLEET_FORK_CREATE_RATE_PER_MIN = "120"
+        $env:NL_FLEET_FORK_CREATE_RATE_PER_MIN = "200"
+        $env:NL_FLEET_MAX_FORK_CREATES_PER_HOUR = "9999"
         $env:NL_FORK_ORCHESTRATOR_ENABLED = "true"
         $env:NL_FORK_ORCHESTRATOR_MODE = "mock"
         dotnet run --project src/NL.SessionHost.Web -c Release --no-build
@@ -169,6 +174,10 @@ try {
     $settings = Invoke-NlApi GET "/api/v1/fleet/settings"
     if (-not $settings.enabled) {
         Write-Warning "NL_FLEET_ENABLED is false on target - validation may not reflect production fleet ops."
+    }
+    $forkRate = $settings.abuse.globalForkCreatesPerMinute
+    if ($forkRate -lt $ConcurrentSessions) {
+        Write-Warning ("Global fork create rate is {0}/min - need >={1} for {1} sessions in one minute. Set NL_FLEET_FORK_CREATE_RATE_PER_MIN=200 on session host." -f $forkRate, $ConcurrentSessions)
     }
 
     $orch = Invoke-NlApi GET "/api/v1/fork/orchestrator/settings"
