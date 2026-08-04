@@ -147,8 +147,8 @@ Set `NL_FORK_ORCHESTRATOR_MODE=kubernetes` in the ConfigMap for cluster fork Job
 - [x] Non-placeholder relay URL in staging env
 - [x] `scripts/nl-staging-stack-up.ps1` + validation wrapper
 - [x] 100-session validation PASS on mock orchestrator
-- [ ] VPS with real domain + Let's Encrypt (operator deploy step)
+- [x] VPS with real domain + Let's Encrypt (operator deploy step)
 
-Next: **Phase 4** — see [NL_PRODUCTION_FLEET.md](NL_PRODUCTION_FLEET.md) for real Docker/K8s forks and `NL_FLEET_PRODUCTION_READY=true`.
+**Phase 4** complete — see [NL_PRODUCTION_FLEET.md](NL_PRODUCTION_FLEET.md).
 
 See also: [NL_FLEET_STAGING.md](NL_FLEET_STAGING.md) · [NL_FLEET_OPS.md](NL_FLEET_OPS.md)
