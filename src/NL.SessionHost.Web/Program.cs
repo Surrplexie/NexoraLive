@@ -847,6 +847,41 @@ app.MapPost("/api/v1/ga/validation/run", (
     NlForkCatalogHost catalog) =>
     Results.Json(BuildGaValidationReport(fleet, orchestrator, bus, identity, security, catalog)));
 
+app.MapGet("/api/v1/live-production/settings", (NlFleetHost fleet) =>
+    Results.Json(fleet.LiveProductionSettings.ToPublicInfo()));
+
+app.MapGet("/api/v1/live-production/status", (
+    NlFleetHost fleet,
+    NlIdentitySettings identity) =>
+    Results.Json(new LiveProductionStatus(
+        fleet.LiveProductionSettings.Enabled,
+        fleet.LiveProductionSettings.DevMode,
+        fleet.GaSettings.Enabled,
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY")),
+        identity.Mode.ToString(),
+        identity.PublicBaseUrl ?? Environment.GetEnvironmentVariable("NL_PUBLIC_BASE_URL"),
+        fleet.Settings.Relay.RelayWebSocketTemplate,
+        fleet.Settings.Relay.TurnUri,
+        DateTimeOffset.UtcNow)));
+
+app.MapGet("/api/v1/live-production/validation", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog) =>
+    Results.Json(BuildLiveProductionValidationReport(fleet, orchestrator, bus, identity, security, catalog)));
+
+app.MapPost("/api/v1/live-production/validation/run", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog) =>
+    Results.Json(BuildLiveProductionValidationReport(fleet, orchestrator, bus, identity, security, catalog)));
+
 app.MapPost("/api/v1/fleet/compliance/export/{playerId}", (NlFleetHost fleet, ModerationHostState mod, string playerId) =>
 {
     try
@@ -1592,6 +1627,48 @@ static GaValidationReport BuildGaValidationReport(
         catalogCheck,
         fleet.Compliance.RetentionPolicy,
         productionSlos);
+}
+
+static LiveProductionValidationReport BuildLiveProductionValidationReport(
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog)
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    var production = fleet.Validation.Evaluate(
+        fleet.Settings,
+        orchestrator.Settings.Mode.ToString(),
+        snap,
+        fleet.Metrics,
+        fleet.Incidents,
+        fleet.ValidationStore.GetLast()?.LastLoadTest);
+    var activeGameIds = catalog.Settings.Enabled
+        ? catalog.Catalog.ListGames()
+            .Select(e => e.GameId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList()
+        : (IReadOnlyList<string>)[];
+    var catalogCheck = fleet.GaCatalog.Evaluate(catalog.Settings.Enabled, activeGameIds, fleet.GaSettings);
+    return fleet.LiveProductionValidation.Evaluate(
+        fleet.LiveProductionSettings,
+        fleet.GaSettings,
+        fleet.BetaSettings,
+        !string.IsNullOrEmpty(security.OperatorKey),
+        security.PublicMode,
+        identity.Mode.ToString(),
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY")),
+        production.ProductionReady,
+        identity.PublicBaseUrl ?? Environment.GetEnvironmentVariable("NL_PUBLIC_BASE_URL"),
+        fleet.Settings.Relay.RelayWebSocketTemplate,
+        fleet.Settings.Relay.TurnUri,
+        catalog.Settings.Enabled,
+        catalogCheck,
+        fleet.Compliance.RetentionPolicy);
 }
 
 static string ResolveIdentityPublicBase(HttpContext ctx, NlIdentitySettings settings)

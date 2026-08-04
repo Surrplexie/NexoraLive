@@ -84,6 +84,6 @@ Checks:
 - [x] Compliance policy (GDPR + retention)
 - [x] GA validation script + API gate
 - [x] Operator runbook
-- [ ] VPS with real domain + live Steam (operator deploy)
+- [ ] VPS with real domain + live Steam (operator deploy) — see [NL_LIVE_PRODUCTION.md](NL_LIVE_PRODUCTION.md)
 
-See also: [NL_GA_RUNBOOK.md](NL_GA_RUNBOOK.md) · [NL_PUBLIC_BETA.md](NL_PUBLIC_BETA.md) · [NL_PRODUCTION_FLEET.md](NL_PRODUCTION_FLEET.md)
+Next: **Phase 7** — live production deploy ([NL_LIVE_PRODUCTION.md](NL_LIVE_PRODUCTION.md)).

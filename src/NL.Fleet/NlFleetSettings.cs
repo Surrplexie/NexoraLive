@@ -107,6 +107,8 @@ public sealed class NlFleetHost
         Ga = new GaProgramService(GaSettings, GaStreamers);
         GaCatalog = new GaCatalogService();
         GaValidation = new GaValidationService();
+        LiveProductionSettings = NlLiveProductionSettings.LoadFromEnvironment();
+        LiveProductionValidation = new LiveProductionValidationService();
     }
 
     public NlFleetSettings Settings { get; }
@@ -152,4 +154,8 @@ public sealed class NlFleetHost
     public GaCatalogService GaCatalog { get; }
 
     public GaValidationService GaValidation { get; }
+
+    public NlLiveProductionSettings LiveProductionSettings { get; }
+
+    public LiveProductionValidationService LiveProductionValidation { get; }
 }
