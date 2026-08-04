@@ -314,6 +314,12 @@ public sealed class BusHostState
                 return new ForkProvisionResult(false, abuse.DenyReason, null, null);
             }
 
+            var beta = fleet.Beta.CheckStreamer(streamerId);
+            if (!beta.Allowed)
+            {
+                return new ForkProvisionResult(false, beta.DenyReason, null, null);
+            }
+
             var placement = fleet.Regions.Place(
                 new FleetPlacementRequest(streamerId, profile.FleetPreferredRegion, profile.FleetGeoHint),
                 manifest.HttpBaseUrl);

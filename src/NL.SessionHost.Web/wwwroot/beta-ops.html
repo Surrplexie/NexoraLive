@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NL Beta Ops</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="operator-page">
+  <header>
+    <h1>Beta Operations</h1>
+    <p class="sub">Approve streamers, run validation — see <code>docs/NL_BETA_RUNBOOK.md</code></p>
+    <nav class="nav">
+      <a href="/operator.html">Operator</a>
+      <a href="/fleet-ops.html">Fleet ops</a>
+      <a href="/beta.html">Beta waitlist</a>
+      <a href="/beta-ops.html" aria-current="page">Beta ops</a>
+    </nav>
+  </header>
+
+  <section class="card operator-panel">
+    <h2>Operator key</h2>
+    <label>NL_OPERATOR_KEY <input id="operator-key" type="password" autocomplete="off" /></label>
+    <button type="button" id="save-key">Save key</button>
+    <span id="key-status"></span>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Beta validation</h2>
+    <p id="validation-summary"></p>
+    <button type="button" id="run-validation">Run beta validation</button>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Waitlist</h2>
+    <table id="waitlist-table">
+      <thead><tr><th>Name</th><th>Contact</th><th>Status</th><th>Streamer ID</th><th>Actions</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <button type="button" id="refresh-waitlist">Refresh</button>
+  </section>
+
+  <script src="nl-auth.js"></script>
+  <script src="beta-ops-app.js"></script>
+</body>
+</html>

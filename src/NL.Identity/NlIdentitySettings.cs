@@ -85,6 +85,8 @@ public sealed class NlIdentitySettings
 
 public sealed class NlIdentityHost
 {
+    private readonly MockGameOwnershipVerifier _mockVerifier;
+
     public NlIdentityHost(NlIdentitySettings settings)
     {
         Settings = settings;
@@ -94,15 +96,15 @@ public sealed class NlIdentityHost
         Audit = new JsonlIdentityAuditStore();
         Identity = new NlIdentityService(Store, Audit);
 
-        var mock = new MockGameOwnershipVerifier();
-        var steam = new SteamWebApiOwnershipVerifier(fallback: mock);
+        _mockVerifier = new MockGameOwnershipVerifier();
+        var steam = new SteamWebApiOwnershipVerifier(fallback: _mockVerifier);
 
         OwnershipVerifier = settings.Mode switch
         {
             NlOwnershipMode.Off => new OffGameOwnershipVerifier(),
             NlOwnershipMode.Live => new CompositeGameOwnershipVerifier(
                 steam,
-                mock,
+                _mockVerifier,
                 new StubPlatformOwnershipVerifier(NlPlatform.Epic),
                 new StubPlatformOwnershipVerifier(NlPlatform.Ubisoft),
                 new StubPlatformOwnershipVerifier(NlPlatform.Ea),
@@ -110,11 +112,11 @@ public sealed class NlIdentityHost
                 new StubPlatformOwnershipVerifier(NlPlatform.PlayStation),
                 new StubPlatformOwnershipVerifier(NlPlatform.Riot),
                 new StubPlatformOwnershipVerifier(NlPlatform.Itch)),
-            _ => mock,
+            _ => _mockVerifier,
         };
 
-        BanChecker = new CompositePublisherBanChecker(steam, mock);
-        SubscriptionChecker = mock;
+        BanChecker = new CompositePublisherBanChecker(steam, _mockVerifier);
+        SubscriptionChecker = _mockVerifier;
         OwnershipGate = new NlOwnershipAdmissionGate(
             OwnershipVerifier,
             BanChecker,
@@ -146,6 +148,9 @@ public sealed class NlIdentityHost
     public JsonOAuthStateStore OAuthStates { get; }
 
     public SteamOpenIdService SteamOpenId { get; }
+
+    /// <summary>Reload mock ownership matrix after the on-disk config file is created or updated.</summary>
+    public void ReloadMockOwnership() => _mockVerifier.Reload();
 }
 
 internal sealed class OffGameOwnershipVerifier : IGameOwnershipVerifier

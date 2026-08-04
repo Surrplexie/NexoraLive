@@ -116,6 +116,6 @@ Script: [`scripts/nl-production-validate.ps1`](../scripts/nl-production-validate
 - [x] 100-session production validation script
 - [ ] VPS with real domain (operator deploy step)
 
-Next: **Phase 5** — public beta, live Steam identity on hosted fleet, operator runbooks.
+Next: **Phase 6** — general availability (multi-game catalog, SLA, compliance).
 
-See also: [NL_STAGING_HOSTED.md](NL_STAGING_HOSTED.md) · [NL_FLEET_STAGING.md](NL_FLEET_STAGING.md) · [NL_FLEET_OPS.md](NL_FLEET_OPS.md)
+See also: [NL_PUBLIC_BETA.md](NL_PUBLIC_BETA.md) · [NL_STAGING_HOSTED.md](NL_STAGING_HOSTED.md) · [NL_FLEET_OPS.md](NL_FLEET_OPS.md)

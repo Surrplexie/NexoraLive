@@ -8,6 +8,7 @@ param(
     [string]$MajorVersion = "1.0",
     [ValidateSet("mock", "process", "docker", "auto")]
     [string]$ExpectProvisioner = "mock",
+    [string]$OperatorKey = "",
     [switch]$SkipImageBuild,
     [switch]$VerifyRuleEvents,
     [int]$TeardownGraceSec = 30,
@@ -27,6 +28,9 @@ function Invoke-Nl {
         ContentType = "application/json"
         ErrorAction = "Stop"
         TimeoutSec = 120
+    }
+    if (-not [string]::IsNullOrWhiteSpace($OperatorKey)) {
+        $params.Headers = @{ "X-NL-Operator-Key" = $OperatorKey }
     }
     if ($null -ne $Body) {
         $params.Body = ($Body | ConvertTo-Json -Depth 6 -Compress)

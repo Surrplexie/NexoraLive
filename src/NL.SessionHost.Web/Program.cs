@@ -41,6 +41,7 @@ var moderationLog = Environment.GetEnvironmentVariable("NL_MODERATION_LOG");
 var spStore = Environment.GetEnvironmentVariable("NL_SP_STORE");
 
 NlPaths.EnsureRoot();
+DogfoodSetup.EnsureMockOwnership(DogfoodSetup.FindRepoRoot());
 
 var identitySettings = NlIdentitySettings.LoadFromEnvironment();
 var identityHost = new NlIdentityHost(identitySettings);
@@ -664,6 +665,84 @@ app.MapPut("/api/v1/fleet/streamer-requirements", (NlFleetHost fleet, FleetStrea
     return Results.Ok(body);
 });
 
+app.MapGet("/api/v1/beta/settings", (NlFleetHost fleet) => Results.Json(fleet.BetaSettings.ToPublicInfo()));
+
+app.MapGet("/api/v1/beta/status", (NlFleetHost fleet) => Results.Json(fleet.Beta.GetStatus()));
+
+app.MapPost("/api/v1/beta/waitlist", (NlFleetHost fleet, BetaWaitlistSignupRequest body) =>
+{
+    try
+    {
+        var entry = fleet.Beta.SignUp(body.DisplayName ?? "", body.Contact ?? "", body.TwitchHandle, body.RequestedGameId);
+        return Results.Json(entry);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/api/v1/beta/waitlist", (NlFleetHost fleet, HttpContext ctx) =>
+{
+    if (!NlWebSecurityExtensions.IsAuthorized(ctx))
+    {
+        return Results.Unauthorized();
+    }
+
+    return Results.Json(fleet.Beta.ListWaitlist());
+});
+
+app.MapPost("/api/v1/beta/waitlist/{entryId}/approve", (NlFleetHost fleet, HttpContext ctx, string entryId, BetaWaitlistApproveRequest? body) =>
+{
+    if (!NlWebSecurityExtensions.IsAuthorized(ctx))
+    {
+        return Results.Unauthorized();
+    }
+
+    try
+    {
+        var entry = fleet.Beta.Approve(entryId, body?.StreamerId);
+        return Results.Json(entry);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/v1/beta/waitlist/{entryId}/reject", (NlFleetHost fleet, HttpContext ctx, string entryId) =>
+{
+    if (!NlWebSecurityExtensions.IsAuthorized(ctx))
+    {
+        return Results.Unauthorized();
+    }
+
+    try
+    {
+        return Results.Json(fleet.Beta.Reject(entryId));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/api/v1/beta/validation", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security) =>
+    Results.Json(BuildBetaValidationReport(fleet, orchestrator, bus, identity, security)));
+
+app.MapPost("/api/v1/beta/validation/run", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security) =>
+    Results.Json(BuildBetaValidationReport(fleet, orchestrator, bus, identity, security)));
+
 app.MapPost("/api/v1/fleet/compliance/export/{playerId}", (NlFleetHost fleet, ModerationHostState mod, string playerId) =>
 {
     try
@@ -934,7 +1013,7 @@ app.MapPost("/api/v1/client/mobile/action", async (ModerationHostState mod, NlCl
     }
 });
 
-app.MapPost("/api/v1/dogfood/setup", async (BusHostState bus, NlForkOrchestratorHost orchestrator, NlFleetHost fleet, HttpRequest req) =>
+app.MapPost("/api/v1/dogfood/setup", async (BusHostState bus, NlForkOrchestratorHost orchestrator, NlFleetHost fleet, NlIdentityHost identity, HttpRequest req) =>
 {
     try
     {
@@ -946,6 +1025,7 @@ app.MapPost("/api/v1/dogfood/setup", async (BusHostState bus, NlForkOrchestrator
 
         var root = DogfoodSetup.FindRepoRoot();
         DogfoodSetup.EnsureMockOwnership(root);
+        identity.ReloadMockOwnership();
         var profile = DogfoodSetup.BuildProfile(root, body?.GameId);
         bus.SaveProfile(profile);
         NlSessionBusHelper.ApplyBusSource(profile, bus.BusInfo);
@@ -1321,6 +1401,7 @@ Console.WriteLine($"Identity (Phase L)       → {identitySettings.Enabled} mode
 Console.WriteLine($"Partnership (Phase Q)  → {partnershipSettings.Enabled} gate={partnershipSettings.RequireGateAtAdmit}");
 Console.WriteLine($"NL Client (Phase R)    → /nl-client.html + NL.Client CLI");
 Console.WriteLine($"Fleet ops (Phase S)    → {fleetSettings.Enabled} /fleet-ops.html max={fleetSettings.Autoscale.MaxConcurrentSessions}");
+Console.WriteLine($"Public beta (Phase 5)  → {fleetHost.BetaSettings.Enabled} /beta.html waitlist={(fleetHost.BetaSettings.WaitlistOpen ? "open" : "closed")}");
 Console.WriteLine($"Web editor (Phase I)   → /editor.html + /api/v1/editor/*");
 if (demoSettings.Enabled)
 {
@@ -1338,6 +1419,32 @@ else
 }
 
 app.Run();
+
+static BetaValidationReport BuildBetaValidationReport(
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security)
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    var production = fleet.Validation.Evaluate(
+        fleet.Settings,
+        orchestrator.Settings.Mode.ToString(),
+        snap,
+        fleet.Metrics,
+        fleet.Incidents,
+        fleet.ValidationStore.GetLast()?.LastLoadTest);
+    return fleet.BetaValidation.Evaluate(
+        fleet.BetaSettings,
+        !string.IsNullOrEmpty(security.OperatorKey),
+        security.PublicMode,
+        identity.Mode.ToString(),
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY")),
+        production.ProductionReady);
+}
 
 static string ResolveIdentityPublicBase(HttpContext ctx, NlIdentitySettings settings)
 {
@@ -1548,4 +1655,17 @@ internal sealed class NlClientBlockInviteRequest
 {
     public string? InviteUrl { get; set; }
     public string? ExpectedHost { get; set; }
+}
+
+internal sealed class BetaWaitlistSignupRequest
+{
+    public string? DisplayName { get; set; }
+    public string? Contact { get; set; }
+    public string? TwitchHandle { get; set; }
+    public string? RequestedGameId { get; set; }
+}
+
+internal sealed class BetaWaitlistApproveRequest
+{
+    public string? StreamerId { get; set; }
 }

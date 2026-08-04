@@ -97,6 +97,10 @@ public sealed class NlFleetHost
         Slo = new FleetSloEvaluator();
         Validation = new FleetStagingValidationService();
         ValidationStore = new JsonFleetValidationStore();
+        BetaSettings = NlBetaSettings.LoadFromEnvironment();
+        BetaWaitlist = new JsonBetaWaitlistStore();
+        Beta = new BetaProgramService(BetaSettings, BetaWaitlist);
+        BetaValidation = new BetaValidationService();
     }
 
     public NlFleetSettings Settings { get; }
@@ -124,4 +128,12 @@ public sealed class NlFleetHost
     public FleetStagingValidationService Validation { get; }
 
     public JsonFleetValidationStore ValidationStore { get; }
+
+    public NlBetaSettings BetaSettings { get; }
+
+    public JsonBetaWaitlistStore BetaWaitlist { get; }
+
+    public BetaProgramService Beta { get; }
+
+    public BetaValidationService BetaValidation { get; }
 }

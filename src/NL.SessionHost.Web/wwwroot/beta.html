@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NL Public Beta — Join Waitlist</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>NexoraLive Public Beta</h1>
+    <p class="sub">Hosted fork sessions with live Steam identity and streamer rules</p>
+    <nav class="nav">
+      <a href="/nl-client.html">NL Client</a>
+      <a href="/identity-link.html">Link Steam</a>
+      <a href="/beta.html" aria-current="page">Beta waitlist</a>
+      <a href="/beta-ops.html">Beta ops</a>
+    </nav>
+  </header>
+
+  <section class="card">
+    <h2>Streamer waitlist</h2>
+    <p id="beta-status" class="sub">Loading beta status...</p>
+    <form id="signup-form">
+      <label>Display name <input id="display-name" required /></label>
+      <label>Email or contact <input id="contact" type="email" required /></label>
+      <label>Twitch handle (optional) <input id="twitch" placeholder="yourchannel" /></label>
+      <label>Game (optional) <input id="game" placeholder="hello-fork" /></label>
+      <button type="submit">Join waitlist</button>
+    </form>
+    <p id="signup-result"></p>
+  </section>
+
+  <script src="beta-app.js"></script>
+</body>
+</html>
