@@ -7,7 +7,8 @@ param(
     [int]$AdmitBurst = 50,
     [string]$NlePath = "",
     [switch]$SkipCleanup,
-    [switch]$StartHost
+    [switch]$StartHost,
+    [switch]$RequireProductionReady
 )
 
 $ErrorActionPreference = "Stop"
@@ -146,14 +147,14 @@ function Start-SessionHostIfNeeded {
 }
 
 function Invoke-NlApi {
-    param([string]$Method, [string]$Path, $Body = $null)
+    param([string]$Method, [string]$Path, $Body = $null, [int]$TimeoutSec = 120)
     $uri = ($BaseUrl.TrimEnd('/') + $Path)
     $params = @{
         Uri = $uri
         Method = $Method
         ContentType = "application/json"
         ErrorAction = "Stop"
-        TimeoutSec = 120
+        TimeoutSec = $TimeoutSec
     }
     if ($null -ne $Body) {
         $params.Body = ($Body | ConvertTo-Json -Depth 6 -Compress)
@@ -171,6 +172,15 @@ try {
 
     Invoke-NlApi GET "/health" | Out-Null
 
+    Write-Host "Clearing existing fork sessions before load test..." -ForegroundColor DarkGray
+    $existing = @(Invoke-NlApi GET "/api/v1/fork/orchestrator/sessions")
+    foreach ($s in $existing) {
+        if ($s.sessionId) {
+            try { Invoke-NlApi POST ("/api/v1/fork/orchestrator/destroy/{0}" -f $s.sessionId) | Out-Null } catch { }
+        }
+    }
+    Start-Sleep -Seconds 2
+
     $settings = Invoke-NlApi GET "/api/v1/fleet/settings"
     if (-not $settings.enabled) {
         Write-Warning "NL_FLEET_ENABLED is false on target - validation may not reflect production fleet ops."
@@ -182,33 +192,88 @@ try {
 
     $orch = Invoke-NlApi GET "/api/v1/fork/orchestrator/settings"
     Write-Host ("Orchestrator mode: {0}" -f $orch.mode)
+    $isRealProvisioner = $orch.mode -in @("Docker", "Kubernetes")
+    $createTimeoutSec = if ($isRealProvisioner) { 180 } else { 120 }
+    $createDelayMs = if ($isRealProvisioner) { 150 } else { 0 }
 
     $created = @()
     $latencies = New-Object System.Collections.Generic.List[double]
     $swTotal = [System.Diagnostics.Stopwatch]::StartNew()
 
-    Write-Host ("Creating {0} fork sessions (mock/process)..." -f $ConcurrentSessions) -ForegroundColor Yellow
-    for ($i = 1; $i -le $ConcurrentSessions; $i++) {
-        $sid = "load-{0:D4}" -f $i
-        $body = @{
-            streamerId = $sid
+    function New-ForkCreateBody([string]$StreamerId) {
+        $idx = [int]($StreamerId -replace '\D', '')
+        return @{
+            streamerId = $StreamerId
             gameId = "hello-fork"
             majorVersion = "1.0"
             nlePath = $NlePath
             modIds = @()
             twitchFollowers = 100
-            preferredRegion = if ($i % 3 -eq 0) { "eu-west" } elseif ($i % 3 -eq 1) { "us-west" } else { "us-east" }
+            preferredRegion = if ($idx % 3 -eq 0) { "eu-west" } elseif ($idx % 3 -eq 1) { "us-west" } else { "us-east" }
         }
+    }
+
+    function Try-CreateForkSession([string]$StreamerId) {
         $t = [System.Diagnostics.Stopwatch]::StartNew()
         try {
-            $r = Invoke-NlApi POST "/api/v1/fork/orchestrator/create" $body
+            $r = Invoke-NlApi POST "/api/v1/fork/orchestrator/create" (New-ForkCreateBody $StreamerId) -TimeoutSec $createTimeoutSec
             $t.Stop()
-            $latencies.Add($t.Elapsed.TotalMilliseconds) | Out-Null
-            $created += $r.sessionId
+            return @{ Ok = $true; SessionId = $r.sessionId; Ms = $t.Elapsed.TotalMilliseconds }
         } catch {
-            Write-Warning ("Create {0} failed: {1}" -f $sid, $_.Exception.Message)
+            return @{ Ok = $false; Error = $_.Exception.Message }
         }
+    }
+
+    $provisionLabel = if ($isRealProvisioner) { "real container forks" } else { "mock/process" }
+    if ($isRealProvisioner) {
+        Write-Host "Warming up Docker/Kubernetes provisioner (3 sessions)..." -ForegroundColor DarkGray
+        for ($w = 1; $w -le 3; $w++) {
+            $warm = Try-CreateForkSession ("warmup-{0}" -f $w)
+            if ($warm.Ok) { $created += $warm.SessionId }
+            Start-Sleep -Milliseconds 500
+        }
+    }
+
+    Write-Host ("Creating {0} fork sessions ({1})..." -f $ConcurrentSessions, $provisionLabel) -ForegroundColor Yellow
+    for ($i = 1; $i -le $ConcurrentSessions; $i++) {
+        $sid = "load-{0:D4}" -f $i
+        $result = Try-CreateForkSession $sid
+        if ($result.Ok) {
+            $latencies.Add($result.Ms) | Out-Null
+            $created += $result.SessionId
+        } else {
+            Write-Warning ("Create {0} failed: {1}" -f $sid, $result.Error)
+        }
+        if ($createDelayMs -gt 0) { Start-Sleep -Milliseconds $createDelayMs }
         if ($i % 25 -eq 0) { Write-Host ("  ... {0} / {1}" -f $i, $ConcurrentSessions) }
+    }
+
+    if ($isRealProvisioner -and $created.Count -lt $ConcurrentSessions) {
+        $need = $ConcurrentSessions - $created.Count
+        Write-Host ("Retrying with extra streamer IDs (need {0} more)..." -f $need) -ForegroundColor Yellow
+        for ($j = 1; $j -le ($need + 20) -and $created.Count -lt $ConcurrentSessions; $j++) {
+            $sid = "load-retry-{0:D4}" -f $j
+            $result = Try-CreateForkSession $sid
+            if ($result.Ok) {
+                $latencies.Add($result.Ms) | Out-Null
+                $created += $result.SessionId
+            }
+            if ($createDelayMs -gt 0) { Start-Sleep -Milliseconds ($createDelayMs * 2) }
+        }
+    }
+
+    $topUp = 0
+    while ($isRealProvisioner -and $topUp -lt 30) {
+        $activeList = @(Invoke-NlApi GET "/api/v1/fork/orchestrator/sessions")
+        if ($activeList.Count -ge $ConcurrentSessions) { break }
+        $sid = "load-topup-{0:D4}" -f $topUp
+        $result = Try-CreateForkSession $sid
+        if ($result.Ok) {
+            $latencies.Add($result.Ms) | Out-Null
+            $created += $result.SessionId
+        }
+        $topUp++
+        Start-Sleep -Milliseconds 300
     }
 
     $activeList = Invoke-NlApi GET "/api/v1/fork/orchestrator/sessions"
@@ -278,8 +343,13 @@ try {
     }
 
     Write-Host ""
-    if ($result.validation.stagingPassed) {
+    if ($result.validation.productionReady) {
+        Write-Host "PRODUCTION VALIDATION PASSED" -ForegroundColor Green
+    } elseif ($result.validation.stagingPassed) {
         Write-Host "STAGING VALIDATION PASSED" -ForegroundColor Green
+        if ($RequireProductionReady) {
+            Write-Host "Production gate not met (set NL_FLEET_PRODUCTION_READY=true + Docker/Kubernetes orchestrator)" -ForegroundColor Yellow
+        }
     } else {
         Write-Host "STAGING VALIDATION FAILED" -ForegroundColor Red
     }
@@ -291,8 +361,14 @@ try {
         }
     }
 
-    if (-not $result.validation.stagingPassed) { exit 1 }
-    Write-Host "Phase S staging fleet validation OK" -ForegroundColor Green
+    if ($RequireProductionReady) {
+        if (-not $result.validation.productionReady) { exit 1 }
+        Write-Host "Phase 4 production fleet validation OK" -ForegroundColor Green
+    } elseif (-not $result.validation.stagingPassed) {
+        exit 1
+    } else {
+        Write-Host "Phase S staging fleet validation OK" -ForegroundColor Green
+    }
 }
 finally {
     if ($script:WeStartedHost -and $null -ne $script:HostJob) {

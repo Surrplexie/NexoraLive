@@ -199,4 +199,22 @@ public class ForkOrchestratorTests
             "host.docker.internal");
         Assert.Equal("http://host.docker.internal:27020/api/v1/session/admit", admit);
     }
+
+    [Fact]
+    public void DockerProvisioner_RewritesWorkspacePathForHostBindMount()
+    {
+        Environment.SetEnvironmentVariable("NL_DATA_ROOT", "/data");
+        Environment.SetEnvironmentVariable("NL_FORK_DOCKER_WORKSPACE_HOST_ROOT", "C:/nl/production-data");
+        try
+        {
+            var hostPath = DockerForkProvisioner.ResolveWorkspaceMountPath(
+                "/data/fork-orchestrator/abc123");
+            Assert.Equal("C:/nl/production-data/fork-orchestrator/abc123", hostPath);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("NL_DATA_ROOT", null);
+            Environment.SetEnvironmentVariable("NL_FORK_DOCKER_WORKSPACE_HOST_ROOT", null);
+        }
+    }
 }

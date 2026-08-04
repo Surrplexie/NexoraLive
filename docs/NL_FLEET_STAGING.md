@@ -53,7 +53,7 @@ View live: `/fleet-ops.html` or `GET /api/v1/fleet/slos`
 |-------|---------|-----------------------------------------------|
 | 100+ concurrent sessions | Required | Required |
 | Relay not `example.com` | Optional with `NL_FLEET_STAGING_DEV=true` | Required |
-| Orchestrator | Mock OK if load test proves scale | **Kubernetes** required |
+| Orchestrator | Mock OK if load test proves scale | **Docker** or **Kubernetes** required |
 | TURN configured | Required | Required |
 
 ## Kubernetes staging cluster
@@ -105,6 +105,6 @@ Phase S exit criteria met when:
 - Load test creates **100+ concurrent fork sessions**
 - All **staging SLOs** pass (observable via `/api/v1/fleet/slos`)
 - **`stagingPassed: true`** on validation report
-- Production promotion additionally requires non-placeholder relay/TURN and Kubernetes orchestrator
+- Production promotion additionally requires non-placeholder relay/TURN and Docker/Kubernetes orchestrator — see [NL_PRODUCTION_FLEET.md](NL_PRODUCTION_FLEET.md)
 
 See also: [NL_FLEET_OPS.md](NL_FLEET_OPS.md)

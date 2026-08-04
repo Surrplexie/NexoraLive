@@ -164,7 +164,7 @@ public sealed class DockerForkProvisioner : IForkProvisioner
 
         var image = string.IsNullOrWhiteSpace(request.DockerImage) ? "nl-fork-hello:latest" : request.DockerImage;
         var name = $"nl-fork-{request.SessionId}".ToLowerInvariant();
-        var ws = request.WorkspacePath.Replace('\\', '/');
+        var ws = ResolveWorkspaceMountPath(request.WorkspacePath);
         var profile = ForkGameProfiles.Resolve(request.GameId);
         var gameArg = profile.GameArg;
         var portMap = profile.PlayerConnectPort is int port
@@ -224,6 +224,35 @@ public sealed class DockerForkProvisioner : IForkProvisioner
         return url
             .Replace("127.0.0.1", dockerHost, StringComparison.Ordinal)
             .Replace("://localhost", "://" + dockerHost, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// When session-host runs in Docker but forks are started via the host daemon (docker.sock),
+    /// workspace paths inside the container must be rewritten to the host bind-mount root.
+    /// </summary>
+    public static string ResolveWorkspaceMountPath(string workspacePath)
+    {
+        var normalized = workspacePath.Replace('\\', '/');
+        var hostRoot = Environment.GetEnvironmentVariable("NL_FORK_DOCKER_WORKSPACE_HOST_ROOT");
+        if (string.IsNullOrWhiteSpace(hostRoot))
+        {
+            return normalized;
+        }
+
+        var dataRoot = (Environment.GetEnvironmentVariable("NL_DATA_ROOT") ?? "/data").Replace('\\', '/').TrimEnd('/');
+        if (!normalized.StartsWith(dataRoot + "/", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(normalized, dataRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            return normalized;
+        }
+
+        var relative = normalized.Length > dataRoot.Length
+            ? normalized[(dataRoot.Length + 1)..]
+            : "";
+        var hostPath = string.IsNullOrEmpty(relative)
+            ? hostRoot
+            : Path.Combine(hostRoot, relative.Replace('/', Path.DirectorySeparatorChar));
+        return hostPath.Replace('\\', '/');
     }
 
     private static string BuildConnectEndpoint(ForkGameProfile profile, string containerName, int? port)

@@ -75,8 +75,9 @@ public sealed class FleetStagingValidationService
         {
             checks.Add(Check(
                 "production_orchestrator",
-                "Production requires Kubernetes provisioner",
-                string.Equals(orchestratorMode, "Kubernetes", StringComparison.OrdinalIgnoreCase),
+                "Production requires Docker or Kubernetes provisioner (real container forks)",
+                string.Equals(orchestratorMode, "Kubernetes", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(orchestratorMode, "Docker", StringComparison.OrdinalIgnoreCase),
                 $"mode={orchestratorMode}"));
         }
 

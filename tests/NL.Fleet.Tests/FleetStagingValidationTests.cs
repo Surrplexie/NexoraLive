@@ -92,4 +92,32 @@ public class FleetStagingValidationTests
             Directory.Delete(dir, recursive: true);
         }
     }
+
+    [Fact]
+    public void Validation_ProductionGate_AcceptsDockerOrchestrator()
+    {
+        Environment.SetEnvironmentVariable("NL_FLEET_PRODUCTION_READY", "true");
+        Environment.SetEnvironmentVariable("NL_FLEET_STAGING_DEV", "false");
+        try
+        {
+            var host = CreateHost();
+            var snap = host.Metrics.BuildSnapshot(activeForks: 100, activeNls: 1);
+            var load = new FleetLoadTestResult(100, 10, 50, 0, 12.5, 800, []);
+            var report = host.Validation.Evaluate(
+                host.Settings,
+                "Docker",
+                snap,
+                host.Metrics,
+                host.Incidents,
+                load);
+
+            Assert.True(report.ProductionReady);
+            Assert.Contains(report.Checks, c => c.Id == "production_orchestrator" && c.Passed);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("NL_FLEET_PRODUCTION_READY", null);
+            Environment.SetEnvironmentVariable("NL_FLEET_STAGING_DEV", null);
+        }
+    }
 }

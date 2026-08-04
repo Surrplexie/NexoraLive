@@ -149,6 +149,6 @@ Set `NL_FORK_ORCHESTRATOR_MODE=kubernetes` in the ConfigMap for cluster fork Job
 - [x] 100-session validation PASS on mock orchestrator
 - [ ] VPS with real domain + Let's Encrypt (operator deploy step)
 
-Next: **Phase 4** — K8s fork provisioner on the VPS/cluster, real Docker/K8s forks (not mock), production `NL_FLEET_PRODUCTION_READY=true`.
+Next: **Phase 4** — see [NL_PRODUCTION_FLEET.md](NL_PRODUCTION_FLEET.md) for real Docker/K8s forks and `NL_FLEET_PRODUCTION_READY=true`.
 
 See also: [NL_FLEET_STAGING.md](NL_FLEET_STAGING.md) · [NL_FLEET_OPS.md](NL_FLEET_OPS.md)

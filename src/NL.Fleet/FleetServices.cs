@@ -8,9 +8,14 @@ public static class FleetSloCatalog
     [
         new("concurrent_ephemeral_sessions", 100, "sessions", "Support 100+ concurrent fork sessions in staging."),
         new("admit_success_rate", 0.99, "ratio", "Admit success rate under load."),
-        new("fork_create_p99_ms", 5000, "ms", "Fork create p99 latency (placeholder)."),
+        new("fork_create_p99_ms", ResolveForkCreateP99Target(), "ms", "Fork create p99 latency."),
         new("incident_auto_restart_rate", 0.95, "ratio", "Fork crashes auto-restarted within grace window."),
     ];
+
+    private static double ResolveForkCreateP99Target() =>
+        int.TryParse(Environment.GetEnvironmentVariable("NL_FLEET_FORK_CREATE_P99_MS"), out var ms)
+            ? Math.Max(1000, ms)
+            : 5000;
 }
 
 public sealed class FleetRegionService
