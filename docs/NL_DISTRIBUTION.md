@@ -98,6 +98,6 @@ powershell -File scripts/nl-distribution-validate.ps1 -OperatorKey "<from distri
 - [x] Ops UI + runbook
 - [ ] CDN or signed release channel on VPS (operator deploy)
 
-Next: **Phase 12** — scale & reliability (multi-region, load testing at GA traffic).
+Next: **Phase 12** — scale & reliability ([NL_SCALE_RELIABILITY.md](NL_SCALE_RELIABILITY.md))
 
-See also: [NL_DISTRIBUTION_RUNBOOK.md](NL_DISTRIBUTION_RUNBOOK.md) · [NL_PRODUCTION_CUTOVER.md](NL_PRODUCTION_CUTOVER.md)
+See also: [NL_DISTRIBUTION_RUNBOOK.md](NL_DISTRIBUTION_RUNBOOK.md) · [NL_PRODUCTION_CUTOVER.md](NL_PRODUCTION_CUTOVER.md) · [NL_SCALE_RELIABILITY.md](NL_SCALE_RELIABILITY.md)

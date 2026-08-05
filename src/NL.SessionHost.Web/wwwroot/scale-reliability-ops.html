@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NL Scale & Reliability Ops</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="operator-page">
+  <header>
+    <h1>Scale & Reliability Operations</h1>
+    <p class="sub">Phase 12 — multi-region placement + GA load SLOs — see <code>docs/NL_SCALE_RELIABILITY.md</code></p>
+    <nav class="nav">
+      <a href="/distribution-ops.html">Distribution ops</a>
+      <a href="/fleet-ops.html">Fleet ops</a>
+      <a href="/scale-reliability-ops.html" aria-current="page">Scale ops</a>
+    </nav>
+  </header>
+
+  <section class="card operator-panel">
+    <h2>Operator key</h2>
+    <label>NL_OPERATOR_KEY <input id="operator-key" type="password" autocomplete="off" /></label>
+    <button type="button" id="save-key">Save key</button>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Scale status</h2>
+    <pre id="status-block">Loading...</pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Regions</h2>
+    <pre id="regions-block">Loading...</pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Production SLOs</h2>
+    <pre id="slos-block">Loading...</pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Scale validation</h2>
+    <p id="validation-summary"></p>
+    <label><input type="checkbox" id="load-verified" /> GA load test passed</label>
+    <label><input type="checkbox" id="region-verified" /> Multi-region placement verified</label>
+    <button type="button" id="run-validation">Run scale validation</button>
+    <pre id="validation-checks"></pre>
+  </section>
+
+  <script src="nl-auth.js"></script>
+  <script src="scale-reliability-ops-app.js"></script>
+</body>
+</html>

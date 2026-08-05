@@ -369,6 +369,7 @@ try {
     } else {
         Write-Host "Phase S staging fleet validation OK" -ForegroundColor Green
     }
+    exit 0
 }
 finally {
     if ($script:WeStartedHost -and $null -ne $script:HostJob) {

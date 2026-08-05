@@ -1157,6 +1157,70 @@ app.MapPost("/api/v1/distribution/validation/run", (
     Results.Json(BuildDistributionValidationReport(
         fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, env, body)));
 
+app.MapGet("/api/v1/scale-reliability/settings", (NlFleetHost fleet) =>
+    Results.Json(fleet.ScaleReliabilitySettings.ToPublicInfo()));
+
+app.MapGet("/api/v1/scale-reliability/status", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus) =>
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var last = fleet.ValidationStore.GetLast();
+    return Results.Json(new ScaleReliabilityStatus(
+        fleet.ScaleReliabilitySettings.Enabled,
+        fleet.ScaleReliabilitySettings.DevMode,
+        fleet.ScaleReliabilitySettings.MinConcurrentSessions,
+        fleet.Regions.ListRegions().Count,
+        fleet.Settings.Autoscale.MaxConcurrentSessions,
+        last?.LastLoadTest is not null,
+        last?.LastLoadTest?.ConcurrentSessionsTarget,
+        fleet.DistributionSettings.Enabled,
+        DateTimeOffset.UtcNow));
+});
+
+app.MapGet("/api/v1/scale-reliability/regions", (NlFleetHost fleet) =>
+    Results.Json(fleet.Regions.ListRegions()));
+
+app.MapGet("/api/v1/scale-reliability/production-slos", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus) =>
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    var last = fleet.ValidationStore.GetLast()?.LastLoadTest;
+    return Results.Json(fleet.Slo.EvaluateProduction(snap, last, fleet.Metrics, fleet.Incidents));
+});
+
+app.MapGet("/api/v1/scale-reliability/validation", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env) =>
+    Results.Json(BuildScaleReliabilityValidationReport(
+        fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, env, null)));
+
+app.MapPost("/api/v1/scale-reliability/validation/run", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env,
+    ScaleReliabilityValidationRunRequest? body) =>
+    Results.Json(BuildScaleReliabilityValidationReport(
+        fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, env, body)));
+
 app.MapPost("/api/v1/fleet/compliance/export/{playerId}", (NlFleetHost fleet, ModerationHostState mod, string playerId) =>
 {
     try
@@ -2174,6 +2238,50 @@ static DistributionValidationReport BuildDistributionValidationReport(
         body?.PlayerJoinVerified ?? false);
 }
 
+static ScaleReliabilityValidationReport BuildScaleReliabilityValidationReport(
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env,
+    ScaleReliabilityValidationRunRequest? body)
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    var last = fleet.ValidationStore.GetLast()?.LastLoadTest;
+
+    var distributionReport = BuildDistributionValidationReport(
+        fleet,
+        orchestrator,
+        bus,
+        identity,
+        security,
+        catalog,
+        partnership,
+        hardening,
+        env,
+        body?.Distribution);
+
+    return fleet.ScaleReliabilityValidation.Evaluate(
+        fleet.ScaleReliabilitySettings,
+        fleet.DistributionSettings,
+        fleet.Settings,
+        fleet.Regions.ListRegions(),
+        snap,
+        last,
+        fleet.Metrics,
+        fleet.Incidents,
+        distributionReport.DistributionPassed,
+        body?.LoadTestVerified ?? false,
+        body?.MultiRegionVerified ?? false,
+        body?.VerifiedRegionIds is { Count: > 0 } ids ? ids : Array.Empty<string>());
+}
+
 static string ResolveIdentityPublicBase(HttpContext ctx, NlIdentitySettings settings)
 {
     if (!string.IsNullOrWhiteSpace(settings.PublicBaseUrl))
@@ -2437,4 +2545,12 @@ internal sealed class DistributionValidationRunRequest
     public bool StreamerSignupVerified { get; set; }
     public bool PlayerJoinVerified { get; set; }
     public ProductionCutoverValidationRunRequest? ProductionCutover { get; set; }
+}
+
+internal sealed class ScaleReliabilityValidationRunRequest
+{
+    public bool LoadTestVerified { get; set; }
+    public bool MultiRegionVerified { get; set; }
+    public List<string>? VerifiedRegionIds { get; set; }
+    public DistributionValidationRunRequest? Distribution { get; set; }
 }

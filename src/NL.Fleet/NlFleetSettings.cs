@@ -122,6 +122,8 @@ public sealed class NlFleetHost
         DistributionSettings = NlDistributionSettings.LoadFromEnvironment();
         DistributionClient = new DistributionClientManifestService();
         DistributionValidation = new DistributionValidationService();
+        ScaleReliabilitySettings = NlScaleReliabilitySettings.LoadFromEnvironment();
+        ScaleReliabilityValidation = new ScaleReliabilityValidationService();
     }
 
     public NlFleetSettings Settings { get; }
@@ -197,4 +199,8 @@ public sealed class NlFleetHost
     public DistributionClientManifestService DistributionClient { get; }
 
     public DistributionValidationService DistributionValidation { get; }
+
+    public NlScaleReliabilitySettings ScaleReliabilitySettings { get; }
+
+    public ScaleReliabilityValidationService ScaleReliabilityValidation { get; }
 }
