@@ -9,4 +9,7 @@ dotnet build src/NL.Social/NL.Social.csproj -c Release --verbosity quiet
 dotnet test tests/NL.Social.Tests/NL.Social.Tests.csproj -c Release --verbosity quiet
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+powershell -File (Join-Path $Root "scripts/nl-social-twitch-oauth-validate.ps1")
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 Write-Host "Phase M social gate smoke OK" -ForegroundColor Green

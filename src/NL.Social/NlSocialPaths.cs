@@ -24,5 +24,9 @@ public static class NlSocialPaths
         Environment.GetEnvironmentVariable("NL_SOCIAL_MOCK_DATA")
         ?? Path.Combine(Root, "mock-social.json");
 
+    public static string OAuthState => Path.Combine(Root, "oauth-state.json");
+
+    public static string TwitchCredentials => Path.Combine(Root, "twitch-oauth-credentials.json");
+
     public static void EnsureRoot() => Directory.CreateDirectory(Root);
 }

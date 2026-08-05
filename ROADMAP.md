@@ -439,8 +439,7 @@ sessions. Anti-pirate / anti-alt from nl.txt section 5.
 Wire Phase 2's `JoinEligibilityEngine` to **live platform APIs** instead of caller-supplied
 bools. nl.txt section 2: SP joins via NL only, not native game invites.
 
-- [x] **Twitch / YouTube / Kick OAuth** — follow + paid sub status with cache + refresh
-      (mock + Twitch Helix; full browser OAuth deferred)
+- [x] **Twitch / YouTube / Kick OAuth** — Twitch browser OAuth at `/social-link.html` + per-player Helix tokens (Phase M.1); YouTube/Kick/Discord OAuth deferred
 - [x] **Discord optional link** — server member checks for streamer communities
 - [x] **`JoinRequirements` from streamer dashboard** — web UI at `/join-gate.html` + REST API
 - [x] **Live-only NLS** — start blocked when offline; `NlLiveOnlyHostedService` auto-stops

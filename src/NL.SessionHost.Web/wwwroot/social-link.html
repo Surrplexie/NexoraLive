@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NL Social — Link Twitch</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="operator-page">
+  <header>
+    <h1>Social account linking</h1>
+    <p class="sub">Link Twitch via OAuth for follow/sub checks at join (Phase M.1)</p>
+    <nav class="nav">
+      <a href="/join-gate.html">Join gate</a>
+      <a href="/identity-link.html">Identity</a>
+      <a href="/social-link.html" aria-current="page">Social link</a>
+      <a href="/nl-client.html">NL Client</a>
+    </nav>
+  </header>
+
+  <section class="card operator-panel">
+    <h2>Settings</h2>
+    <dl id="social-settings"></dl>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>SP profile</h2>
+    <div class="grid">
+      <label>Player id <input id="player-id" placeholder="your-sp-id" /></label>
+    </div>
+    <div class="actions">
+      <button type="button" id="refresh-links">Refresh links</button>
+    </div>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Link Twitch (OAuth)</h2>
+    <p class="sub">Sign in with Twitch to link your account. Used for live follow/sub verification at admit.</p>
+    <div class="actions">
+      <button type="button" id="twitch-sign-in" class="primary">Sign in with Twitch</button>
+    </div>
+    <h3>Linked platforms</h3>
+    <pre id="link-block" class="code-block">No links loaded.</pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Test admit (social gate)</h2>
+    <button type="button" id="test-admit">Test admit with linked Twitch</button>
+    <pre id="admit-result" class="code-block"></pre>
+  </section>
+
+  <p id="status" class="status muted"></p>
+  <script src="nl-auth.js"></script>
+  <script src="social-link-app.js"></script>
+</body>
+</html>

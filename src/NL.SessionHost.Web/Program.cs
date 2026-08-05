@@ -407,6 +407,83 @@ app.MapPost("/api/v1/social/link", (NlSocialHost host, SocialLinkRequest body) =
 app.MapGet("/api/v1/social/links/{playerId}", (NlSocialHost host, string playerId) =>
     Results.Json(host.LinkStore.GetOrDefault(playerId)));
 
+app.MapGet("/api/v1/social/oauth/twitch/authorize", (
+    NlSocialHost host,
+    NlSocialSettings settings,
+    HttpContext ctx,
+    string playerId,
+    string? returnUrl) =>
+{
+    if (!settings.Enabled)
+    {
+        return Results.Json(new { error = "Social gate disabled." }, statusCode: 503);
+    }
+
+    if (!host.TwitchOAuth.IsConfigured)
+    {
+        return Results.Json(new { error = "TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET required." }, statusCode: 503);
+    }
+
+    if (string.IsNullOrWhiteSpace(playerId))
+    {
+        return Results.BadRequest(new { error = "playerId required." });
+    }
+
+    var publicBase = ResolveSocialPublicBase(ctx);
+    var redirect = host.TwitchOAuth.BuildAuthorizeRedirect(playerId.Trim(), returnUrl, publicBase);
+    return Results.Redirect(redirect);
+});
+
+app.MapGet("/api/v1/social/oauth/twitch/callback", async (
+    NlSocialHost host,
+    NlSocialSettings settings,
+    HttpContext ctx,
+    CancellationToken ct) =>
+{
+    if (!settings.Enabled)
+    {
+        return Results.Content("Social gate disabled.", "text/plain", statusCode: 503);
+    }
+
+    var query = ctx.Request.Query.ToDictionary(
+        kv => kv.Key,
+        kv => kv.Value.ToString(),
+        StringComparer.OrdinalIgnoreCase);
+
+    var publicBase = ResolveSocialPublicBase(ctx);
+    var result = await host.TwitchOAuth.HandleCallbackAsync(query, publicBase, ct);
+    var landing = string.IsNullOrWhiteSpace(result.ReturnUrl)
+        ? "/social-link.html"
+        : result.ReturnUrl!;
+
+    var sep = landing.Contains('?') ? "&" : "?";
+    if (result.Success)
+    {
+        return Results.Redirect(
+            $"{landing}{sep}linked=twitch&playerId={Uri.EscapeDataString(result.PlayerId!)}&twitchUserId={Uri.EscapeDataString(result.TwitchUserId!)}&twitchLogin={Uri.EscapeDataString(result.TwitchLogin ?? "")}");
+    }
+
+    return Results.Redirect(
+        $"{landing}{sep}error={Uri.EscapeDataString(result.Error ?? "Twitch sign-in failed.")}");
+});
+
+app.MapGet("/api/v1/social/twitch-oauth/{playerId}", (NlSocialHost host, string playerId) =>
+{
+    var credential = host.TwitchCredentials.GetByPlayer(playerId);
+    if (credential is null)
+    {
+        return Results.NotFound(new { error = "No Twitch OAuth link for this player." });
+    }
+
+    return Results.Json(new
+    {
+        playerId = credential.PlayerId,
+        twitchUserId = credential.TwitchUserId,
+        twitchLogin = credential.TwitchLogin,
+        linked = true,
+    });
+});
+
 app.MapGet("/api/v1/fork/catalog/settings", (NlForkCatalogHost host) => Results.Json(host.Settings.ToPublicInfo()));
 
 app.MapGet("/api/v1/fork/catalog/version-policy", (BusHostState bus, NlForkCatalogHost host, NlFleetHost fleet, string? streamerId) =>
@@ -2533,6 +2610,18 @@ static string ResolveIdentityPublicBase(HttpContext ctx, NlIdentitySettings sett
     if (!string.IsNullOrWhiteSpace(settings.PublicBaseUrl))
     {
         return settings.PublicBaseUrl.TrimEnd('/');
+    }
+
+    var req = ctx.Request;
+    return $"{req.Scheme}://{req.Host}";
+}
+
+static string ResolveSocialPublicBase(HttpContext ctx)
+{
+    var publicBase = Environment.GetEnvironmentVariable("NL_PUBLIC_BASE_URL");
+    if (!string.IsNullOrWhiteSpace(publicBase))
+    {
+        return publicBase.TrimEnd('/');
     }
 
     var req = ctx.Request;

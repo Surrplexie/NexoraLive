@@ -22,6 +22,8 @@
 
     <ProjectReference Include="..\NL.Core\NL.Core.csproj" />
 
+    <ProjectReference Include="..\NL.Identity\NL.Identity.csproj" />
+
     <ProjectReference Include="..\NL.Social.Core\NL.Social.Core.csproj" />
 
   </ItemGroup>

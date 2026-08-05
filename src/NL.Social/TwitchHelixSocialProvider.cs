@@ -6,17 +6,22 @@ using NL.Social.Core;
 namespace NL.Social;
 
 /// <summary>
-/// Minimal Twitch Helix follow/sub checks when <c>TWITCH_CLIENT_ID</c> and
-/// <c>TWITCH_ACCESS_TOKEN</c> are configured. Falls back to mock provider on errors.
+/// Twitch Helix follow/sub checks using per-player OAuth tokens when available, otherwise
+/// server <c>TWITCH_ACCESS_TOKEN</c>, then mock fallback.
 /// </summary>
 public sealed class TwitchHelixSocialProvider : ISocialRelationshipProvider
 {
     private readonly HttpClient _http;
     private readonly ISocialRelationshipProvider _fallback;
+    private readonly TwitchOAuthTokenService? _tokenService;
 
-    public TwitchHelixSocialProvider(ISocialRelationshipProvider fallback, HttpClient? http = null)
+    public TwitchHelixSocialProvider(
+        ISocialRelationshipProvider fallback,
+        TwitchOAuthTokenService? tokenService = null,
+        HttpClient? http = null)
     {
         _fallback = fallback;
+        _tokenService = tokenService;
         _http = http ?? new HttpClient();
     }
 
@@ -25,14 +30,18 @@ public sealed class TwitchHelixSocialProvider : ISocialRelationshipProvider
         CancellationToken cancellationToken = default)
     {
         var clientId = Environment.GetEnvironmentVariable("TWITCH_CLIENT_ID");
-        var accessToken = Environment.GetEnvironmentVariable("TWITCH_ACCESS_TOKEN");
         var broadcasterId = context.StreamerConfig.TwitchBroadcasterId;
         var viewerId = context.Links.TwitchUserId;
 
         if (string.IsNullOrWhiteSpace(clientId)
-            || string.IsNullOrWhiteSpace(accessToken)
             || string.IsNullOrWhiteSpace(broadcasterId)
             || string.IsNullOrWhiteSpace(viewerId))
+        {
+            return await _fallback.GetStatusAsync(context, cancellationToken);
+        }
+
+        var accessToken = await ResolveAccessTokenAsync(context.PlayerId, cancellationToken);
+        if (string.IsNullOrWhiteSpace(accessToken.Token))
         {
             return await _fallback.GetStatusAsync(context, cancellationToken);
         }
@@ -41,15 +50,15 @@ public sealed class TwitchHelixSocialProvider : ISocialRelationshipProvider
         {
             using var followReq = new HttpRequestMessage(
                 HttpMethod.Get,
-                $"https://api.twitch.tv/helix/channels/followers?broadcaster_id={Uri.EscapeDataString(broadcasterId)}&user_id={Uri.EscapeDataString(viewerId)}");
-            followReq.Headers.Add("Client-Id", clientId);
-            followReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                $"https://api.twitch.tv/helix/channels/followed?user_id={Uri.EscapeDataString(viewerId)}&broadcaster_id={Uri.EscapeDataString(broadcasterId)}");
+            followReq.Headers.Add("Client-Id", clientId.Trim());
+            followReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken.Token);
 
             using var subReq = new HttpRequestMessage(
                 HttpMethod.Get,
-                $"https://api.twitch.tv/helix/subscriptions?broadcaster_id={Uri.EscapeDataString(broadcasterId)}&user_id={Uri.EscapeDataString(viewerId)}");
-            subReq.Headers.Add("Client-Id", clientId);
-            subReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                $"https://api.twitch.tv/helix/subscriptions/user?broadcaster_id={Uri.EscapeDataString(broadcasterId)}&user_id={Uri.EscapeDataString(viewerId)}");
+            subReq.Headers.Add("Client-Id", clientId.Trim());
+            subReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken.Token);
 
             var followTask = _http.SendAsync(followReq, cancellationToken);
             var subTask = _http.SendAsync(subReq, cancellationToken);
@@ -78,12 +87,28 @@ public sealed class TwitchHelixSocialProvider : ISocialRelationshipProvider
                 isFollowing,
                 isSubscribed,
                 discord.IsDiscordMember,
-                "twitch-helix");
+                accessToken.Source);
         }
         catch
         {
             return await _fallback.GetStatusAsync(context, cancellationToken);
         }
+    }
+
+    private async Task<(string? Token, string Source)> ResolveAccessTokenAsync(
+        string playerId,
+        CancellationToken cancellationToken)
+    {
+        if (_tokenService is not null)
+        {
+            var userToken = await _tokenService.GetValidAccessTokenAsync(playerId, cancellationToken);
+            if (!string.IsNullOrWhiteSpace(userToken))
+            {
+                return (userToken, "twitch-oauth");
+            }
+        }
+
+        return (Environment.GetEnvironmentVariable("TWITCH_ACCESS_TOKEN"), "twitch-helix");
     }
 
     private sealed class TwitchDataEnvelope<T>

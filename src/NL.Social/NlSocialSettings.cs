@@ -41,9 +41,13 @@ public sealed class NlSocialSettings
             _ => NlSocialMode.Mock,
         };
 
-        if (mode == NlSocialMode.Live
-            && (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("TWITCH_CLIENT_ID"))
-                || string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("TWITCH_ACCESS_TOKEN"))))
+        var clientId = Environment.GetEnvironmentVariable("TWITCH_CLIENT_ID");
+        var clientSecret = Environment.GetEnvironmentVariable("TWITCH_CLIENT_SECRET");
+        var serverToken = Environment.GetEnvironmentVariable("TWITCH_ACCESS_TOKEN");
+        var twitchLiveReady = !string.IsNullOrWhiteSpace(clientId)
+            && (!string.IsNullOrWhiteSpace(clientSecret) || !string.IsNullOrWhiteSpace(serverToken));
+
+        if (mode == NlSocialMode.Live && !twitchLiveReady)
         {
             mode = NlSocialMode.Mock;
         }
@@ -65,17 +69,33 @@ public sealed class NlSocialSettings
         };
     }
 
-    public object ToPublicInfo() => new
+    public object ToPublicInfo()
     {
-        enabled = Enabled,
-        mode = Mode.ToString(),
-        cacheTtlSeconds = CacheTtlSeconds,
-        liveCheckIntervalSeconds = LiveCheckIntervalSeconds,
-        twitchConfigured = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("TWITCH_CLIENT_ID"))
-            && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("TWITCH_ACCESS_TOKEN")),
-        storePath = NlSocialPaths.Root,
-        mockDataPath = NlSocialPaths.MockData,
-    };
+        var clientId = Environment.GetEnvironmentVariable("TWITCH_CLIENT_ID");
+        var clientSecret = Environment.GetEnvironmentVariable("TWITCH_CLIENT_SECRET");
+        var serverToken = Environment.GetEnvironmentVariable("TWITCH_ACCESS_TOKEN");
+
+        return new
+        {
+            enabled = Enabled,
+            mode = Mode.ToString(),
+            cacheTtlSeconds = CacheTtlSeconds,
+            liveCheckIntervalSeconds = LiveCheckIntervalSeconds,
+            twitchConfigured = !string.IsNullOrWhiteSpace(clientId)
+                && (!string.IsNullOrWhiteSpace(clientSecret) || !string.IsNullOrWhiteSpace(serverToken)),
+            twitchOAuthConfigured = !string.IsNullOrWhiteSpace(clientId)
+                && !string.IsNullOrWhiteSpace(clientSecret),
+            oauth = new
+            {
+                twitchAuthorize = "/api/v1/social/oauth/twitch/authorize",
+                twitchCallback = "/api/v1/social/oauth/twitch/callback",
+                scopes = TwitchOAuthService.DefaultScopes,
+            },
+            storePath = NlSocialPaths.Root,
+            mockDataPath = NlSocialPaths.MockData,
+            socialLinkPath = "/social-link.html",
+        };
+    }
 }
 
 public sealed class NlSocialHost
@@ -87,6 +107,10 @@ public sealed class NlSocialHost
 
         StreamerStore = new JsonStreamerSocialStore();
         LinkStore = new JsonSpSocialLinkStore();
+        OAuthStates = new JsonSocialOAuthStateStore();
+        TwitchCredentials = new JsonTwitchOAuthCredentialStore();
+        TwitchTokenService = new TwitchOAuthTokenService(TwitchCredentials);
+        TwitchOAuth = new TwitchOAuthService(OAuthStates, TwitchCredentials, LinkStore);
         Cache = new SocialStatusCache(TimeSpan.FromSeconds(settings.CacheTtlSeconds));
 
         var mock = new MockSocialRelationshipProvider();
@@ -95,7 +119,7 @@ public sealed class NlSocialHost
         ISocialRelationshipProvider provider = settings.Mode switch
         {
             NlSocialMode.Off => new OffSocialRelationshipProvider(),
-            NlSocialMode.Live => new TwitchHelixSocialProvider(mock),
+            NlSocialMode.Live => new TwitchHelixSocialProvider(mock, TwitchTokenService),
             _ => mock,
         };
 
@@ -117,6 +141,14 @@ public sealed class NlSocialHost
     public JsonStreamerSocialStore StreamerStore { get; }
 
     public JsonSpSocialLinkStore LinkStore { get; }
+
+    public JsonSocialOAuthStateStore OAuthStates { get; }
+
+    public JsonTwitchOAuthCredentialStore TwitchCredentials { get; }
+
+    public TwitchOAuthTokenService TwitchTokenService { get; }
+
+    public TwitchOAuthService TwitchOAuth { get; }
 
     public SocialStatusCache Cache { get; }
 

@@ -44,7 +44,9 @@ Admit request → SocialGateService (live API / mock)
 | `NL_SOCIAL_CACHE_TTL_SEC` | `300` | Relationship/live cache TTL |
 | `NL_LIVE_CHECK_INTERVAL_SEC` | `60` | Poll interval for auto-stop |
 | `TWITCH_CLIENT_ID` | — | Required for `live` mode Twitch checks |
-| `TWITCH_ACCESS_TOKEN` | — | Broadcaster/mod token with follow/sub scopes |
+| `TWITCH_CLIENT_SECRET` | — | Required for Twitch OAuth player linking |
+| `TWITCH_ACCESS_TOKEN` | — | Optional legacy server token when players have not OAuth-linked |
+| `NL_PUBLIC_BASE_URL` | request host | OAuth callback base (must match Twitch app redirect URI) |
 
 ## REST API
 
@@ -90,14 +92,39 @@ Offenses remain in storage forever but only count toward join eligibility for **
 (`SpOffense.ActiveWindow`). The moderation API returns `activeOffenses` and
 `archivedOffenses` separately; the web console shows both with an Active/Archived column.
 
-## OAuth note
+## Twitch OAuth (Phase M.1)
 
-Full Twitch/YouTube/Kick **browser OAuth** flows are deferred (same pattern as Phase L Steam
-OpenID). Production deployments can supply refresh tokens via `/api/v1/social/link` or env
-tokens for Helix until OAuth UI ships.
+Players link their own Twitch account via browser OAuth — no manual id entry required.
+
+1. Open **`/social-link.html`**
+2. Enter **player id** (NL SP profile id)
+3. Click **Sign in with Twitch**
+4. On callback, Twitch user id + encrypted refresh token are stored; follow/sub checks use the player's token at admit
+
+### OAuth routes
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/v1/social/oauth/twitch/authorize?playerId=…&returnUrl=…` | Start Twitch OAuth redirect |
+| GET | `/api/v1/social/oauth/twitch/callback` | Exchange code, link account, redirect |
+| GET | `/api/v1/social/twitch-oauth/{playerId}` | Read linked Twitch profile (no tokens) |
+
+Configure Twitch developer app redirect URI:
+
+`{NL_PUBLIC_BASE_URL}/api/v1/social/oauth/twitch/callback`
+
+See [`samples/social/twitch-oauth.env.example`](../samples/social/twitch-oauth.env.example).
+
+```powershell
+powershell -File scripts/nl-social-twitch-oauth-validate.ps1
+```
+
+Expected: **`TWITCH OAUTH VALIDATION PASSED`**
 
 ## Smoke test
 
 ```powershell
 ./scripts/nl-social-smoke.ps1
 ```
+
+## Native invite blocking
