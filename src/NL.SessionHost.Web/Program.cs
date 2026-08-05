@@ -1047,6 +1047,50 @@ app.MapPost("/api/v1/launch-ops/backup/run", (
     return Results.Json(new { snapshotDir, backupRoot });
 });
 
+app.MapGet("/api/v1/production-cutover/settings", (NlFleetHost fleet) =>
+    Results.Json(fleet.ProductionCutoverSettings.ToPublicInfo()));
+
+app.MapGet("/api/v1/production-cutover/status", (
+    NlFleetHost fleet,
+    NlIdentitySettings identity,
+    NlHardeningSettings hardening) =>
+    Results.Json(new ProductionCutoverStatus(
+        fleet.ProductionCutoverSettings.Enabled,
+        fleet.ProductionCutoverSettings.DevMode,
+        !fleet.LiveProductionSettings.DevMode,
+        !fleet.LaunchOpsSettings.DevMode,
+        !fleet.GaSettings.AllowMockIdentity,
+        fleet.GaSettings.RequireProductionReady,
+        fleet.GaSettings.RequireLiveIdentity,
+        identity.PublicBaseUrl ?? Environment.GetEnvironmentVariable("NL_PUBLIC_BASE_URL"),
+        hardening.Enabled,
+        DateTimeOffset.UtcNow)));
+
+app.MapGet("/api/v1/production-cutover/validation", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening) =>
+    Results.Json(BuildProductionCutoverValidationReport(
+        fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, null)));
+
+app.MapPost("/api/v1/production-cutover/validation/run", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    ProductionCutoverValidationRunRequest? body) =>
+    Results.Json(BuildProductionCutoverValidationReport(
+        fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, body)));
+
 app.MapPost("/api/v1/fleet/compliance/export/{playerId}", (NlFleetHost fleet, ModerationHostState mod, string playerId) =>
 {
     try
@@ -1943,6 +1987,85 @@ static LaunchOpsValidationReport BuildLaunchOpsValidationReport(
         body?.AlertingTestPassed ?? false);
 }
 
+static ProductionCutoverValidationReport BuildProductionCutoverValidationReport(
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    ProductionCutoverValidationRunRequest? body)
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    var productionReport = fleet.Validation.Evaluate(
+        fleet.Settings,
+        orchestrator.Settings.Mode.ToString(),
+        snap,
+        fleet.Metrics,
+        fleet.Incidents,
+        fleet.ValidationStore.GetLast()?.LastLoadTest);
+
+    var liveReport = BuildLiveProductionValidationReport(
+        fleet, orchestrator, bus, identity, security, catalog);
+
+    var launchBody = body?.LaunchOps ?? new LaunchOpsValidationRunRequest
+    {
+        LegalPagesVerified = body?.LegalPagesVerified ?? false,
+        HostBackupVerified = body?.HostBackupVerified ?? false,
+        AlertingTestPassed = body?.AlertingTestPassed ?? false,
+        MultiGame = body?.MultiGame,
+    };
+    if (launchBody.MultiGame is null && body?.MultiGame is not null)
+    {
+        launchBody.MultiGame = body.MultiGame;
+    }
+
+    var multiReport = BuildMultiGameValidationReport(
+        fleet,
+        orchestrator,
+        bus,
+        identity,
+        security,
+        catalog,
+        partnership,
+        body?.MultiGame);
+
+    var launchReport = BuildLaunchOpsValidationReport(
+        fleet,
+        orchestrator,
+        bus,
+        identity,
+        security,
+        catalog,
+        partnership,
+        hardening,
+        launchBody);
+
+    return fleet.ProductionCutoverValidation.Evaluate(
+        fleet.ProductionCutoverSettings,
+        fleet.LiveProductionSettings,
+        fleet.LaunchOpsSettings,
+        fleet.GaSettings,
+        fleet.BetaSettings,
+        !string.IsNullOrEmpty(security.OperatorKey),
+        security.PublicMode,
+        identity.Mode.ToString(),
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY")),
+        hardening.Enabled,
+        productionReport.ProductionReady,
+        identity.PublicBaseUrl ?? Environment.GetEnvironmentVariable("NL_PUBLIC_BASE_URL"),
+        fleet.Settings.Relay.RelayWebSocketTemplate,
+        fleet.Settings.Relay.TurnUri,
+        liveReport.LiveProductionPassed,
+        multiReport.MultiGamePassed,
+        launchReport.LaunchOpsPassed,
+        body?.PublicHttpsVerified ?? false);
+}
+
 static string ResolveIdentityPublicBase(HttpContext ctx, NlIdentitySettings settings)
 {
     if (!string.IsNullOrWhiteSpace(settings.PublicBaseUrl))
@@ -2188,4 +2311,14 @@ internal sealed class LaunchOpsValidationRunRequest
     public bool LegalPagesVerified { get; set; }
     public bool AlertingTestPassed { get; set; }
     public MultiGameValidationRunRequest? MultiGame { get; set; }
+}
+
+internal sealed class ProductionCutoverValidationRunRequest
+{
+    public bool PublicHttpsVerified { get; set; }
+    public bool LegalPagesVerified { get; set; }
+    public bool HostBackupVerified { get; set; }
+    public bool AlertingTestPassed { get; set; }
+    public MultiGameValidationRunRequest? MultiGame { get; set; }
+    public LaunchOpsValidationRunRequest? LaunchOps { get; set; }
 }

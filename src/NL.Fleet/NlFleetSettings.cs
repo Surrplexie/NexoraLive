@@ -117,6 +117,8 @@ public sealed class NlFleetHost
         LaunchBackup = new LaunchBackupService();
         LaunchAlerting = new LaunchAlertingService();
         LaunchOpsValidation = new LaunchOpsValidationService();
+        ProductionCutoverSettings = NlProductionCutoverSettings.LoadFromEnvironment();
+        ProductionCutoverValidation = new ProductionCutoverValidationService();
     }
 
     public NlFleetSettings Settings { get; }
@@ -182,4 +184,8 @@ public sealed class NlFleetHost
     public LaunchAlertingService LaunchAlerting { get; }
 
     public LaunchOpsValidationService LaunchOpsValidation { get; }
+
+    public NlProductionCutoverSettings ProductionCutoverSettings { get; }
+
+    public ProductionCutoverValidationService ProductionCutoverValidation { get; }
 }

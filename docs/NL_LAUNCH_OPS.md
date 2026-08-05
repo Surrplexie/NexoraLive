@@ -75,4 +75,4 @@ powershell -File scripts/nl-launch-ops-validate.ps1 -OperatorKey "<from launch-o
 - [x] Ops UI + runbook
 - [ ] Production webhook + scheduled backups on VPS
 
-See also: [NL_LAUNCH_OPS_RUNBOOK.md](NL_LAUNCH_OPS_RUNBOOK.md) · [NL_MULTI_GAME_PRODUCTION.md](NL_MULTI_GAME_PRODUCTION.md) · [NL_HARDENING.md](NL_HARDENING.md)
+Next: **Phase 10** — production VPS cutover ([NL_PRODUCTION_CUTOVER.md](NL_PRODUCTION_CUTOVER.md))
