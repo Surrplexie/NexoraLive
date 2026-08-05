@@ -943,6 +943,110 @@ app.MapPost("/api/v1/multigame/validation/run", (
     MultiGameValidationRunRequest? body) =>
     Results.Json(BuildMultiGameValidationReport(fleet, orchestrator, bus, identity, security, catalog, partnership, body)));
 
+app.MapGet("/api/v1/launch-ops/settings", (NlFleetHost fleet) =>
+    Results.Json(fleet.LaunchOpsSettings.ToPublicInfo()));
+
+app.MapGet("/api/v1/launch-ops/status", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    NlIdentitySettings identity,
+    NlForkCatalogHost catalog,
+    NlHardeningSettings hardening) =>
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var recentIncidents = fleet.Incidents.ListRecent(100)
+        .Count(i => i.DetectedAtUtc >= DateTimeOffset.UtcNow.AddHours(-24));
+    var snapshot = fleet.LaunchStatus.BuildSnapshot(
+        sessionHealthy: true,
+        orchestrator.Settings.Enabled,
+        activeForks,
+        identity.Enabled,
+        identity.Mode.ToString(),
+        catalog.Settings.Enabled,
+        fleet.GaSettings.Enabled,
+        hardening.Enabled,
+        recentIncidents);
+    return Results.Json(snapshot);
+});
+
+app.MapGet("/api/v1/launch-ops/health-summary", (
+    NlFleetHost fleet,
+    NlIdentitySettings identity,
+    NlHardeningSettings hardening) =>
+    Results.Json(new LaunchOpsStatus(
+        fleet.LaunchOpsSettings.Enabled,
+        fleet.LaunchOpsSettings.DevMode,
+        fleet.LaunchOpsSettings.StatusPageEnabled,
+        hardening.Enabled,
+        fleet.MultiGameSettings.Enabled,
+        fleet.LaunchAlerting.IsConfigured(fleet.LaunchOpsSettings),
+        fleet.LaunchOpsSettings.LegalVersion,
+        fleet.LaunchOpsSettings.BackupRoot,
+        DateTimeOffset.UtcNow)));
+
+app.MapGet("/api/v1/launch-ops/validation", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening) =>
+    Results.Json(BuildLaunchOpsValidationReport(fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, null)));
+
+app.MapPost("/api/v1/launch-ops/validation/run", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    LaunchOpsValidationRunRequest? body) =>
+    Results.Json(BuildLaunchOpsValidationReport(fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, body)));
+
+app.MapPost("/api/v1/launch-ops/alert/test", async (
+    NlFleetHost fleet,
+    NlSecuritySettings security,
+    HttpContext ctx,
+    CancellationToken ct) =>
+{
+    if (!NlOperatorAuth.IsAuthorized(security, ctx.Request.Headers[NlOperatorAuth.HeaderName], ctx.Request.Headers.Authorization))
+    {
+        return Results.Unauthorized();
+    }
+
+    var ok = await fleet.LaunchAlerting.SendTestAlertAsync(fleet.LaunchOpsSettings, ct);
+    return ok
+        ? Results.Json(new { sent = true })
+        : Results.BadRequest(new { error = "Alert webhook not configured or delivery failed." });
+});
+
+app.MapPost("/api/v1/launch-ops/backup/run", (
+    NlFleetHost fleet,
+    NlSecuritySettings security,
+    HttpContext ctx) =>
+{
+    if (!NlOperatorAuth.IsAuthorized(security, ctx.Request.Headers[NlOperatorAuth.HeaderName], ctx.Request.Headers.Authorization))
+    {
+        return Results.Unauthorized();
+    }
+
+    var dataRoot = NL.Core.NlPaths.Root;
+    var paths = new List<string> { "fleet" };
+    var partnership = Path.Combine(dataRoot, "partnership");
+    if (Directory.Exists(partnership))
+    {
+        paths.Add("partnership");
+    }
+
+    var backupRoot = fleet.LaunchOpsSettings.BackupRoot ?? Path.Combine(dataRoot, "backups");
+    var snapshotDir = fleet.LaunchBackup.WriteManifest(backupRoot, dataRoot, paths);
+    return Results.Json(new { snapshotDir, backupRoot });
+});
+
 app.MapPost("/api/v1/fleet/compliance/export/{playerId}", (NlFleetHost fleet, ModerationHostState mod, string playerId) =>
 {
     try
@@ -1795,6 +1899,50 @@ static MultiGameValidationReport BuildMultiGameValidationReport(
         body?.VerifiedGameIds);
 }
 
+static LaunchOpsValidationReport BuildLaunchOpsValidationReport(
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    LaunchOpsValidationRunRequest? body)
+{
+    var multiReport = BuildMultiGameValidationReport(
+        fleet,
+        orchestrator,
+        bus,
+        identity,
+        security,
+        catalog,
+        partnership,
+        body?.MultiGame is null
+            ? null
+            : new MultiGameValidationRunRequest
+            {
+                HostImagesVerified = body.MultiGame.HostImagesVerified,
+                VerifiedGameIds = body.MultiGame.VerifiedGameIds,
+            });
+
+    var backup = fleet.LaunchBackup.Evaluate(
+        fleet.LaunchOpsSettings,
+        body?.HostBackupVerified ?? false);
+
+    return fleet.LaunchOpsValidation.Evaluate(
+        fleet.LaunchOpsSettings,
+        fleet.MultiGameSettings,
+        multiReport.MultiGamePassed,
+        hardening.Enabled,
+        fleet.Settings.Abuse,
+        fleet.Compliance.RetentionPolicy,
+        backup,
+        body?.LegalPagesVerified ?? false,
+        fleet.LaunchAlerting.IsConfigured(fleet.LaunchOpsSettings),
+        body?.AlertingTestPassed ?? false);
+}
+
 static string ResolveIdentityPublicBase(HttpContext ctx, NlIdentitySettings settings)
 {
     if (!string.IsNullOrWhiteSpace(settings.PublicBaseUrl))
@@ -2032,4 +2180,12 @@ internal sealed class MultiGameValidationRunRequest
 {
     public bool HostImagesVerified { get; set; }
     public IReadOnlyList<string>? VerifiedGameIds { get; set; }
+}
+
+internal sealed class LaunchOpsValidationRunRequest
+{
+    public bool HostBackupVerified { get; set; }
+    public bool LegalPagesVerified { get; set; }
+    public bool AlertingTestPassed { get; set; }
+    public MultiGameValidationRunRequest? MultiGame { get; set; }
 }

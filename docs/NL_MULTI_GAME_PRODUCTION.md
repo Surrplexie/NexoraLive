@@ -89,4 +89,4 @@ powershell -File scripts/nl-multi-game-validate.ps1 -OperatorKey "<from multi-ga
 
 Next: **Phase 9** — launch ops & trust (alerting, status page, legal, abuse hardening, backups).
 
-See also: [NL_MULTI_GAME_RUNBOOK.md](NL_MULTI_GAME_RUNBOOK.md) · [NL_LIVE_PRODUCTION.md](NL_LIVE_PRODUCTION.md) · [NL_FORK_GAME_IMAGES.md](NL_FORK_GAME_IMAGES.md)
+See [NL_LAUNCH_OPS.md](NL_LAUNCH_OPS.md)

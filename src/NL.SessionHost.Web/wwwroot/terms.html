@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Terms of Service — NexoraLive</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Terms of Service</h1>
+    <p class="sub">Version <span id="legal-version">2026-08-01</span> · <a href="/privacy.html">Privacy Policy</a> · <a href="/status.html">Status</a></p>
+  </header>
+
+  <section class="card">
+    <h2>1. Service</h2>
+    <p>NexoraLive ("NL") provides hosted session infrastructure for streamers and spectators. Games may be offered under Official, Platform, or At-Own-Risk partnership tiers as described in the fork catalog.</p>
+
+    <h2>2. Eligibility</h2>
+    <p>You must comply with applicable game EULAs, platform terms, and local law. At-own-risk titles require explicit acknowledgment before join.</p>
+
+    <h2>3. Acceptable use</h2>
+    <p>Do not abuse fork provisioning, circumvent rate limits, harass users, or use the service for unlawful content. NL may throttle, suspend, or terminate access for abuse.</p>
+
+    <h2>4. Data &amp; progress</h2>
+    <p>Unless a partnered title explicitly allows it, game progress is not transferred between NL forks and official game servers. See the Privacy Policy for retention and GDPR rights.</p>
+
+    <h2>5. Availability</h2>
+    <p>Service levels are published on the <a href="/status.html">status page</a>. NL does not guarantee uninterrupted availability during beta or early GA periods.</p>
+
+    <h2>6. Contact</h2>
+    <p>Operators: use the launch-ops console. Players and streamers: contact your streamer's support channel or NL operator email configured for your deployment.</p>
+  </section>
+
+  <script>
+    fetch('/api/v1/launch-ops/settings').then(function (r) { return r.json(); }).then(function (s) {
+      if (s.legal && s.legal.version) document.getElementById('legal-version').textContent = s.legal.version;
+    }).catch(function () {});
+  </script>
+</body>
+</html>

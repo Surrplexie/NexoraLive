@@ -112,6 +112,11 @@ public sealed class NlFleetHost
         MultiGameSettings = NlMultiGameProductionSettings.LoadFromEnvironment();
         MultiGameCatalog = new MultiGameCatalogService();
         MultiGameValidation = new MultiGameValidationService();
+        LaunchOpsSettings = NlLaunchOpsSettings.LoadFromEnvironment();
+        LaunchStatus = new LaunchStatusService();
+        LaunchBackup = new LaunchBackupService();
+        LaunchAlerting = new LaunchAlertingService();
+        LaunchOpsValidation = new LaunchOpsValidationService();
     }
 
     public NlFleetSettings Settings { get; }
@@ -167,4 +172,14 @@ public sealed class NlFleetHost
     public MultiGameCatalogService MultiGameCatalog { get; }
 
     public MultiGameValidationService MultiGameValidation { get; }
+
+    public NlLaunchOpsSettings LaunchOpsSettings { get; }
+
+    public LaunchStatusService LaunchStatus { get; }
+
+    public LaunchBackupService LaunchBackup { get; }
+
+    public LaunchAlertingService LaunchAlerting { get; }
+
+    public LaunchOpsValidationService LaunchOpsValidation { get; }
 }
