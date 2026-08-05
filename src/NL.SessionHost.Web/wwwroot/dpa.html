@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Data Processing Addendum — NexoraLive</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Data Processing Addendum (DPA)</h1>
+    <p class="sub">Version <span id="legal-version">2026-08-01</span> · <a href="/privacy.html">Privacy Policy</a></p>
+  </header>
+
+  <section class="card">
+    <h2>Scope</h2>
+    <p>This DPA applies when NexoraLive processes personal data on behalf of streamers and players under the hosted fleet program.</p>
+
+    <h2>Processing activities</h2>
+    <ul>
+      <li>Steam/platform identity verification</li>
+      <li>Session and moderation logging</li>
+      <li>Streamer registration contact details</li>
+      <li>GDPR export and delete on operator request</li>
+    </ul>
+
+    <h2>Retention</h2>
+    <p>Moderation and compliance records are retained for at least 730 days unless a shorter period is required by law.</p>
+
+    <h2>Subprocessors</h2>
+    <p>See the <a href="/subprocessors.html">subprocessor list</a> for third parties engaged in processing.</p>
+  </section>
+
+  <script>
+    fetch('/api/v1/legal-compliance/manifest').then(function (r) { return r.json(); }).then(function (m) {
+      if (m.legalVersion) document.getElementById('legal-version').textContent = m.legalVersion;
+    }).catch(function () {});
+  </script>
+  <script src="legal-consent.js"></script>
+</body>
+</html>

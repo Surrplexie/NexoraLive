@@ -71,6 +71,6 @@ powershell -File scripts/nl-scale-reliability-validate.ps1 -OperatorKey "<key>"
 - [x] Ops UI + runbook
 - [ ] Multi-region VPS fleet (operator deploy)
 
-Next: **Phase 13** — legal & compliance hardening for public GA.
+Next: **Phase 13** — legal & compliance hardening ([NL_LEGAL_COMPLIANCE.md](NL_LEGAL_COMPLIANCE.md))
 
 See also: [NL_SCALE_RELIABILITY_RUNBOOK.md](NL_SCALE_RELIABILITY_RUNBOOK.md) · [NL_DISTRIBUTION.md](NL_DISTRIBUTION.md)

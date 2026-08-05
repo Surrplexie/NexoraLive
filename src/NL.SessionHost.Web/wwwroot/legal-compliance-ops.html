@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NL Legal Compliance Ops</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="operator-page">
+  <header>
+    <h1>Legal & Compliance Operations</h1>
+    <p class="sub">Phase 13 — legal center, GDPR, audit log — see <code>docs/NL_LEGAL_COMPLIANCE.md</code></p>
+    <nav class="nav">
+      <a href="/legal-center.html">Legal center</a>
+      <a href="/scale-reliability-ops.html">Scale ops</a>
+      <a href="/legal-compliance-ops.html" aria-current="page">Compliance ops</a>
+    </nav>
+  </header>
+
+  <section class="card operator-panel">
+    <h2>Operator key</h2>
+    <label>NL_OPERATOR_KEY <input id="operator-key" type="password" autocomplete="off" /></label>
+    <button type="button" id="save-key">Save key</button>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Compliance status</h2>
+    <pre id="status-block">Loading...</pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Legal manifest</h2>
+    <pre id="manifest-block">Loading...</pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Recent audit log</h2>
+    <pre id="audit-block">Loading...</pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Legal compliance validation</h2>
+    <p id="validation-summary"></p>
+    <label><input type="checkbox" id="gdpr-verified" /> GDPR export smoke passed</label>
+    <label><input type="checkbox" id="terms-verified" /> Streamer terms acceptance verified</label>
+    <button type="button" id="run-validation">Run legal compliance validation</button>
+    <pre id="validation-checks"></pre>
+  </section>
+
+  <script src="nl-auth.js"></script>
+  <script src="legal-compliance-ops-app.js"></script>
+</body>
+</html>

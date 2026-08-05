@@ -124,6 +124,10 @@ public sealed class NlFleetHost
         DistributionValidation = new DistributionValidationService();
         ScaleReliabilitySettings = NlScaleReliabilitySettings.LoadFromEnvironment();
         ScaleReliabilityValidation = new ScaleReliabilityValidationService();
+        LegalComplianceSettings = NlLegalComplianceSettings.LoadFromEnvironment();
+        LegalComplianceManifest = new LegalComplianceManifestService();
+        LegalComplianceAudit = new JsonLegalComplianceAuditStore();
+        LegalComplianceValidation = new LegalComplianceValidationService();
     }
 
     public NlFleetSettings Settings { get; }
@@ -203,4 +207,12 @@ public sealed class NlFleetHost
     public NlScaleReliabilitySettings ScaleReliabilitySettings { get; }
 
     public ScaleReliabilityValidationService ScaleReliabilityValidation { get; }
+
+    public NlLegalComplianceSettings LegalComplianceSettings { get; }
+
+    public LegalComplianceManifestService LegalComplianceManifest { get; }
+
+    public JsonLegalComplianceAuditStore LegalComplianceAudit { get; }
+
+    public LegalComplianceValidationService LegalComplianceValidation { get; }
 }

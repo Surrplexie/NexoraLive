@@ -46,6 +46,7 @@ document.getElementById('signup-form').onsubmit = async function (ev) {
         contact: document.getElementById('contact').value,
         twitchHandle: document.getElementById('twitch').value || null,
         preferredGameId: document.getElementById('game').value || null,
+        termsAccepted: document.getElementById('terms-accepted').checked,
       }),
     });
     result.textContent = 'Registered! Streamer ID: ' + entry.streamerId + ' — use this on /operator.html to go live.';

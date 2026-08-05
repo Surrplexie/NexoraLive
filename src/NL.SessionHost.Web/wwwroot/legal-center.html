@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Legal Center — NexoraLive</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Legal Center</h1>
+    <p class="sub">Version <span id="legal-version">2026-08-01</span> · Public GA compliance documents</p>
+    <nav class="nav">
+      <a href="/play.html">Play</a>
+      <a href="/legal-center.html" aria-current="page">Legal</a>
+      <a href="/status.html">Status</a>
+    </nav>
+  </header>
+
+  <section class="card">
+    <h2>Documents</h2>
+    <ul id="doc-list">
+      <li><a href="/terms.html">Terms of Service</a></li>
+      <li><a href="/privacy.html">Privacy Policy</a></li>
+      <li><a href="/cookie-policy.html">Cookie Policy</a></li>
+      <li><a href="/subprocessors.html">Subprocessors</a></li>
+      <li><a href="/dpa.html">Data Processing Addendum (DPA)</a></li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Your rights</h2>
+    <p>Players may request data export or deletion through the operator. Streamers must accept current terms at signup when legal compliance is enabled.</p>
+    <p>Minimum age: <strong id="min-age">13</strong>+</p>
+  </section>
+
+  <script>
+    fetch('/api/v1/legal-compliance/manifest').then(function (r) { return r.json(); }).then(function (m) {
+      if (m.legalVersion) document.getElementById('legal-version').textContent = m.legalVersion;
+      if (m.minimumAgeYears) document.getElementById('min-age').textContent = m.minimumAgeYears;
+    }).catch(function () {});
+  </script>
+  <script src="legal-consent.js"></script>
+</body>
+</html>

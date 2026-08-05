@@ -32,6 +32,8 @@ public static class NlFleetPaths
 
     public static string LoadTestReport => Path.Combine(Root, "load-test-last.json");
 
+    public static string LegalComplianceAudit => Path.Combine(Root, "legal-compliance-audit.json");
+
     public static void EnsureRoot()
     {
         Directory.CreateDirectory(Root);

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cookie Policy — NexoraLive</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Cookie Policy</h1>
+    <p class="sub">Version <span id="legal-version">2026-08-01</span> · <a href="/legal-center.html">Legal Center</a></p>
+  </header>
+
+  <section class="card">
+    <h2>What we use</h2>
+    <p>NexoraLive uses essential cookies and local storage for operator authentication, cookie consent preferences, and session continuity. We do not use third-party advertising cookies on the hosted fleet console.</p>
+
+    <h2>Consent</h2>
+    <p>The public landing pages display a cookie consent banner (<code id="banner-id">nl-cookie-consent</code>). You may dismiss the banner to store your preference in local storage.</p>
+
+    <h2>Updates</h2>
+    <p>Material changes increment the legal version on the launch-ops and legal-compliance APIs.</p>
+  </section>
+
+  <script>
+    fetch('/api/v1/legal-compliance/manifest').then(function (r) { return r.json(); }).then(function (m) {
+      if (m.legalVersion) document.getElementById('legal-version').textContent = m.legalVersion;
+      if (m.cookieConsentBannerId) document.getElementById('banner-id').textContent = m.cookieConsentBannerId;
+    }).catch(function () {});
+  </script>
+  <script src="legal-consent.js"></script>
+</body>
+</html>

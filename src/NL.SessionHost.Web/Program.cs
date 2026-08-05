@@ -787,12 +787,24 @@ app.MapPost("/api/v1/ga/streamers/register", (NlFleetHost fleet, GaStreamerRegis
 {
     try
     {
+        if (fleet.LegalComplianceSettings.Enabled
+            && fleet.LegalComplianceSettings.RequireStreamerTerms
+            && body.TermsAccepted != true)
+        {
+            return Results.BadRequest(new { error = "termsAccepted required for GA signup." });
+        }
+
         var entry = fleet.Ga.Register(
             body.DisplayName ?? "",
             body.Contact ?? "",
             body.TwitchHandle,
             body.PreferredGameId,
             body.StreamerId);
+        if (fleet.LegalComplianceSettings.Enabled && body.TermsAccepted == true)
+        {
+            fleet.LegalComplianceAudit.Record("streamer_terms_accepted", entry.StreamerId, fleet.LaunchOpsSettings.LegalVersion);
+        }
+
         return Results.Json(entry);
     }
     catch (Exception ex)
@@ -1221,12 +1233,78 @@ app.MapPost("/api/v1/scale-reliability/validation/run", (
     Results.Json(BuildScaleReliabilityValidationReport(
         fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, env, body)));
 
+app.MapGet("/api/v1/legal-compliance/settings", (NlFleetHost fleet) =>
+    Results.Json(fleet.LegalComplianceSettings.ToPublicInfo()));
+
+app.MapGet("/api/v1/legal-compliance/status", (NlFleetHost fleet) =>
+{
+    var manifest = fleet.LegalComplianceManifest.Build(fleet.LegalComplianceSettings, fleet.LaunchOpsSettings);
+    var auditCount = fleet.LegalComplianceAudit.ListRecent(500).Count;
+    return Results.Json(new LegalComplianceStatus(
+        fleet.LegalComplianceSettings.Enabled,
+        fleet.LegalComplianceSettings.DevMode,
+        manifest.LegalVersion,
+        manifest.Documents.Count,
+        manifest.Subprocessors.Count,
+        auditCount,
+        fleet.ScaleReliabilitySettings.Enabled,
+        DateTimeOffset.UtcNow));
+});
+
+app.MapGet("/api/v1/legal-compliance/manifest", (NlFleetHost fleet) =>
+    Results.Json(fleet.LegalComplianceManifest.Build(fleet.LegalComplianceSettings, fleet.LaunchOpsSettings)));
+
+app.MapGet("/api/v1/legal-compliance/onboarding", (NlFleetHost fleet) =>
+    Results.Json(fleet.LegalComplianceManifest.BuildOnboardingPaths()));
+
+app.MapGet("/api/v1/legal-compliance/audit/recent", (NlFleetHost fleet, HttpContext ctx) =>
+{
+    if (!NlWebSecurityExtensions.IsAuthorized(ctx))
+    {
+        return Results.Unauthorized();
+    }
+
+    return Results.Json(fleet.LegalComplianceAudit.ListRecent(50));
+});
+
+app.MapGet("/api/v1/legal-compliance/validation", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env) =>
+    Results.Json(BuildLegalComplianceValidationReport(
+        fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, env, null)));
+
+app.MapPost("/api/v1/legal-compliance/validation/run", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env,
+    LegalComplianceValidationRunRequest? body) =>
+    Results.Json(BuildLegalComplianceValidationReport(
+        fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, env, body)));
+
 app.MapPost("/api/v1/fleet/compliance/export/{playerId}", (NlFleetHost fleet, ModerationHostState mod, string playerId) =>
 {
     try
     {
         var profile = mod.Moderation.GetOrCreateProfile(playerId.Trim(), playerId.Trim());
         var export = fleet.Compliance.ExportSpProfile(playerId.Trim(), new { profile.Id, profile.DisplayName });
+        if (fleet.LegalComplianceSettings.Enabled)
+        {
+            fleet.LegalComplianceAudit.Record("gdpr_export", playerId.Trim());
+        }
+
         return Results.Json(new { export.PlayerId, export.ExportedAtUtc, path = NlFleetPaths.ComplianceExports });
     }
     catch (InvalidOperationException ex)
@@ -1240,6 +1318,11 @@ app.MapDelete("/api/v1/fleet/compliance/sp/{playerId}", (NlFleetHost fleet, stri
     try
     {
         fleet.Compliance.DeleteSpProfile(NlPaths.SpProfiles, playerId.Trim());
+        if (fleet.LegalComplianceSettings.Enabled)
+        {
+            fleet.LegalComplianceAudit.Record("gdpr_delete", playerId.Trim());
+        }
+
         return Results.Ok(new { deleted = playerId.Trim() });
     }
     catch (InvalidOperationException ex)
@@ -2282,6 +2365,48 @@ static ScaleReliabilityValidationReport BuildScaleReliabilityValidationReport(
         body?.VerifiedRegionIds is { Count: > 0 } ids ? ids : Array.Empty<string>());
 }
 
+static LegalComplianceValidationReport BuildLegalComplianceValidationReport(
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env,
+    LegalComplianceValidationRunRequest? body)
+{
+    var manifest = fleet.LegalComplianceManifest.Build(fleet.LegalComplianceSettings, fleet.LaunchOpsSettings);
+    var onboarding = fleet.LegalComplianceManifest.BuildOnboardingPaths();
+    var auditCount = fleet.LegalComplianceAudit.ListRecent(500).Count;
+
+    var scaleReport = BuildScaleReliabilityValidationReport(
+        fleet,
+        orchestrator,
+        bus,
+        identity,
+        security,
+        catalog,
+        partnership,
+        hardening,
+        env,
+        body?.ScaleReliability);
+
+    return fleet.LegalComplianceValidation.Evaluate(
+        fleet.LegalComplianceSettings,
+        fleet.LaunchOpsSettings,
+        fleet.ScaleReliabilitySettings,
+        fleet.Settings.Retention,
+        partnership.Settings.Enabled,
+        onboarding,
+        manifest,
+        auditCount,
+        scaleReport.ScaleReliabilityPassed,
+        body?.GdprExportVerified ?? false,
+        body?.StreamerTermsVerified ?? false);
+}
+
 static string ResolveIdentityPublicBase(HttpContext ctx, NlIdentitySettings settings)
 {
     if (!string.IsNullOrWhiteSpace(settings.PublicBaseUrl))
@@ -2513,6 +2638,7 @@ internal sealed class GaStreamerRegisterRequest
     public string? TwitchHandle { get; set; }
     public string? PreferredGameId { get; set; }
     public string? StreamerId { get; set; }
+    public bool? TermsAccepted { get; set; }
 }
 
 internal sealed class MultiGameValidationRunRequest
@@ -2553,4 +2679,11 @@ internal sealed class ScaleReliabilityValidationRunRequest
     public bool MultiRegionVerified { get; set; }
     public List<string>? VerifiedRegionIds { get; set; }
     public DistributionValidationRunRequest? Distribution { get; set; }
+}
+
+internal sealed class LegalComplianceValidationRunRequest
+{
+    public bool GdprExportVerified { get; set; }
+    public bool StreamerTermsVerified { get; set; }
+    public ScaleReliabilityValidationRunRequest? ScaleReliability { get; set; }
 }
