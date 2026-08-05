@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Play on NexoraLive</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="spectator-page">
+  <header class="hero">
+    <p class="eyebrow">NexoraLive — hosted play</p>
+    <h1>Join streamers. Rules enforced live.</h1>
+    <p class="lead">
+      Download the NL Client, link Steam, and join hosted fork sessions for
+      <strong>Minecraft</strong>, <strong>BeamNG</strong>, and more — with streamer-authored
+      <code>.nle</code> rules on every event.
+    </p>
+    <nav class="nav">
+      <a href="/play.html" aria-current="page">Play</a>
+      <a href="/download.html">Download client</a>
+      <a href="/nl-client.html">Play in browser</a>
+      <a href="/ga.html">Become a streamer</a>
+      <a href="/status.html">Status</a>
+    </nav>
+  </header>
+
+  <section class="stats-row">
+    <div class="stat"><span class="stat-label">Players</span><span class="stat-value"><a href="/download.html">Get NL Client</a></span></div>
+    <div class="stat"><span class="stat-label">Streamers</span><span class="stat-value"><a href="/ga.html">Open signup</a></span></div>
+    <div class="stat"><span class="stat-label">Games</span><span class="stat-value"><a href="/fork-catalog.html">Catalog</a></span></div>
+  </section>
+
+  <section class="card">
+    <h2>How to play</h2>
+    <ol class="how-list">
+      <li><a href="/download.html">Download NL Client</a> (Windows x64) or use the <a href="/nl-client.html">web client</a>.</li>
+      <li><a href="/identity-link.html">Link your Steam account</a> for ownership verification.</li>
+      <li>Pick a live streamer and join — acknowledge at-own-risk copy when required.</li>
+      <li>Launch the game with connect params from the manifest.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>Deep link</h2>
+    <p class="hint">Streamers share links like:</p>
+    <pre class="code-block" id="deeplink-example">nlclient://join?streamer=…&amp;game=hello-fork&amp;major=1.0</pre>
+  </section>
+
+  <script>
+    fetch('/api/v1/distribution/client-manifest').then(function (r) { return r.json(); }).then(function (m) {
+      if (m.deepLinkExample) document.getElementById('deeplink-example').textContent = m.deepLinkExample;
+    }).catch(function () {});
+  </script>
+</body>
+</html>

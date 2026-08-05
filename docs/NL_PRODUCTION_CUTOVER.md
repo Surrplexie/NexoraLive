@@ -71,6 +71,6 @@ On VPS set `NL_PRODUCTION_CUTOVER_DEV=false` — validation **requires** real HT
 - [x] Ops UI + runbook
 - [ ] Real VPS with domain + Let's Encrypt (operator deploy)
 
-Next: **Phase 11** — player & streamer distribution (installable NL Client, onboarding).
+Next: **Phase 11** — player & streamer distribution ([NL_DISTRIBUTION.md](NL_DISTRIBUTION.md))
 
-See also: [NL_PRODUCTION_CUTOVER_RUNBOOK.md](NL_PRODUCTION_CUTOVER_RUNBOOK.md) · [NL_LAUNCH_OPS.md](NL_LAUNCH_OPS.md)
+See also: [NL_PRODUCTION_CUTOVER_RUNBOOK.md](NL_PRODUCTION_CUTOVER_RUNBOOK.md) · [NL_LAUNCH_OPS.md](NL_LAUNCH_OPS.md) · [NL_DISTRIBUTION.md](NL_DISTRIBUTION.md)

@@ -1091,6 +1091,72 @@ app.MapPost("/api/v1/production-cutover/validation/run", (
     Results.Json(BuildProductionCutoverValidationReport(
         fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, body)));
 
+app.MapGet("/api/v1/distribution/settings", (NlFleetHost fleet) =>
+    Results.Json(fleet.DistributionSettings.ToPublicInfo()));
+
+app.MapGet("/api/v1/distribution/status", (
+    NlFleetHost fleet,
+    NlIdentitySettings identity,
+    IWebHostEnvironment env) =>
+{
+    var wwwroot = Path.Combine(env.ContentRootPath, "wwwroot");
+    var manifest = fleet.DistributionClient.Build(
+        fleet.DistributionSettings,
+        identity.PublicBaseUrl ?? Environment.GetEnvironmentVariable("NL_PUBLIC_BASE_URL"),
+        wwwroot);
+    var win = manifest.Releases.FirstOrDefault();
+    return Results.Json(new DistributionStatus(
+        fleet.DistributionSettings.Enabled,
+        fleet.DistributionSettings.DevMode,
+        fleet.GaSettings.OpenSignup,
+        fleet.DistributionSettings.ClientVersion,
+        identity.PublicBaseUrl ?? Environment.GetEnvironmentVariable("NL_PUBLIC_BASE_URL"),
+        win?.PackageAvailable ?? false,
+        DateTimeOffset.UtcNow));
+});
+
+app.MapGet("/api/v1/distribution/onboarding", (NlFleetHost fleet) =>
+    Results.Json(fleet.DistributionClient.BuildOnboardingPaths(fleet.GaSettings)));
+
+app.MapGet("/api/v1/distribution/client-manifest", (
+    NlFleetHost fleet,
+    NlIdentitySettings identity,
+    IWebHostEnvironment env) =>
+{
+    var wwwroot = Path.Combine(env.ContentRootPath, "wwwroot");
+    return Results.Json(fleet.DistributionClient.Build(
+        fleet.DistributionSettings,
+        identity.PublicBaseUrl ?? Environment.GetEnvironmentVariable("NL_PUBLIC_BASE_URL"),
+        wwwroot));
+});
+
+app.MapGet("/api/v1/distribution/validation", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env) =>
+    Results.Json(BuildDistributionValidationReport(
+        fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, env, null)));
+
+app.MapPost("/api/v1/distribution/validation/run", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env,
+    DistributionValidationRunRequest? body) =>
+    Results.Json(BuildDistributionValidationReport(
+        fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, env, body)));
+
 app.MapPost("/api/v1/fleet/compliance/export/{playerId}", (NlFleetHost fleet, ModerationHostState mod, string playerId) =>
 {
     try
@@ -2066,6 +2132,48 @@ static ProductionCutoverValidationReport BuildProductionCutoverValidationReport(
         body?.PublicHttpsVerified ?? false);
 }
 
+static DistributionValidationReport BuildDistributionValidationReport(
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env,
+    DistributionValidationRunRequest? body)
+{
+    var wwwroot = Path.Combine(env.ContentRootPath, "wwwroot");
+    var manifest = fleet.DistributionClient.Build(
+        fleet.DistributionSettings,
+        identity.PublicBaseUrl ?? Environment.GetEnvironmentVariable("NL_PUBLIC_BASE_URL"),
+        wwwroot);
+    var onboarding = fleet.DistributionClient.BuildOnboardingPaths(fleet.GaSettings);
+
+    var cutoverReport = BuildProductionCutoverValidationReport(
+        fleet,
+        orchestrator,
+        bus,
+        identity,
+        security,
+        catalog,
+        partnership,
+        hardening,
+        body?.ProductionCutover);
+
+    return fleet.DistributionValidation.Evaluate(
+        fleet.DistributionSettings,
+        fleet.ProductionCutoverSettings,
+        fleet.GaSettings,
+        onboarding,
+        manifest,
+        cutoverReport.ProductionCutoverPassed,
+        body?.HostClientPackageVerified ?? false,
+        body?.StreamerSignupVerified ?? false,
+        body?.PlayerJoinVerified ?? false);
+}
+
 static string ResolveIdentityPublicBase(HttpContext ctx, NlIdentitySettings settings)
 {
     if (!string.IsNullOrWhiteSpace(settings.PublicBaseUrl))
@@ -2321,4 +2429,12 @@ internal sealed class ProductionCutoverValidationRunRequest
     public bool AlertingTestPassed { get; set; }
     public MultiGameValidationRunRequest? MultiGame { get; set; }
     public LaunchOpsValidationRunRequest? LaunchOps { get; set; }
+}
+
+internal sealed class DistributionValidationRunRequest
+{
+    public bool HostClientPackageVerified { get; set; }
+    public bool StreamerSignupVerified { get; set; }
+    public bool PlayerJoinVerified { get; set; }
+    public ProductionCutoverValidationRunRequest? ProductionCutover { get; set; }
 }

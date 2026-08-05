@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Download NL Client</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Download NL Client</h1>
+    <p class="sub">Phase 11 — installable join shell with <code>nlclient://</code> deep links</p>
+    <nav class="nav">
+      <a href="/play.html">Play</a>
+      <a href="/download.html" aria-current="page">Download</a>
+      <a href="/nl-client.html">Web client</a>
+      <a href="/ga.html">Streamer signup</a>
+    </nav>
+  </header>
+
+  <section class="card">
+    <h2>Windows x64</h2>
+    <p id="version-line" class="sub">Loading manifest…</p>
+    <p><a id="download-link" class="primary-link" href="#">Download NL Client</a></p>
+    <pre id="manifest-block" class="code-block"></pre>
+    <h3>Register deep link (Windows)</h3>
+    <p class="hint">After install, register the protocol handler (run once as user):</p>
+    <pre class="code-block">powershell -File scripts/register-nlclient-protocol.ps1</pre>
+  </section>
+
+  <section class="card">
+    <h2>CLI (developers)</h2>
+    <pre class="code-block">dotnet run --project src/NL.Client -- join --player sp-1 --streamer YOUR_ID --platform-user STEAM64 --ack</pre>
+  </section>
+
+  <script src="download-app.js"></script>
+</body>
+</html>

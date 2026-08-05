@@ -228,3 +228,4 @@ Step "Verify fork destroyed after grace" {
 Write-Host ""
 Write-Host "DOGFOOD FLOW PASSED" -ForegroundColor Green
 Write-Host "Manual replay: docs/NL_DOGFOOD_FLOW.md" -ForegroundColor DarkGray
+exit 0

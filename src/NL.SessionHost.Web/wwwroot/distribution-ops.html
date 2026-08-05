@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NL Distribution Ops</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="operator-page">
+  <header>
+    <h1>Distribution Operations</h1>
+    <p class="sub">Phase 11 — client packages, onboarding, player join — see <code>docs/NL_DISTRIBUTION.md</code></p>
+    <nav class="nav">
+      <a href="/play.html">Public landing</a>
+      <a href="/download.html">Download</a>
+      <a href="/production-cutover-ops.html">Cutover ops</a>
+      <a href="/distribution-ops.html" aria-current="page">Distribution ops</a>
+    </nav>
+  </header>
+
+  <section class="card operator-panel">
+    <h2>Operator key</h2>
+    <label>NL_OPERATOR_KEY <input id="operator-key" type="password" autocomplete="off" /></label>
+    <button type="button" id="save-key">Save key</button>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Distribution status</h2>
+    <pre id="status-block">Loading...</pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Client manifest</h2>
+    <pre id="manifest-block">Loading...</pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Distribution validation</h2>
+    <p id="validation-summary"></p>
+    <label><input type="checkbox" id="pkg-verified" /> Client package verified on host</label>
+    <label><input type="checkbox" id="signup-verified" /> Streamer signup smoke passed</label>
+    <label><input type="checkbox" id="join-verified" /> Player join smoke passed</label>
+    <button type="button" id="run-validation">Run distribution validation</button>
+    <pre id="validation-checks"></pre>
+  </section>
+
+  <script src="nl-auth.js"></script>
+  <script src="distribution-ops-app.js"></script>
+</body>
+</html>

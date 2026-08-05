@@ -119,6 +119,9 @@ public sealed class NlFleetHost
         LaunchOpsValidation = new LaunchOpsValidationService();
         ProductionCutoverSettings = NlProductionCutoverSettings.LoadFromEnvironment();
         ProductionCutoverValidation = new ProductionCutoverValidationService();
+        DistributionSettings = NlDistributionSettings.LoadFromEnvironment();
+        DistributionClient = new DistributionClientManifestService();
+        DistributionValidation = new DistributionValidationService();
     }
 
     public NlFleetSettings Settings { get; }
@@ -188,4 +191,10 @@ public sealed class NlFleetHost
     public NlProductionCutoverSettings ProductionCutoverSettings { get; }
 
     public ProductionCutoverValidationService ProductionCutoverValidation { get; }
+
+    public NlDistributionSettings DistributionSettings { get; }
+
+    public DistributionClientManifestService DistributionClient { get; }
+
+    public DistributionValidationService DistributionValidation { get; }
 }
