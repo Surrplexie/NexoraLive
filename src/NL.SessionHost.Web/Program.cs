@@ -1294,6 +1294,85 @@ app.MapPost("/api/v1/legal-compliance/validation/run", (
     Results.Json(BuildLegalComplianceValidationReport(
         fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, env, body)));
 
+app.MapGet("/api/v1/public-ga-launch/settings", (NlFleetHost fleet) =>
+    Results.Json(fleet.PublicGaLaunchSettings.ToPublicInfo()));
+
+app.MapGet("/api/v1/public-ga-launch/status", (NlFleetHost fleet) =>
+{
+    var signoffs = fleet.PublicGaLaunchSignoff.ListRecent(10).Count;
+    return Results.Json(new PublicGaLaunchStatus(
+        fleet.PublicGaLaunchSettings.Enabled,
+        fleet.PublicGaLaunchSettings.DevMode,
+        fleet.GaSettings.OpenSignup,
+        fleet.PublicGaLaunchSettings.SupportContact,
+        fleet.PublicGaLaunchSettings.LaunchVersion,
+        fleet.LegalComplianceSettings.Enabled,
+        fleet.GaSettings.Enabled
+            && fleet.DistributionSettings.Enabled
+            && fleet.ScaleReliabilitySettings.Enabled
+            && fleet.LegalComplianceSettings.Enabled
+            && fleet.LaunchOpsSettings.Enabled
+            && fleet.ProductionCutoverSettings.Enabled,
+        DateTimeOffset.UtcNow));
+});
+
+app.MapGet("/api/v1/public-ga-launch/checklist", (NlFleetHost fleet) =>
+    Results.Json(fleet.PublicGaLaunchChecklist.Build(fleet.PublicGaLaunchSettings)));
+
+app.MapGet("/api/v1/public-ga-launch/signoffs", (NlFleetHost fleet, HttpContext ctx) =>
+{
+    if (!NlWebSecurityExtensions.IsAuthorized(ctx))
+    {
+        return Results.Unauthorized();
+    }
+
+    return Results.Json(fleet.PublicGaLaunchSignoff.ListRecent(20));
+});
+
+app.MapPost("/api/v1/public-ga-launch/signoff", (NlFleetHost fleet, HttpContext ctx) =>
+{
+    if (!NlWebSecurityExtensions.IsAuthorized(ctx))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!fleet.PublicGaLaunchSettings.Enabled)
+    {
+        return Results.BadRequest(new { error = "NL_PUBLIC_GA_LAUNCH_ENABLED is not true." });
+    }
+
+    var operatorId = ctx.Request.Headers["X-NL-Operator-Key"].FirstOrDefault() ?? "operator";
+    var entry = fleet.PublicGaLaunchSignoff.Record(operatorId, fleet.PublicGaLaunchSettings.LaunchVersion);
+    return Results.Json(entry);
+});
+
+app.MapGet("/api/v1/public-ga-launch/validation", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env) =>
+    Results.Json(BuildPublicGaLaunchValidationReport(
+        fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, env, null)));
+
+app.MapPost("/api/v1/public-ga-launch/validation/run", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env,
+    PublicGaLaunchValidationRunRequest? body) =>
+    Results.Json(BuildPublicGaLaunchValidationReport(
+        fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, env, body)));
+
 app.MapPost("/api/v1/fleet/compliance/export/{playerId}", (NlFleetHost fleet, ModerationHostState mod, string playerId) =>
 {
     try
@@ -2407,6 +2486,48 @@ static LegalComplianceValidationReport BuildLegalComplianceValidationReport(
         body?.StreamerTermsVerified ?? false);
 }
 
+static PublicGaLaunchValidationReport BuildPublicGaLaunchValidationReport(
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env,
+    PublicGaLaunchValidationRunRequest? body)
+{
+    var legalReport = BuildLegalComplianceValidationReport(
+        fleet,
+        orchestrator,
+        bus,
+        identity,
+        security,
+        catalog,
+        partnership,
+        hardening,
+        env,
+        body?.LegalCompliance);
+
+    var signoffCount = fleet.PublicGaLaunchSignoff.ListRecent(20).Count;
+
+    return fleet.PublicGaLaunchValidation.Evaluate(
+        fleet.PublicGaLaunchSettings,
+        fleet.GaSettings,
+        fleet.DistributionSettings,
+        fleet.ScaleReliabilitySettings,
+        fleet.LegalComplianceSettings,
+        fleet.LaunchOpsSettings,
+        fleet.ProductionCutoverSettings,
+        legalReport.LegalCompliancePassed,
+        body?.BackupVerified ?? false,
+        body?.OperatorSignoffVerified ?? false,
+        body?.SupportContactVerified ?? false,
+        body?.LaunchAnnouncementReady ?? false,
+        signoffCount);
+}
+
 static string ResolveIdentityPublicBase(HttpContext ctx, NlIdentitySettings settings)
 {
     if (!string.IsNullOrWhiteSpace(settings.PublicBaseUrl))
@@ -2686,4 +2807,13 @@ internal sealed class LegalComplianceValidationRunRequest
     public bool GdprExportVerified { get; set; }
     public bool StreamerTermsVerified { get; set; }
     public ScaleReliabilityValidationRunRequest? ScaleReliability { get; set; }
+}
+
+internal sealed class PublicGaLaunchValidationRunRequest
+{
+    public bool OperatorSignoffVerified { get; set; }
+    public bool BackupVerified { get; set; }
+    public bool SupportContactVerified { get; set; }
+    public bool LaunchAnnouncementReady { get; set; }
+    public LegalComplianceValidationRunRequest? LegalCompliance { get; set; }
 }

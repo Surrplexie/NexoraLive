@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NL Public GA Launch Ops</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="operator-page">
+  <header>
+    <h1>Public GA Launch Operations</h1>
+    <p class="sub">Phase 14 — final go-live checklist — see <code>docs/NL_PUBLIC_GA_LAUNCH.md</code></p>
+    <nav class="nav">
+      <a href="/ga-launch-checklist.html">Launch checklist</a>
+      <a href="/legal-compliance-ops.html">Compliance ops</a>
+      <a href="/public-ga-launch-ops.html" aria-current="page">Launch ops</a>
+    </nav>
+  </header>
+
+  <section class="card operator-panel">
+    <h2>Operator key</h2>
+    <label>NL_OPERATOR_KEY <input id="operator-key" type="password" autocomplete="off" /></label>
+    <button type="button" id="save-key">Save key</button>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Launch status</h2>
+    <pre id="status-block">Loading...</pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Checklist</h2>
+    <pre id="checklist-block">Loading...</pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Operator signoff</h2>
+    <button type="button" id="record-signoff">Record launch signoff</button>
+    <pre id="signoff-block"></pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Launch validation</h2>
+    <p id="validation-summary"></p>
+    <label><input type="checkbox" id="backup-verified" /> Fleet backup verified</label>
+    <label><input type="checkbox" id="signoff-verified" /> Operator signoff recorded</label>
+    <label><input type="checkbox" id="support-verified" /> Support contact verified</label>
+    <label><input type="checkbox" id="announcement-ready" /> Launch announcement ready</label>
+    <button type="button" id="run-validation">Run launch validation</button>
+    <pre id="validation-checks"></pre>
+  </section>
+
+  <script src="nl-auth.js"></script>
+  <script src="public-ga-launch-ops-app.js"></script>
+</body>
+</html>

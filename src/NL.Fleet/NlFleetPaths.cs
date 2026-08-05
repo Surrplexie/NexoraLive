@@ -34,6 +34,8 @@ public static class NlFleetPaths
 
     public static string LegalComplianceAudit => Path.Combine(Root, "legal-compliance-audit.json");
 
+    public static string PublicGaLaunchSignoff => Path.Combine(Root, "public-ga-launch-signoff.json");
+
     public static void EnsureRoot()
     {
         Directory.CreateDirectory(Root);

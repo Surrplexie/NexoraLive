@@ -128,6 +128,10 @@ public sealed class NlFleetHost
         LegalComplianceManifest = new LegalComplianceManifestService();
         LegalComplianceAudit = new JsonLegalComplianceAuditStore();
         LegalComplianceValidation = new LegalComplianceValidationService();
+        PublicGaLaunchSettings = NlPublicGaLaunchSettings.LoadFromEnvironment();
+        PublicGaLaunchChecklist = new PublicGaLaunchChecklistService();
+        PublicGaLaunchSignoff = new JsonPublicGaLaunchSignoffStore();
+        PublicGaLaunchValidation = new PublicGaLaunchValidationService();
     }
 
     public NlFleetSettings Settings { get; }
@@ -215,4 +219,12 @@ public sealed class NlFleetHost
     public JsonLegalComplianceAuditStore LegalComplianceAudit { get; }
 
     public LegalComplianceValidationService LegalComplianceValidation { get; }
+
+    public NlPublicGaLaunchSettings PublicGaLaunchSettings { get; }
+
+    public PublicGaLaunchChecklistService PublicGaLaunchChecklist { get; }
+
+    public JsonPublicGaLaunchSignoffStore PublicGaLaunchSignoff { get; }
+
+    public PublicGaLaunchValidationService PublicGaLaunchValidation { get; }
 }

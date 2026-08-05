@@ -77,6 +77,6 @@ powershell -File scripts/nl-legal-compliance-validate.ps1 -OperatorKey "<key>"
 - [x] Ops UI + runbook
 - [ ] Counsel review + signed DPA on VPS (operator deploy)
 
-Next: **Phase 14** — public GA launch checklist & operator runbook.
+Next: **Phase 14** — public GA launch checklist & operator runbook. See [`docs/NL_PUBLIC_GA_LAUNCH.md`](NL_PUBLIC_GA_LAUNCH.md).
 
 See also: [NL_LEGAL_COMPLIANCE_RUNBOOK.md](NL_LEGAL_COMPLIANCE_RUNBOOK.md) · [NL_SCALE_RELIABILITY.md](NL_SCALE_RELIABILITY.md)

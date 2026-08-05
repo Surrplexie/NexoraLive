@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Public GA Launch Checklist — NexoraLive</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Public GA Launch Checklist</h1>
+    <p class="sub">Version <span id="launch-version">—</span> · Operator go-live gate — see <code>docs/NL_PUBLIC_GA_LAUNCH.md</code></p>
+    <nav class="nav">
+      <a href="/play.html">Play</a>
+      <a href="/legal-center.html">Legal</a>
+      <a href="/status.html">Status</a>
+      <a href="/public-ga-launch-ops.html">Launch ops</a>
+    </nav>
+  </header>
+
+  <section class="card">
+    <h2>Pre-launch checklist</h2>
+    <p id="launch-status" class="sub">Loading...</p>
+    <ul id="checklist-items"></ul>
+  </section>
+
+  <section class="card">
+    <h2>Validation</h2>
+    <p>Run <code>scripts/nl-public-ga-launch-validate.ps1</code> against this host. Expected: <strong>PUBLIC GA LAUNCH VALIDATION PASSED</strong>.</p>
+  </section>
+
+  <script>
+    fetch('/api/v1/public-ga-launch/checklist').then(function (r) { return r.json(); }).then(function (c) {
+      document.getElementById('launch-version').textContent = c.launchVersion || '—';
+      var list = document.getElementById('checklist-items');
+      (c.items || []).forEach(function (item) {
+        var li = document.createElement('li');
+        var req = item.required ? ' (required)' : ' (optional)';
+        li.innerHTML = '<strong>' + item.title + '</strong>' + req + ' — ' + item.description;
+        if (item.docPath) {
+          li.innerHTML += ' <span class="hint">[' + item.docPath + ']</span>';
+        }
+        list.appendChild(li);
+      });
+    }).catch(function () {});
+
+    fetch('/api/v1/public-ga-launch/status').then(function (r) { return r.json(); }).then(function (s) {
+      var el = document.getElementById('launch-status');
+      el.textContent = 'GA signup: ' + (s.gaOpenSignup ? 'open' : 'closed')
+        + ' · Programs: ' + (s.allProgramsEnabled ? 'all enabled' : 'incomplete')
+        + (s.supportContact ? ' · Support: ' + s.supportContact : '');
+    }).catch(function () {});
+  </script>
+  <script src="legal-consent.js"></script>
+</body>
+</html>
