@@ -150,8 +150,12 @@ Step "Start session + fork provision" {
     if ($fork.forkConnectEndpoint) {
         Write-Host ("  forkConnect={0}" -f $fork.forkConnectEndpoint) -ForegroundColor DarkGray
     }
-    if ($ExpectProvisioner -eq "docker" -and $fork.forkConnectEndpoint -notmatch '^(docker|minecraft)://') {
-        throw ("Expected docker:// or minecraft:// connect URL, got {0}" -f $fork.forkConnectEndpoint)
+    if ($ExpectProvisioner -eq "docker") {
+        $connect = [string]$fork.forkConnectEndpoint
+        $validConnect = $connect -match '^(docker|minecraft|beamng-sidecar)://'
+        if (-not $validConnect) {
+            throw ("Expected docker://, minecraft://, or beamng-sidecar:// connect URL, got {0}" -f $connect)
+        }
     }
 }
 

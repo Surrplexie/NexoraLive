@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NL Multi-Game Production Ops</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="operator-page">
+  <header>
+    <h1>Multi-Game Production Operations</h1>
+    <p class="sub">Phase 8 — production fork images for hello-fork, minecraft, beamng — see <code>docs/NL_MULTI_GAME_PRODUCTION.md</code></p>
+    <nav class="nav">
+      <a href="/ga-ops.html">GA ops</a>
+      <a href="/live-production-ops.html">Live prod ops</a>
+      <a href="/fleet-ops.html">Fleet ops</a>
+      <a href="/nl-client.html">Player client</a>
+      <a href="/multigame-ops.html" aria-current="page">Multi-game ops</a>
+    </nav>
+  </header>
+
+  <section class="card operator-panel">
+    <h2>Operator key</h2>
+    <label>NL_OPERATOR_KEY <input id="operator-key" type="password" autocomplete="off" /></label>
+    <button type="button" id="save-key">Save key</button>
+    <span id="key-status"></span>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Multi-game status</h2>
+    <pre id="status-block">Loading...</pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Catalog images</h2>
+    <pre id="catalog-block">Loading...</pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Multi-game validation</h2>
+    <p id="validation-summary"></p>
+    <label><input type="checkbox" id="host-images-verified" /> Host fork images verified (run validate script on host)</label>
+    <button type="button" id="run-validation">Run multi-game validation</button>
+    <pre id="validation-checks"></pre>
+  </section>
+
+  <script src="nl-auth.js"></script>
+  <script src="multigame-ops-app.js"></script>
+</body>
+</html>

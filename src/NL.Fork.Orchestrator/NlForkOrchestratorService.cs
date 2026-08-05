@@ -120,7 +120,16 @@ public sealed class NlForkOrchestratorService
         _audit.Append("create_pending", session);
 
         var gameProfile = ForkGameProfiles.Resolve(request.GameId);
-        var dockerImage = request.DockerImage ?? gameProfile.DockerImage ?? _settings.DefaultDockerImage;
+        string? catalogDockerImage = null;
+        if (_catalog?.Settings.Enabled == true)
+        {
+            catalogDockerImage = _catalog.Catalog.GetEntry(request.GameId, request.MajorVersion)?.DockerImage;
+        }
+
+        var dockerImage = request.DockerImage
+            ?? catalogDockerImage
+            ?? gameProfile.DockerImage
+            ?? _settings.DefaultDockerImage;
 
         var start = await provisioner.StartAsync(new ForkProvisionerStartRequest(
             sessionId,

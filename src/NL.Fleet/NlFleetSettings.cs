@@ -109,6 +109,9 @@ public sealed class NlFleetHost
         GaValidation = new GaValidationService();
         LiveProductionSettings = NlLiveProductionSettings.LoadFromEnvironment();
         LiveProductionValidation = new LiveProductionValidationService();
+        MultiGameSettings = NlMultiGameProductionSettings.LoadFromEnvironment();
+        MultiGameCatalog = new MultiGameCatalogService();
+        MultiGameValidation = new MultiGameValidationService();
     }
 
     public NlFleetSettings Settings { get; }
@@ -158,4 +161,10 @@ public sealed class NlFleetHost
     public NlLiveProductionSettings LiveProductionSettings { get; }
 
     public LiveProductionValidationService LiveProductionValidation { get; }
+
+    public NlMultiGameProductionSettings MultiGameSettings { get; }
+
+    public MultiGameCatalogService MultiGameCatalog { get; }
+
+    public MultiGameValidationService MultiGameValidation { get; }
 }

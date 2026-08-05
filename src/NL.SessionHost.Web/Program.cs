@@ -882,6 +882,67 @@ app.MapPost("/api/v1/live-production/validation/run", (
     NlForkCatalogHost catalog) =>
     Results.Json(BuildLiveProductionValidationReport(fleet, orchestrator, bus, identity, security, catalog)));
 
+app.MapGet("/api/v1/multigame/settings", (NlFleetHost fleet) =>
+    Results.Json(fleet.MultiGameSettings.ToPublicInfo()));
+
+app.MapGet("/api/v1/multigame/status", (
+    NlFleetHost fleet,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership) =>
+    Results.Json(new MultiGameStatus(
+        fleet.MultiGameSettings.Enabled,
+        fleet.LiveProductionSettings.Enabled,
+        fleet.GaSettings.Enabled,
+        catalog.Settings.Enabled,
+        partnership.Settings.Enabled,
+        fleet.MultiGameSettings.RequiredGameIds,
+        DateTimeOffset.UtcNow)));
+
+app.MapGet("/api/v1/multigame/catalog", (NlFleetHost fleet, NlForkCatalogHost catalog) =>
+{
+    if (!catalog.Settings.Enabled)
+    {
+        return Results.Json(new { enabled = false, games = Array.Empty<object>() });
+    }
+
+    var games = fleet.MultiGameSettings.RequiredGameIds
+        .Select(gameId =>
+        {
+            var stable = catalog.Catalog.ResolveLatestStableEntry(gameId);
+            return new
+            {
+                gameId,
+                displayName = stable?.DisplayName,
+                majorVersion = stable?.MajorVersion,
+                dockerImage = stable?.DockerImage ?? ForkGameProfiles.Resolve(gameId).DockerImage,
+                nleTemplate = stable?.DefaultNleTemplate ?? ForkGameProfiles.Resolve(gameId).DefaultNleTemplate,
+            };
+        })
+        .ToList();
+    return Results.Json(new { enabled = true, games });
+});
+
+app.MapGet("/api/v1/multigame/validation", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership) =>
+    Results.Json(BuildMultiGameValidationReport(fleet, orchestrator, bus, identity, security, catalog, partnership, null)));
+
+app.MapPost("/api/v1/multigame/validation/run", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    MultiGameValidationRunRequest? body) =>
+    Results.Json(BuildMultiGameValidationReport(fleet, orchestrator, bus, identity, security, catalog, partnership, body)));
+
 app.MapPost("/api/v1/fleet/compliance/export/{playerId}", (NlFleetHost fleet, ModerationHostState mod, string playerId) =>
 {
     try
@@ -1671,6 +1732,69 @@ static LiveProductionValidationReport BuildLiveProductionValidationReport(
         fleet.Compliance.RetentionPolicy);
 }
 
+static MultiGameValidationReport BuildMultiGameValidationReport(
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    MultiGameValidationRunRequest? body)
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    var liveReport = fleet.LiveProductionValidation.Evaluate(
+        fleet.LiveProductionSettings,
+        fleet.GaSettings,
+        fleet.BetaSettings,
+        !string.IsNullOrEmpty(security.OperatorKey),
+        security.PublicMode,
+        identity.Mode.ToString(),
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY")),
+        fleet.Validation.Evaluate(
+            fleet.Settings,
+            orchestrator.Settings.Mode.ToString(),
+            snap,
+            fleet.Metrics,
+            fleet.Incidents,
+            fleet.ValidationStore.GetLast()?.LastLoadTest).ProductionReady,
+        identity.PublicBaseUrl ?? Environment.GetEnvironmentVariable("NL_PUBLIC_BASE_URL"),
+        fleet.Settings.Relay.RelayWebSocketTemplate,
+        fleet.Settings.Relay.TurnUri,
+        catalog.Settings.Enabled,
+        fleet.GaCatalog.Evaluate(
+            catalog.Settings.Enabled,
+            catalog.Catalog.ListGames()
+                .Select(e => e.GameId)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            fleet.GaSettings),
+        fleet.Compliance.RetentionPolicy);
+
+    var catalogGames = fleet.MultiGameSettings.RequiredGameIds
+        .Select(gameId =>
+        {
+            var stable = catalog.Catalog.ResolveLatestStableEntry(gameId);
+            return (gameId, stable?.DockerImage, stable?.MajorVersion);
+        })
+        .ToList();
+    var catalogCheck = fleet.MultiGameCatalog.Evaluate(catalog.Settings.Enabled, catalogGames, fleet.MultiGameSettings);
+
+    return fleet.MultiGameValidation.Evaluate(
+        fleet.MultiGameSettings,
+        fleet.LiveProductionSettings,
+        fleet.GaSettings,
+        catalog.Settings.Enabled,
+        catalogCheck,
+        liveReport.LiveProductionPassed,
+        partnership.Settings.Enabled,
+        partnership.Settings.RequireGateAtAdmit,
+        body?.HostImagesVerified ?? false,
+        body?.VerifiedGameIds);
+}
+
 static string ResolveIdentityPublicBase(HttpContext ctx, NlIdentitySettings settings)
 {
     if (!string.IsNullOrWhiteSpace(settings.PublicBaseUrl))
@@ -1902,4 +2026,10 @@ internal sealed class GaStreamerRegisterRequest
     public string? TwitchHandle { get; set; }
     public string? PreferredGameId { get; set; }
     public string? StreamerId { get; set; }
+}
+
+internal sealed class MultiGameValidationRunRequest
+{
+    public bool HostImagesVerified { get; set; }
+    public IReadOnlyList<string>? VerifiedGameIds { get; set; }
 }

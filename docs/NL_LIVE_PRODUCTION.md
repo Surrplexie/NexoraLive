@@ -75,6 +75,6 @@ powershell -File scripts/nl-live-production-validate.ps1 `
 - [x] Operator runbook
 - [ ] VPS with real domain + live Steam (operator deploy)
 
-Next: **Phase 8** — multi-game production fork images + player UX on public URL.
+Next: **Phase 9** — launch ops & trust (alerting, status page, legal, abuse hardening, backups).
 
-See also: [NL_LIVE_PRODUCTION_RUNBOOK.md](NL_LIVE_PRODUCTION_RUNBOOK.md) · [NL_GENERAL_AVAILABILITY.md](NL_GENERAL_AVAILABILITY.md)
+Multi-game production (Phase 8): [NL_MULTI_GAME_PRODUCTION.md](NL_MULTI_GAME_PRODUCTION.md)
