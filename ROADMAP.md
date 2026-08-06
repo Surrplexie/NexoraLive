@@ -3,9 +3,8 @@
 This tracks progress against the ideas in [`NexoraLive.txt`](NexoraLive.txt), broken into phases
 roughly ordered by dependency (each later phase leans on earlier ones).
 
-**Built:** Phases 0–K + **Phase P** (fork runtime) + **Phase L** (platform identity) + **Phase M** (live social gate) + **Phase N** (fork catalog) + **Phase O** (fork orchestrator) + **Phase Q** (partnerships) + **Phase R** (NL Client) + **Phase S** (fleet ops + staging validation) + **Production dogfood track** (Docker fork E2E gate).
-**Next track:** VPS production deploy — run production dogfood on a real domain with live OAuth. See
-[docs/NL_PRODUCTION_DOGFOOD.md](docs/NL_PRODUCTION_DOGFOOD.md).
+**Built:** Phases 0–K + **Phase P** (fork runtime) + **Phase L** (platform identity) + **Phase M** (live social gate) + **Phase N** (fork catalog) + **Phase O** (fork orchestrator) + **Phase Q** (partnerships) + **Phase R** (NL Client) + **Phase S** (fleet ops + staging validation) + **Production dogfood track** + **VPS production deploy templates**.
+**Next track:** Operator VPS signoff on real domain — run [docs/NL_VPS_DEPLOY.md](docs/NL_VPS_DEPLOY.md) on your server.
 
 Status legend: `[x]` done, `[~]` partially done / in progress, `[ ]` not started.
 
