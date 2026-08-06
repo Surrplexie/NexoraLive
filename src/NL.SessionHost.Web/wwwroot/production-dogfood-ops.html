@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NL Production Dogfood Ops</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="operator-page">
+  <header>
+    <h1>Production Dogfood Operations</h1>
+    <p class="sub">End-to-end stream on real Docker fork images — see <code>docs/NL_PRODUCTION_DOGFOOD.md</code></p>
+    <nav class="nav">
+      <a href="/play.html">Public landing</a>
+      <a href="/ga.html">Streamer signup</a>
+      <a href="/identity-link.html">Identity link</a>
+      <a href="/nl-client.html">NL Client</a>
+      <a href="/public-ga-launch-ops.html">GA launch ops</a>
+      <a href="/production-dogfood-ops.html" aria-current="page">Dogfood ops</a>
+    </nav>
+  </header>
+
+  <section class="card operator-panel">
+    <h2>Operator key</h2>
+    <label>NL_OPERATOR_KEY <input id="operator-key" type="password" autocomplete="off" /></label>
+    <button type="button" id="save-key">Save key</button>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Production dogfood status</h2>
+    <pre id="status-block">Loading...</pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Validation gate</h2>
+    <p id="validation-summary"></p>
+    <label><input type="checkbox" id="signup-verified" /> Streamer signup smoke passed</label>
+    <label><input type="checkbox" id="identity-verified" /> Identity account + Steam link passed</label>
+    <label><input type="checkbox" id="join-verified" /> hello-fork Docker join passed</label>
+    <label><input type="checkbox" id="minecraft-verified" /> minecraft Docker join passed</label>
+    <label><input type="checkbox" id="beamng-verified" /> beamng Docker join passed</label>
+    <label><input type="checkbox" id="teardown-verified" /> Fork teardown passed</label>
+    <button type="button" id="run-validation">Run production dogfood validation</button>
+    <pre id="validation-checks"></pre>
+  </section>
+
+  <script src="nl-auth.js"></script>
+  <script src="production-dogfood-ops-app.js"></script>
+</body>
+</html>

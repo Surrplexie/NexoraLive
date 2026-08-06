@@ -9,6 +9,7 @@ param(
     [ValidateSet("mock", "process", "docker", "auto")]
     [string]$ExpectProvisioner = "mock",
     [string]$OperatorKey = "",
+    [string]$NlAccountId = "",
     [switch]$SkipImageBuild,
     [switch]$VerifyRuleEvents,
     [int]$TeardownGraceSec = 30,
@@ -169,6 +170,9 @@ Step "NL Client join flow" {
         majorVersion = $MajorVersion
         atOwnRiskAcknowledged = $true
         mode = "Player"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($NlAccountId)) {
+        $joinBody.nlAccountId = $NlAccountId
     }
     $join = Invoke-Nl POST "/api/v1/client/join-flow" $joinBody
     if (-not $join.success) {

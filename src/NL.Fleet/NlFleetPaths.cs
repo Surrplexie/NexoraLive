@@ -36,6 +36,8 @@ public static class NlFleetPaths
 
     public static string PublicGaLaunchSignoff => Path.Combine(Root, "public-ga-launch-signoff.json");
 
+    public static string ProductionDogfoodLastRun => Path.Combine(Root, "production-dogfood-last-run.json");
+
     public static void EnsureRoot()
     {
         Directory.CreateDirectory(Root);

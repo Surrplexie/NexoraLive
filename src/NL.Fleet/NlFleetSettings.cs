@@ -132,6 +132,9 @@ public sealed class NlFleetHost
         PublicGaLaunchChecklist = new PublicGaLaunchChecklistService();
         PublicGaLaunchSignoff = new JsonPublicGaLaunchSignoffStore();
         PublicGaLaunchValidation = new PublicGaLaunchValidationService();
+        ProductionDogfoodSettings = NlProductionDogfoodSettings.LoadFromEnvironment();
+        ProductionDogfoodRuns = new JsonProductionDogfoodRunStore();
+        ProductionDogfoodValidation = new ProductionDogfoodValidationService();
     }
 
     public NlFleetSettings Settings { get; }
@@ -227,4 +230,10 @@ public sealed class NlFleetHost
     public JsonPublicGaLaunchSignoffStore PublicGaLaunchSignoff { get; }
 
     public PublicGaLaunchValidationService PublicGaLaunchValidation { get; }
+
+    public NlProductionDogfoodSettings ProductionDogfoodSettings { get; }
+
+    public JsonProductionDogfoodRunStore ProductionDogfoodRuns { get; }
+
+    public ProductionDogfoodValidationService ProductionDogfoodValidation { get; }
 }

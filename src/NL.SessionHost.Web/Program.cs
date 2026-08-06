@@ -1913,6 +1913,64 @@ app.MapGet("/api/v1/dogfood/status", (BusHostState bus, NlForkOrchestratorHost o
         File.Exists(NlIdentityPaths.MockOwnershipConfig)));
 });
 
+app.MapGet("/api/v1/production-dogfood/settings", (NlFleetHost fleet) =>
+    Results.Json(fleet.ProductionDogfoodSettings.ToPublicInfo()));
+
+app.MapGet("/api/v1/production-dogfood/status", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator) =>
+{
+    var last = fleet.ProductionDogfoodRuns.GetLast();
+    return Results.Json(new ProductionDogfoodStatus(
+        fleet.ProductionDogfoodSettings.Enabled,
+        fleet.ProductionDogfoodSettings.DevMode,
+        orchestrator.Settings.Enabled,
+        orchestrator.Settings.Mode.ToString(),
+        fleet.ProductionDogfoodSettings.RequiredGames,
+        last));
+});
+
+app.MapGet("/api/v1/production-dogfood/validation", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    NlIdentityHost identity) =>
+    Results.Json(BuildProductionDogfoodValidationReport(fleet, orchestrator, identity.Settings.Enabled, null)));
+
+app.MapPost("/api/v1/production-dogfood/validation/run", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    NlIdentityHost identity,
+    ProductionDogfoodValidationRunRequest? body) =>
+{
+    var report = BuildProductionDogfoodValidationReport(fleet, orchestrator, identity.Settings.Enabled, body);
+    if (report.ProductionDogfoodPassed)
+    {
+        var games = new List<string> { "hello-fork" };
+        if (body?.MinecraftJoinVerified == true)
+        {
+            games.Add("minecraft");
+        }
+
+        if (body?.BeamngJoinVerified == true)
+        {
+            games.Add("beamng");
+        }
+
+        if (body?.VerifiedGames is { Count: > 0 })
+        {
+            games = body.VerifiedGames.Where(g => !string.IsNullOrWhiteSpace(g)).Select(g => g.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        fleet.ProductionDogfoodRuns.Save(new ProductionDogfoodLastRun(
+            true,
+            report.EvaluatedAtUtc,
+            body?.StreamerId,
+            games));
+    }
+
+    return Results.Json(report);
+});
+
 app.MapPut("/api/v1/session/profile", async (BusHostState b, HttpRequest req) =>
 {
     var profile = await req.ReadFromJsonAsync<SessionProfileFile>();
@@ -2622,6 +2680,26 @@ static DistributionValidationReport BuildDistributionValidationReport(
         body?.PlayerJoinVerified ?? false);
 }
 
+static ProductionDogfoodValidationReport BuildProductionDogfoodValidationReport(
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    bool identityEnabled,
+    ProductionDogfoodValidationRunRequest? body) =>
+    fleet.ProductionDogfoodValidation.Evaluate(
+        fleet.ProductionDogfoodSettings,
+        fleet.PublicGaLaunchSettings,
+        fleet.GaSettings,
+        fleet.DistributionSettings,
+        identityEnabled,
+        orchestrator.Settings.Enabled,
+        orchestrator.Settings.Mode.ToString(),
+        body?.StreamerSignupVerified ?? false,
+        body?.IdentityAccountVerified ?? false,
+        body?.PlayerJoinVerified ?? false,
+        body?.MinecraftJoinVerified ?? false,
+        body?.BeamngJoinVerified ?? false,
+        body?.ForkTeardownVerified ?? false);
+
 static ScaleReliabilityValidationReport BuildScaleReliabilityValidationReport(
     NlFleetHost fleet,
     NlForkOrchestratorHost orchestrator,
@@ -3119,4 +3197,16 @@ internal sealed class PublicGaLaunchValidationRunRequest
     public bool SupportContactVerified { get; set; }
     public bool LaunchAnnouncementReady { get; set; }
     public LegalComplianceValidationRunRequest? LegalCompliance { get; set; }
+}
+
+internal sealed class ProductionDogfoodValidationRunRequest
+{
+    public bool StreamerSignupVerified { get; set; }
+    public bool IdentityAccountVerified { get; set; }
+    public bool PlayerJoinVerified { get; set; }
+    public bool MinecraftJoinVerified { get; set; }
+    public bool BeamngJoinVerified { get; set; }
+    public bool ForkTeardownVerified { get; set; }
+    public string? StreamerId { get; set; }
+    public List<string>? VerifiedGames { get; set; }
 }

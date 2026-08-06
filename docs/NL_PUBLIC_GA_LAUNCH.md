@@ -72,6 +72,7 @@ powershell -File scripts/nl-public-ga-launch-validate.ps1 -OperatorKey "<key>"
 - [x] Operator signoff store + validation API
 - [x] Validation script + unit tests
 - [x] Runbook + deploy README
+- [x] Production dogfood local gate — [`docs/NL_PRODUCTION_DOGFOOD.md`](NL_PRODUCTION_DOGFOOD.md)
 - [ ] Production VPS signoff with `NL_PUBLIC_GA_LAUNCH_DEV=false` (operator deploy)
 
 See also: [`docs/NL_PUBLIC_GA_LAUNCH_RUNBOOK.md`](NL_PUBLIC_GA_LAUNCH_RUNBOOK.md)

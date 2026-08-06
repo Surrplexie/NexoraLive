@@ -258,6 +258,7 @@ Invoke-RestMethod http://127.0.0.1:27020/api/v1/dogfood/status
 
 ## Next after dogfood
 
+- **Production dogfood (full gate):** `scripts/nl-production-dogfood-stack-up.ps1 -Validate` — see [docs/NL_PRODUCTION_DOGFOOD.md](NL_PRODUCTION_DOGFOOD.md)
 - Switch `NL_FORK_ORCHESTRATOR_MODE=process` or `docker` for real fork runtime
 - Docker hello-fork: `scripts/nl-dogfood-flow-docker.ps1`
 - Docker minecraft sidecar: `scripts/nl-dogfood-flow-docker-minecraft.ps1`
