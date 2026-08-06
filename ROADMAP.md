@@ -428,6 +428,7 @@ sessions. Anti-pirate / anti-alt from nl.txt section 5.
 - [x] **Tests** — `tests/NL.Identity.Tests` + `scripts/nl-identity-smoke.ps1`
 - [x] **Docs** — [docs/NL_IDENTITY.md](docs/NL_IDENTITY.md)
 - [x] **Steam OpenID sign-in flow** — live OAuth redirect UI at `/identity-link.html` + `/api/v1/identity/oauth/steam/*`
+- [x] **Epic/Xbox/PlayStation OAuth** — browser OAuth + live ownership APIs (Phase L.3)
 
 **Exit criteria:** Player without ownership of title X denied at admit — **met** via mock Steam app
 440/730 matrix and integration tests.
@@ -439,7 +440,8 @@ sessions. Anti-pirate / anti-alt from nl.txt section 5.
 Wire Phase 2's `JoinEligibilityEngine` to **live platform APIs** instead of caller-supplied
 bools. nl.txt section 2: SP joins via NL only, not native game invites.
 
-- [x] **Twitch / YouTube / Kick OAuth** — Twitch browser OAuth at `/social-link.html` + per-player Helix tokens (Phase M.1); YouTube/Kick/Discord OAuth deferred
+- [x] **Twitch / YouTube / Kick OAuth** — Twitch browser OAuth at `/social-link.html` + per-player Helix tokens (Phase M.1); YouTube/Kick OAuth deferred
+- [x] **Discord OAuth** — browser OAuth + live guild membership via `guilds.members.read` (Phase M.2)
 - [x] **Discord optional link** — server member checks for streamer communities
 - [x] **`JoinRequirements` from streamer dashboard** — web UI at `/join-gate.html` + REST API
 - [x] **Live-only NLS** — start blocked when offline; `NlLiveOnlyHostedService` auto-stops

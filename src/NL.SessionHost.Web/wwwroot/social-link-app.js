@@ -27,6 +27,14 @@
       }
       window.history.replaceState({}, '', '/social-link.html');
     }
+    if (params.get('linked') === 'discord') {
+      setStatus('Discord linked: ' + (params.get('discordUsername') || params.get('discordUserId') || 'ok'));
+      if (params.get('playerId')) {
+        playerInput.value = params.get('playerId');
+        localStorage.setItem('nlPlayerId', params.get('playerId'));
+      }
+      window.history.replaceState({}, '', '/social-link.html');
+    }
     if (params.get('error')) {
       setStatus(decodeURIComponent(params.get('error')), true);
       window.history.replaceState({}, '', '/social-link.html');
@@ -50,14 +58,12 @@
     localStorage.setItem('nlPlayerId', id);
 
     var links = await api('/api/v1/social/links/' + encodeURIComponent(id));
-    var oauth = null;
-    try {
-      oauth = await api('/api/v1/social/twitch-oauth/' + encodeURIComponent(id));
-    } catch (e) {
-      oauth = { linked: false };
-    }
+    var twitchOAuth = null;
+    var discordOAuth = null;
+    try { twitchOAuth = await api('/api/v1/social/twitch-oauth/' + encodeURIComponent(id)); } catch (e) { twitchOAuth = { linked: false }; }
+    try { discordOAuth = await api('/api/v1/social/discord-oauth/' + encodeURIComponent(id)); } catch (e) { discordOAuth = { linked: false }; }
 
-    linkBlock.textContent = JSON.stringify({ links: links, twitchOAuth: oauth }, null, 2);
+    linkBlock.textContent = JSON.stringify({ links: links, twitchOAuth: twitchOAuth, discordOAuth: discordOAuth }, null, 2);
   }
 
   document.getElementById('refresh-links').onclick = function () {
@@ -76,6 +82,18 @@
       + encodeURIComponent(playerId) + '&returnUrl=' + returnUrl;
   };
 
+  document.getElementById('discord-sign-in').onclick = function () {
+    var playerId = playerInput.value.trim() || localStorage.getItem('nlPlayerId');
+    if (!playerId) {
+      setStatus('Enter a player id first.', true);
+      return;
+    }
+    localStorage.setItem('nlPlayerId', playerId);
+    var returnUrl = encodeURIComponent('/social-link.html');
+    window.location.href = '/api/v1/social/oauth/discord/authorize?playerId='
+      + encodeURIComponent(playerId) + '&returnUrl=' + returnUrl;
+  };
+
   document.getElementById('test-admit').onclick = async function () {
     try {
       var playerId = playerInput.value.trim() || localStorage.getItem('nlPlayerId');
@@ -90,6 +108,7 @@
           playerId: playerId,
           displayName: playerId,
           twitchUserId: links.twitchUserId,
+          discordUserId: links.discordUserId,
         }),
       });
       document.getElementById('admit-result').textContent = JSON.stringify(result, null, 2);

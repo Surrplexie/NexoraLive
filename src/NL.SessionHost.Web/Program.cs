@@ -339,6 +339,74 @@ app.MapGet("/api/v1/identity/oauth/steam/callback", async (
         $"{landing}{sep}error={Uri.EscapeDataString(result.Error ?? "Steam sign-in failed.")}");
 });
 
+app.MapGet("/api/v1/identity/oauth/epic/authorize", (
+    NlIdentityHost host,
+    NlIdentitySettings settings,
+    HttpContext ctx,
+    string accountId,
+    string? returnUrl) =>
+    MapIdentityPlatformAuthorize(host, settings, ctx, accountId, returnUrl, host.EpicOAuth.IsConfigured, "Epic", () =>
+    {
+        var publicBase = ResolveIdentityPublicBase(ctx, settings);
+        return host.EpicOAuth.BuildAuthorizeRedirect(accountId.Trim(), returnUrl, publicBase);
+    }));
+
+app.MapGet("/api/v1/identity/oauth/epic/callback", (NlIdentityHost host, NlIdentitySettings settings, HttpContext ctx, CancellationToken ct) =>
+    MapIdentityPlatformCallback(host, settings, ctx, ct, NlPlatform.Epic, "epic", host.EpicOAuth.HandleCallbackAsync));
+
+app.MapGet("/api/v1/identity/oauth/xbox/authorize", (
+    NlIdentityHost host,
+    NlIdentitySettings settings,
+    HttpContext ctx,
+    string accountId,
+    string? returnUrl) =>
+    MapIdentityPlatformAuthorize(host, settings, ctx, accountId, returnUrl, host.XboxOAuth.IsConfigured, "Xbox", () =>
+    {
+        var publicBase = ResolveIdentityPublicBase(ctx, settings);
+        return host.XboxOAuth.BuildAuthorizeRedirect(accountId.Trim(), returnUrl, publicBase);
+    }));
+
+app.MapGet("/api/v1/identity/oauth/xbox/callback", (NlIdentityHost host, NlIdentitySettings settings, HttpContext ctx, CancellationToken ct) =>
+    MapIdentityPlatformCallback(host, settings, ctx, ct, NlPlatform.Xbox, "xbox", host.XboxOAuth.HandleCallbackAsync));
+
+app.MapGet("/api/v1/identity/oauth/playstation/authorize", (
+    NlIdentityHost host,
+    NlIdentitySettings settings,
+    HttpContext ctx,
+    string accountId,
+    string? returnUrl) =>
+    MapIdentityPlatformAuthorize(host, settings, ctx, accountId, returnUrl, host.PlayStationOAuth.IsConfigured, "PlayStation", () =>
+    {
+        var publicBase = ResolveIdentityPublicBase(ctx, settings);
+        return host.PlayStationOAuth.BuildAuthorizeRedirect(accountId.Trim(), returnUrl, publicBase);
+    }));
+
+app.MapGet("/api/v1/identity/oauth/playstation/callback", (NlIdentityHost host, NlIdentitySettings settings, HttpContext ctx, CancellationToken ct) =>
+    MapIdentityPlatformCallback(host, settings, ctx, ct, NlPlatform.PlayStation, "playstation", host.PlayStationOAuth.HandleCallbackAsync));
+
+app.MapGet("/api/v1/identity/platform-oauth/{platform}/{accountId}", (NlIdentityHost host, string platform, string accountId) =>
+{
+    if (!NlPlatformNames.TryParse(platform, out var parsed))
+    {
+        return Results.BadRequest(new { error = "Invalid platform." });
+    }
+
+    var credential = host.PlatformCredentials.Get(parsed, accountId);
+    if (credential is null)
+    {
+        return Results.NotFound(new { error = "No OAuth link for this account/platform." });
+    }
+
+    return Results.Json(new
+    {
+        accountId = credential.AccountId,
+        platform = NlPlatformNames.Normalize(parsed),
+        externalUserId = credential.ExternalUserId,
+        displayName = credential.DisplayName,
+        linked = true,
+    });
+});
+
 app.MapGet("/api/v1/identity/audit", (NlIdentityHost host, int? count) =>
     Results.Json(host.Audit.ReadRecent(count ?? 50)));
 
@@ -480,6 +548,83 @@ app.MapGet("/api/v1/social/twitch-oauth/{playerId}", (NlSocialHost host, string 
         playerId = credential.PlayerId,
         twitchUserId = credential.TwitchUserId,
         twitchLogin = credential.TwitchLogin,
+        linked = true,
+    });
+});
+
+app.MapGet("/api/v1/social/oauth/discord/authorize", (
+    NlSocialHost host,
+    NlSocialSettings settings,
+    HttpContext ctx,
+    string playerId,
+    string? returnUrl) =>
+{
+    if (!settings.Enabled)
+    {
+        return Results.Json(new { error = "Social gate disabled." }, statusCode: 503);
+    }
+
+    if (!host.DiscordOAuth.IsConfigured)
+    {
+        return Results.Json(new { error = "DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET required." }, statusCode: 503);
+    }
+
+    if (string.IsNullOrWhiteSpace(playerId))
+    {
+        return Results.BadRequest(new { error = "playerId required." });
+    }
+
+    var publicBase = ResolveSocialPublicBase(ctx);
+    var redirect = host.DiscordOAuth.BuildAuthorizeRedirect(playerId.Trim(), returnUrl, publicBase);
+    return Results.Redirect(redirect);
+});
+
+app.MapGet("/api/v1/social/oauth/discord/callback", async (
+    NlSocialHost host,
+    NlSocialSettings settings,
+    HttpContext ctx,
+    CancellationToken ct) =>
+{
+    if (!settings.Enabled)
+    {
+        return Results.Content("Social gate disabled.", "text/plain", statusCode: 503);
+    }
+
+    var query = ctx.Request.Query.ToDictionary(
+        kv => kv.Key,
+        kv => kv.Value.ToString(),
+        StringComparer.OrdinalIgnoreCase);
+
+    var publicBase = ResolveSocialPublicBase(ctx);
+    var result = await host.DiscordOAuth.HandleCallbackAsync(query, publicBase, ct);
+    var landing = string.IsNullOrWhiteSpace(result.ReturnUrl)
+        ? "/social-link.html"
+        : result.ReturnUrl!;
+
+    var sep = landing.Contains('?') ? "&" : "?";
+    if (result.Success)
+    {
+        return Results.Redirect(
+            $"{landing}{sep}linked=discord&playerId={Uri.EscapeDataString(result.PlayerId!)}&discordUserId={Uri.EscapeDataString(result.DiscordUserId!)}&discordUsername={Uri.EscapeDataString(result.DiscordUsername ?? "")}");
+    }
+
+    return Results.Redirect(
+        $"{landing}{sep}error={Uri.EscapeDataString(result.Error ?? "Discord sign-in failed.")}");
+});
+
+app.MapGet("/api/v1/social/discord-oauth/{playerId}", (NlSocialHost host, string playerId) =>
+{
+    var credential = host.DiscordCredentials.GetByPlayer(playerId);
+    if (credential is null)
+    {
+        return Results.NotFound(new { error = "No Discord OAuth link for this player." });
+    }
+
+    return Results.Json(new
+    {
+        playerId = credential.PlayerId,
+        discordUserId = credential.DiscordUserId,
+        discordUsername = credential.DiscordUsername,
         linked = true,
     });
 });
@@ -2626,6 +2771,75 @@ static string ResolveSocialPublicBase(HttpContext ctx)
 
     var req = ctx.Request;
     return $"{req.Scheme}://{req.Host}";
+}
+
+static IResult MapIdentityPlatformAuthorize(
+    NlIdentityHost host,
+    NlIdentitySettings settings,
+    HttpContext ctx,
+    string accountId,
+    string? returnUrl,
+    bool configured,
+    string platformLabel,
+    Func<string> buildRedirect)
+{
+    if (!settings.Enabled)
+    {
+        return Results.Json(new { error = "Identity service disabled." }, statusCode: 503);
+    }
+
+    if (!configured)
+    {
+        return Results.Json(new { error = $"{platformLabel} OAuth is not configured." }, statusCode: 503);
+    }
+
+    if (string.IsNullOrWhiteSpace(accountId))
+    {
+        return Results.BadRequest(new { error = "accountId required." });
+    }
+
+    if (host.Identity.GetAccount(accountId.Trim()) is null)
+    {
+        return Results.NotFound(new { error = "Account not found." });
+    }
+
+    return Results.Redirect(buildRedirect());
+}
+
+static async Task<IResult> MapIdentityPlatformCallback(
+    NlIdentityHost host,
+    NlIdentitySettings settings,
+    HttpContext ctx,
+    CancellationToken ct,
+    NlPlatform platform,
+    string linkedName,
+    Func<IReadOnlyDictionary<string, string>, string, CancellationToken, Task<PlatformOAuthCallbackResult>> handler)
+{
+    if (!settings.Enabled)
+    {
+        return Results.Content("Identity service disabled.", "text/plain", statusCode: 503);
+    }
+
+    var query = ctx.Request.Query.ToDictionary(
+        kv => kv.Key,
+        kv => kv.Value.ToString(),
+        StringComparer.OrdinalIgnoreCase);
+
+    var publicBase = ResolveIdentityPublicBase(ctx, settings);
+    var result = await handler(query, publicBase, ct);
+    var landing = string.IsNullOrWhiteSpace(result.ReturnUrl)
+        ? "/identity-link.html"
+        : result.ReturnUrl!;
+
+    var sep = landing.Contains('?') ? "&" : "?";
+    if (result.Success)
+    {
+        return Results.Redirect(
+            $"{landing}{sep}linked={linkedName}&accountId={Uri.EscapeDataString(result.AccountId!)}&platformUserId={Uri.EscapeDataString(result.ExternalUserId!)}&displayName={Uri.EscapeDataString(result.DisplayName ?? "")}");
+    }
+
+    return Results.Redirect(
+        $"{landing}{sep}error={Uri.EscapeDataString(result.Error ?? $"{platform} sign-in failed.")}");
 }
 
 static string ResolveSamplesRoot()

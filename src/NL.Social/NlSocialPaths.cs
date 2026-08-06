@@ -28,5 +28,7 @@ public static class NlSocialPaths
 
     public static string TwitchCredentials => Path.Combine(Root, "twitch-oauth-credentials.json");
 
+    public static string DiscordCredentials => Path.Combine(Root, "discord-oauth-credentials.json");
+
     public static void EnsureRoot() => Directory.CreateDirectory(Root);
 }

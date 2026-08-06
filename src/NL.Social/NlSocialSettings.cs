@@ -41,13 +41,18 @@ public sealed class NlSocialSettings
             _ => NlSocialMode.Mock,
         };
 
-        var clientId = Environment.GetEnvironmentVariable("TWITCH_CLIENT_ID");
-        var clientSecret = Environment.GetEnvironmentVariable("TWITCH_CLIENT_SECRET");
-        var serverToken = Environment.GetEnvironmentVariable("TWITCH_ACCESS_TOKEN");
-        var twitchLiveReady = !string.IsNullOrWhiteSpace(clientId)
-            && (!string.IsNullOrWhiteSpace(clientSecret) || !string.IsNullOrWhiteSpace(serverToken));
+        var twitchClientId = Environment.GetEnvironmentVariable("TWITCH_CLIENT_ID");
+        var twitchClientSecret = Environment.GetEnvironmentVariable("TWITCH_CLIENT_SECRET");
+        var twitchServerToken = Environment.GetEnvironmentVariable("TWITCH_ACCESS_TOKEN");
+        var twitchLiveReady = !string.IsNullOrWhiteSpace(twitchClientId)
+            && (!string.IsNullOrWhiteSpace(twitchClientSecret) || !string.IsNullOrWhiteSpace(twitchServerToken));
 
-        if (mode == NlSocialMode.Live && !twitchLiveReady)
+        var discordClientId = Environment.GetEnvironmentVariable("DISCORD_CLIENT_ID");
+        var discordClientSecret = Environment.GetEnvironmentVariable("DISCORD_CLIENT_SECRET");
+        var discordLiveReady = !string.IsNullOrWhiteSpace(discordClientId)
+            && !string.IsNullOrWhiteSpace(discordClientSecret);
+
+        if (mode == NlSocialMode.Live && !twitchLiveReady && !discordLiveReady)
         {
             mode = NlSocialMode.Mock;
         }
@@ -71,9 +76,11 @@ public sealed class NlSocialSettings
 
     public object ToPublicInfo()
     {
-        var clientId = Environment.GetEnvironmentVariable("TWITCH_CLIENT_ID");
-        var clientSecret = Environment.GetEnvironmentVariable("TWITCH_CLIENT_SECRET");
-        var serverToken = Environment.GetEnvironmentVariable("TWITCH_ACCESS_TOKEN");
+        var twitchClientId = Environment.GetEnvironmentVariable("TWITCH_CLIENT_ID");
+        var twitchClientSecret = Environment.GetEnvironmentVariable("TWITCH_CLIENT_SECRET");
+        var twitchServerToken = Environment.GetEnvironmentVariable("TWITCH_ACCESS_TOKEN");
+        var discordClientId = Environment.GetEnvironmentVariable("DISCORD_CLIENT_ID");
+        var discordClientSecret = Environment.GetEnvironmentVariable("DISCORD_CLIENT_SECRET");
 
         return new
         {
@@ -81,15 +88,20 @@ public sealed class NlSocialSettings
             mode = Mode.ToString(),
             cacheTtlSeconds = CacheTtlSeconds,
             liveCheckIntervalSeconds = LiveCheckIntervalSeconds,
-            twitchConfigured = !string.IsNullOrWhiteSpace(clientId)
-                && (!string.IsNullOrWhiteSpace(clientSecret) || !string.IsNullOrWhiteSpace(serverToken)),
-            twitchOAuthConfigured = !string.IsNullOrWhiteSpace(clientId)
-                && !string.IsNullOrWhiteSpace(clientSecret),
+            twitchConfigured = !string.IsNullOrWhiteSpace(twitchClientId)
+                && (!string.IsNullOrWhiteSpace(twitchClientSecret) || !string.IsNullOrWhiteSpace(twitchServerToken)),
+            twitchOAuthConfigured = !string.IsNullOrWhiteSpace(twitchClientId)
+                && !string.IsNullOrWhiteSpace(twitchClientSecret),
+            discordOAuthConfigured = !string.IsNullOrWhiteSpace(discordClientId)
+                && !string.IsNullOrWhiteSpace(discordClientSecret),
             oauth = new
             {
                 twitchAuthorize = "/api/v1/social/oauth/twitch/authorize",
                 twitchCallback = "/api/v1/social/oauth/twitch/callback",
-                scopes = TwitchOAuthService.DefaultScopes,
+                twitchScopes = TwitchOAuthService.DefaultScopes,
+                discordAuthorize = "/api/v1/social/oauth/discord/authorize",
+                discordCallback = "/api/v1/social/oauth/discord/callback",
+                discordScopes = DiscordOAuthService.DefaultScopes,
             },
             storePath = NlSocialPaths.Root,
             mockDataPath = NlSocialPaths.MockData,
@@ -111,6 +123,10 @@ public sealed class NlSocialHost
         TwitchCredentials = new JsonTwitchOAuthCredentialStore();
         TwitchTokenService = new TwitchOAuthTokenService(TwitchCredentials);
         TwitchOAuth = new TwitchOAuthService(OAuthStates, TwitchCredentials, LinkStore);
+        DiscordCredentials = new JsonDiscordOAuthCredentialStore();
+        DiscordTokenService = new DiscordOAuthTokenService(DiscordCredentials);
+        DiscordOAuth = new DiscordOAuthService(OAuthStates, DiscordCredentials, LinkStore);
+        DiscordGuild = new DiscordGuildMemberService(DiscordTokenService);
         Cache = new SocialStatusCache(TimeSpan.FromSeconds(settings.CacheTtlSeconds));
 
         var mock = new MockSocialRelationshipProvider();
@@ -119,7 +135,9 @@ public sealed class NlSocialHost
         ISocialRelationshipProvider provider = settings.Mode switch
         {
             NlSocialMode.Off => new OffSocialRelationshipProvider(),
-            NlSocialMode.Live => new TwitchHelixSocialProvider(mock, TwitchTokenService),
+            NlSocialMode.Live => new LiveSocialRelationshipProvider(
+                new TwitchHelixSocialProvider(mock, TwitchTokenService),
+                DiscordGuild),
             _ => mock,
         };
 
@@ -149,6 +167,14 @@ public sealed class NlSocialHost
     public TwitchOAuthTokenService TwitchTokenService { get; }
 
     public TwitchOAuthService TwitchOAuth { get; }
+
+    public JsonDiscordOAuthCredentialStore DiscordCredentials { get; }
+
+    public DiscordOAuthTokenService DiscordTokenService { get; }
+
+    public DiscordOAuthService DiscordOAuth { get; }
+
+    public DiscordGuildMemberService DiscordGuild { get; }
 
     public SocialStatusCache Cache { get; }
 

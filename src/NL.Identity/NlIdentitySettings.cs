@@ -22,10 +22,8 @@ public sealed class NlIdentitySettings
 
     public bool EnforceOneLinkPerPlatform { get; init; } = true;
 
-    /// <summary>Public HTTP base for OAuth callbacks (e.g. http://127.0.0.1:27020).</summary>
     public string? PublicBaseUrl { get; init; }
 
-    /// <summary>Steam OpenID realm; defaults to public base URL.</summary>
     public string? SteamRealm { get; init; }
 
     public static NlIdentitySettings LoadFromEnvironment()
@@ -43,8 +41,13 @@ public sealed class NlIdentitySettings
             _ => NlOwnershipMode.Mock,
         };
 
-        if (mode == NlOwnershipMode.Live
-            && string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY")))
+        var liveReady = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY"))
+            || PlatformOAuthEnv.HasPair("EPIC_CLIENT_ID", "EPIC_CLIENT_SECRET")
+            || PlatformOAuthEnv.HasPair("XBOX_CLIENT_ID", "XBOX_CLIENT_SECRET")
+            || PlatformOAuthEnv.HasPair("MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET")
+            || PlatformOAuthEnv.HasPair("PSN_CLIENT_ID", "PSN_CLIENT_SECRET");
+
+        if (mode == NlOwnershipMode.Live && !liveReady)
         {
             mode = NlOwnershipMode.Mock;
         }
@@ -71,12 +74,22 @@ public sealed class NlIdentitySettings
         mode = Mode.ToString(),
         strictUnknown = StrictUnknown,
         steamConfigured = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY")),
+        epicOAuthConfigured = PlatformOAuthEnv.HasPair("EPIC_CLIENT_ID", "EPIC_CLIENT_SECRET"),
+        xboxOAuthConfigured = PlatformOAuthEnv.HasPair("XBOX_CLIENT_ID", "XBOX_CLIENT_SECRET")
+            || PlatformOAuthEnv.HasPair("MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET"),
+        psnOAuthConfigured = PlatformOAuthEnv.HasPair("PSN_CLIENT_ID", "PSN_CLIENT_SECRET"),
         steamOpenIdEnabled = Enabled,
         publicBaseUrl = PublicBaseUrl,
         oauth = new
         {
             steamAuthorize = "/api/v1/identity/oauth/steam/authorize",
             steamCallback = "/api/v1/identity/oauth/steam/callback",
+            epicAuthorize = "/api/v1/identity/oauth/epic/authorize",
+            epicCallback = "/api/v1/identity/oauth/epic/callback",
+            xboxAuthorize = "/api/v1/identity/oauth/xbox/authorize",
+            xboxCallback = "/api/v1/identity/oauth/xbox/callback",
+            playstationAuthorize = "/api/v1/identity/oauth/playstation/authorize",
+            playstationCallback = "/api/v1/identity/oauth/playstation/callback",
             linkUi = "/identity-link.html",
         },
         storePath = NlIdentityPaths.Root,
@@ -98,25 +111,30 @@ public sealed class NlIdentityHost
 
         _mockVerifier = new MockGameOwnershipVerifier();
         var steam = new SteamWebApiOwnershipVerifier(fallback: _mockVerifier);
+        PlatformCredentials = new JsonPlatformOAuthCredentialStore();
+        PlatformTokens = new PlatformOAuthTokenService(PlatformCredentials);
+        var epic = new EpicOwnershipVerifier(_mockVerifier);
+        var xbox = new XboxOwnershipVerifier(_mockVerifier, PlatformTokens);
+        var playstation = new PlayStationOwnershipVerifier(_mockVerifier, PlatformTokens);
 
         OwnershipVerifier = settings.Mode switch
         {
             NlOwnershipMode.Off => new OffGameOwnershipVerifier(),
             NlOwnershipMode.Live => new CompositeGameOwnershipVerifier(
                 steam,
+                epic,
+                xbox,
+                playstation,
                 _mockVerifier,
-                new StubPlatformOwnershipVerifier(NlPlatform.Epic),
                 new StubPlatformOwnershipVerifier(NlPlatform.Ubisoft),
                 new StubPlatformOwnershipVerifier(NlPlatform.Ea),
-                new StubPlatformOwnershipVerifier(NlPlatform.Xbox),
-                new StubPlatformOwnershipVerifier(NlPlatform.PlayStation),
                 new StubPlatformOwnershipVerifier(NlPlatform.Riot),
                 new StubPlatformOwnershipVerifier(NlPlatform.Itch)),
             _ => _mockVerifier,
         };
 
         BanChecker = new CompositePublisherBanChecker(steam, _mockVerifier);
-        SubscriptionChecker = _mockVerifier;
+        SubscriptionChecker = new CompositeMultiplayerSubscriptionChecker(xbox, playstation, _mockVerifier);
         OwnershipGate = new NlOwnershipAdmissionGate(
             OwnershipVerifier,
             BanChecker,
@@ -127,6 +145,9 @@ public sealed class NlIdentityHost
 
         OAuthStates = new JsonOAuthStateStore();
         SteamOpenId = new SteamOpenIdService(OAuthStates, settings);
+        EpicOAuth = new EpicOAuthService(OAuthStates, PlatformCredentials, Identity);
+        XboxOAuth = new XboxOAuthService(OAuthStates, PlatformCredentials, Identity);
+        PlayStationOAuth = new PlayStationOAuthService(OAuthStates, PlatformCredentials, Identity);
     }
 
     public NlIdentitySettings Settings { get; }
@@ -136,6 +157,10 @@ public sealed class NlIdentityHost
     public IIdentityAuditStore Audit { get; }
 
     public NlIdentityService Identity { get; }
+
+    public JsonPlatformOAuthCredentialStore PlatformCredentials { get; }
+
+    public PlatformOAuthTokenService PlatformTokens { get; }
 
     public IGameOwnershipVerifier OwnershipVerifier { get; }
 
@@ -149,7 +174,12 @@ public sealed class NlIdentityHost
 
     public SteamOpenIdService SteamOpenId { get; }
 
-    /// <summary>Reload mock ownership matrix after the on-disk config file is created or updated.</summary>
+    public EpicOAuthService EpicOAuth { get; }
+
+    public XboxOAuthService XboxOAuth { get; }
+
+    public PlayStationOAuthService PlayStationOAuth { get; }
+
     public void ReloadMockOwnership() => _mockVerifier.Reload();
 }
 

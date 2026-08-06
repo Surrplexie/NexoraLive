@@ -23,15 +23,19 @@
 
   function loadQueryParams() {
     var params = new URLSearchParams(window.location.search);
-    if (params.get('linked') === 'steam') {
-      setStatus('Steam linked: ' + (params.get('steamId') || 'ok'));
+    var linked = params.get('linked');
+    if (linked) {
+      setStatus(linked + ' linked: ' + (params.get('displayName') || params.get('platformUserId') || params.get('steamId') || 'ok'));
       if (params.get('accountId')) {
         accountInput.value = params.get('accountId');
         localStorage.setItem('nlAccountId', params.get('accountId'));
       }
+      if (params.get('platformUserId')) {
+        document.getElementById('verify-platform-user').value = params.get('platformUserId');
+      }
       if (params.get('steamId')) {
-        document.getElementById('verify-steam64').value = params.get('steamId');
-        localStorage.setItem('nlSteam64', params.get('steamId'));
+        document.getElementById('verify-platform-user').value = params.get('steamId');
+        document.getElementById('verify-platform').value = 'steam';
       }
       window.history.replaceState({}, '', '/identity-link.html');
     }
@@ -57,12 +61,22 @@
     (acct.links || []).forEach(function (l) {
       var li = document.createElement('li');
       li.textContent = l.platform + ': ' + l.externalUserId;
-      if (l.platform.toLowerCase() === 'steam') {
-        document.getElementById('verify-steam64').value = l.externalUserId;
-        localStorage.setItem('nlSteam64', l.externalUserId);
-      }
       linkList.appendChild(li);
+      if (l.platform.toLowerCase() === 'steam') {
+        document.getElementById('verify-platform').value = 'steam';
+        document.getElementById('verify-platform-user').value = l.externalUserId;
+      }
     });
+  }
+
+  function startOAuth(path) {
+    var accountId = accountInput.value.trim() || localStorage.getItem('nlAccountId');
+    if (!accountId) {
+      setStatus('Create an NL account first.', true);
+      return;
+    }
+    var returnUrl = encodeURIComponent('/identity-link.html');
+    window.location.href = path + '?accountId=' + encodeURIComponent(accountId) + '&returnUrl=' + returnUrl;
   }
 
   document.getElementById('create-account').onclick = async function () {
@@ -84,19 +98,22 @@
   };
 
   document.getElementById('steam-sign-in').onclick = function () {
-    var accountId = accountInput.value.trim() || localStorage.getItem('nlAccountId');
-    if (!accountId) {
-      setStatus('Create an NL account first.', true);
-      return;
-    }
-    var returnUrl = encodeURIComponent('/identity-link.html');
-    window.location.href = '/api/v1/identity/oauth/steam/authorize?accountId='
-      + encodeURIComponent(accountId) + '&returnUrl=' + returnUrl;
+    startOAuth('/api/v1/identity/oauth/steam/authorize');
+  };
+  document.getElementById('epic-sign-in').onclick = function () {
+    startOAuth('/api/v1/identity/oauth/epic/authorize');
+  };
+  document.getElementById('xbox-sign-in').onclick = function () {
+    startOAuth('/api/v1/identity/oauth/xbox/authorize');
+  };
+  document.getElementById('playstation-sign-in').onclick = function () {
+    startOAuth('/api/v1/identity/oauth/playstation/authorize');
   };
 
   document.getElementById('test-admit').onclick = async function () {
     try {
-      var steam64 = document.getElementById('verify-steam64').value.trim();
+      var platform = document.getElementById('verify-platform').value;
+      var platformUserId = document.getElementById('verify-platform-user').value.trim();
       var appId = document.getElementById('verify-appid').value.trim();
       var accountId = accountInput.value.trim() || localStorage.getItem('nlAccountId');
       var result = await api('/api/v1/session/admit', {
@@ -104,8 +121,8 @@
         body: JSON.stringify({
           playerId: 'identity-test',
           displayName: 'Identity Test',
-          platform: 'steam',
-          platformUserId: steam64,
+          platform: platform,
+          platformUserId: platformUserId,
           appId: appId,
           nlAccountId: accountId,
         }),

@@ -17,23 +17,51 @@ $env:NL_PUBLIC_BASE_URL = "http://127.0.0.1:27020"  # OAuth callback base (requi
 Copy `samples/identity/mock-ownership.json` to `%LOCALAPPDATA%\NL\identity\mock-ownership.json`
 (or `$NL_DATA_ROOT/identity/`).
 
-## Steam OpenID sign-in (browser)
+## Platform sign-in (browser)
 
-1. Open **`/identity-link.html`** (or use **Sign in with Steam** on `/nl-client.html`)
-2. **Create account** → receives `accountId`
-3. **Sign in with Steam** → redirects to Steam → callback links Steam64 to account
-4. Use linked Steam64 + `nlAccountId` on admit / join flow
+Open **`/identity-link.html`** to create an NL account and link platforms via OAuth/OpenID.
+
+| Platform | Flow | Env |
+|----------|------|-----|
+| Steam | OpenID 2.0 | `STEAM_WEB_API_KEY` (live ownership) |
+| Epic | OAuth 2.0 | `EPIC_CLIENT_ID`, `EPIC_CLIENT_SECRET` |
+| Xbox | Microsoft OAuth + Xbox Live | `XBOX_CLIENT_ID`, `XBOX_CLIENT_SECRET` |
+| PlayStation | PSN OAuth 2.0 | `PSN_CLIENT_ID`, `PSN_CLIENT_SECRET` |
 
 ### OAuth routes
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/api/v1/identity/oauth/steam/authorize?accountId=…&returnUrl=…` | Start Steam OpenID redirect |
-| GET | `/api/v1/identity/oauth/steam/callback` | Verify OpenID, link platform, redirect to `returnUrl` |
+| GET | `/api/v1/identity/oauth/steam/authorize?accountId=…&returnUrl=…` | Steam OpenID |
+| GET | `/api/v1/identity/oauth/steam/callback` | Steam callback |
+| GET | `/api/v1/identity/oauth/epic/authorize?accountId=…&returnUrl=…` | Epic OAuth |
+| GET | `/api/v1/identity/oauth/epic/callback` | Epic callback |
+| GET | `/api/v1/identity/oauth/xbox/authorize?accountId=…&returnUrl=…` | Xbox OAuth |
+| GET | `/api/v1/identity/oauth/xbox/callback` | Xbox callback |
+| GET | `/api/v1/identity/oauth/playstation/authorize?accountId=…&returnUrl=…` | PlayStation OAuth |
+| GET | `/api/v1/identity/oauth/playstation/callback` | PlayStation callback |
+| GET | `/api/v1/identity/platform-oauth/{platform}/{accountId}` | Linked profile (no tokens) |
 
 CSRF protection: short-lived `state` token in `identity/oauth-state.json`.
 
+See [`samples/identity/platform-oauth.env.example`](../samples/identity/platform-oauth.env.example).
+
+```powershell
+powershell -File scripts/nl-identity-platform-oauth-validate.ps1
+```
+
+Expected: **`PLATFORM OAUTH VALIDATION PASSED`**
+
 Manual linking (API / dev): `POST /api/v1/identity/link` still works without browser.
+
+## Live ownership APIs (Phase L.3)
+
+| Platform | API | Notes |
+|----------|-----|-------|
+| Steam | `IPlayerService/GetOwnedGames` | Requires `STEAM_WEB_API_KEY` |
+| Epic | Ecom `POST /epic/ecom/v1/ownership` | Client credentials + linked Epic account id |
+| Xbox | Title Hub batch lookup | Requires linked XUID + Xbox OAuth token |
+| PlayStation | Entitlements API | Requires linked PSN account + user token |
 
 ## Session profile (ownership required)
 
@@ -92,13 +120,14 @@ Live Steam: `ISteamUser/GetPlayerBans/v1` when `STEAM_WEB_API_KEY` is set.
 ## Console multiplayer pass
 
 Mock: `subscriptionRequired` + `multiplayerActive` in `mock-ownership.json`.  
-Live Xbox/PS enforcement requires platform SDK partnership (documented stub).
+Live Xbox/PlayStation: multiplayer access checked via Title Hub / entitlements when OAuth configured.
 
 ## Smoke test
 
 ```powershell
 powershell -File scripts/nl-identity-smoke.ps1
+powershell -File scripts/nl-identity-platform-oauth-validate.ps1
 dotnet test tests/NL.Identity.Tests
 ```
 
-Browser test: Session Host running → `/identity-link.html` → create account → Sign in with Steam (requires reachable `NL_PUBLIC_BASE_URL` for callback).
+Browser test: Session Host running → `/identity-link.html` → create account → link Steam/Epic/Xbox/PlayStation.

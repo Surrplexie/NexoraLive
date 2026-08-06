@@ -46,7 +46,9 @@ Admit request → SocialGateService (live API / mock)
 | `TWITCH_CLIENT_ID` | — | Required for `live` mode Twitch checks |
 | `TWITCH_CLIENT_SECRET` | — | Required for Twitch OAuth player linking |
 | `TWITCH_ACCESS_TOKEN` | — | Optional legacy server token when players have not OAuth-linked |
-| `NL_PUBLIC_BASE_URL` | request host | OAuth callback base (must match Twitch app redirect URI) |
+| `DISCORD_CLIENT_ID` | — | Required for Discord OAuth player linking |
+| `DISCORD_CLIENT_SECRET` | — | Required for Discord OAuth player linking |
+| `NL_PUBLIC_BASE_URL` | request host | OAuth callback base (must match app redirect URIs) |
 
 ## REST API
 
@@ -120,6 +122,38 @@ powershell -File scripts/nl-social-twitch-oauth-validate.ps1
 ```
 
 Expected: **`TWITCH OAUTH VALIDATION PASSED`**
+
+## Discord OAuth (Phase M.2)
+
+Players link Discord via browser OAuth; guild membership is verified live at admit using the player's token.
+
+1. Open **`/social-link.html`**
+2. Enter **player id**
+3. Click **Sign in with Discord**
+4. Set streamer **Discord guild id** in `/join-gate.html`
+5. At admit, `GET /users/@me/guilds/{guild.id}/member` confirms membership
+
+### OAuth routes
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/v1/social/oauth/discord/authorize?playerId=…&returnUrl=…` | Start Discord OAuth redirect |
+| GET | `/api/v1/social/oauth/discord/callback` | Exchange code, link account, redirect |
+| GET | `/api/v1/social/discord-oauth/{playerId}` | Read linked Discord profile (no tokens) |
+
+Configure Discord app redirect URI:
+
+`{NL_PUBLIC_BASE_URL}/api/v1/social/oauth/discord/callback`
+
+Scopes: `identify guilds.members.read`
+
+See [`samples/social/discord-oauth.env.example`](../samples/social/discord-oauth.env.example).
+
+```powershell
+powershell -File scripts/nl-social-discord-oauth-validate.ps1
+```
+
+Expected: **`DISCORD OAUTH VALIDATION PASSED`**
 
 ## Smoke test
 

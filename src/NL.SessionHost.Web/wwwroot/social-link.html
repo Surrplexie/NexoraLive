@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>NL Social — Link Twitch</title>
+  <title>NL Social — Link accounts</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body class="operator-page">
   <header>
     <h1>Social account linking</h1>
-    <p class="sub">Link Twitch via OAuth for follow/sub checks at join (Phase M.1)</p>
+    <p class="sub">Link Twitch and Discord via OAuth for join gate checks (Phase M.1–M.2)</p>
     <nav class="nav">
       <a href="/join-gate.html">Join gate</a>
       <a href="/identity-link.html">Identity</a>
@@ -35,9 +35,17 @@
 
   <section class="card operator-panel">
     <h2>Link Twitch (OAuth)</h2>
-    <p class="sub">Sign in with Twitch to link your account. Used for live follow/sub verification at admit.</p>
+    <p class="sub">Sign in with Twitch for live follow/sub verification at admit.</p>
     <div class="actions">
       <button type="button" id="twitch-sign-in" class="primary">Sign in with Twitch</button>
+    </div>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Link Discord (OAuth)</h2>
+    <p class="sub">Sign in with Discord for live guild membership verification at admit.</p>
+    <div class="actions">
+      <button type="button" id="discord-sign-in" class="primary">Sign in with Discord</button>
     </div>
     <h3>Linked platforms</h3>
     <pre id="link-block" class="code-block">No links loaded.</pre>
@@ -45,7 +53,7 @@
 
   <section class="card operator-panel">
     <h2>Test admit (social gate)</h2>
-    <button type="button" id="test-admit">Test admit with linked Twitch</button>
+    <button type="button" id="test-admit">Test admit with linked accounts</button>
     <pre id="admit-result" class="code-block"></pre>
   </section>
 

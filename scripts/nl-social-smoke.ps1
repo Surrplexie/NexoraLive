@@ -12,4 +12,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 powershell -File (Join-Path $Root "scripts/nl-social-twitch-oauth-validate.ps1")
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+powershell -File (Join-Path $Root "scripts/nl-social-discord-oauth-validate.ps1")
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 Write-Host "Phase M social gate smoke OK" -ForegroundColor Green

@@ -9,7 +9,7 @@
 <body class="operator-page">
   <header>
     <h1>Platform identity</h1>
-    <p class="sub">Create an NL account and link Steam via OpenID (Phase L)</p>
+    <p class="sub">Link Steam, Epic, Xbox, and PlayStation for live ownership verification (Phase L.3)</p>
     <nav class="nav">
       <a href="/operator.html">Operator</a>
       <a href="/identity-link.html" aria-current="page">Identity</a>
@@ -36,10 +36,13 @@
   </section>
 
   <section class="card operator-panel">
-    <h2>Link Steam (OpenID)</h2>
-    <p class="sub">Sign in with Steam to link your Steam64 to this NL account. Used for ownership verification at admit.</p>
+    <h2>Link platforms</h2>
+    <p class="sub">Sign in to link platform accounts to this NL account. Used for ownership verification at admit.</p>
     <div class="actions">
       <button type="button" id="steam-sign-in" class="primary">Sign in with Steam</button>
+      <button type="button" id="epic-sign-in">Sign in with Epic</button>
+      <button type="button" id="xbox-sign-in">Sign in with Xbox</button>
+      <button type="button" id="playstation-sign-in">Sign in with PlayStation</button>
     </div>
     <h3>Linked platforms</h3>
     <ul id="link-list"></ul>
@@ -48,8 +51,16 @@
   <section class="card operator-panel">
     <h2>Verify ownership (mock/live)</h2>
     <div class="grid">
-      <label>Steam64 <input id="verify-steam64" placeholder="from linked account" /></label>
-      <label>App id <input id="verify-appid" value="440" /></label>
+      <label>Platform
+        <select id="verify-platform">
+          <option value="steam">Steam</option>
+          <option value="epic">Epic</option>
+          <option value="xbox">Xbox</option>
+          <option value="playstation">PlayStation</option>
+        </select>
+      </label>
+      <label>Platform user id <input id="verify-platform-user" placeholder="from linked account" /></label>
+      <label>App / title id <input id="verify-appid" value="440" /></label>
     </div>
     <button type="button" id="test-admit">Test admit with ownership</button>
     <pre id="admit-result" class="code-block"></pre>

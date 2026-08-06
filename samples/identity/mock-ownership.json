@@ -1,13 +1,10 @@
 {
   "defaultOwned": false,
   "ownership": {
-    "steam:76561198000000001": {
-      "440": "Owned",
-      "730": "NotOwned"
-    },
-    "steam:76561198000000002": {
-      "440": "Owned"
-    }
+    "steam:76561198000000001": { "440": "Owned", "730": "NotOwned" },
+    "epic:epic-account-001": { "hello-fork": "Owned" },
+    "xbox:2533274790360720": { "hello-fork": "Owned" },
+    "playstation:psn-account-001": { "hello-fork": "Owned" }
   },
   "banned": {
     "steam:76561198999999999": true
