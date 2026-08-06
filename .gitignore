@@ -35,6 +35,7 @@
 # ── Re-ignore inside public trees ────────────────────────────────────────────
 
 # Proprietary / personal notes (even if dropped under docs/)
+cmds.md
 nl.txt
 *.txt
 !LICENSE
