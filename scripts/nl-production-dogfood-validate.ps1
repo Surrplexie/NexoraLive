@@ -80,15 +80,37 @@ if (-not $reg.streamerId) { throw "Streamer registration failed" }
 Write-Host ("OK: streamer {0}" -f $reg.streamerId) -ForegroundColor Green
 
 Write-Host "NL identity account + Steam link..." -ForegroundColor Yellow
-$acct = Invoke-NlApi POST "/api/v1/identity/accounts" @{ displayName = "Dogfood Player" }
-if (-not $acct.accountId) { throw "Identity account create failed" }
-$link = Invoke-NlApi POST "/api/v1/identity/link" @{
-    accountId = $acct.accountId
-    platform = "steam"
-    externalUserId = $Steam64
+$accountId = $null
+try {
+    $existing = Invoke-NlApi GET ("/api/v1/identity/accounts/by-platform/steam/{0}" -f $Steam64)
+    if ($existing.accountId) {
+        $accountId = [string]$existing.accountId
+        Write-Host ("  reusing linked account {0}" -f $accountId) -ForegroundColor DarkGray
+    }
+} catch {
+    $status = $null
+    if ($_.Exception.Response) { $status = [int]$_.Exception.Response.StatusCode }
+    if ($status -ne 404) { throw }
 }
-if (-not $link.accountId) { throw "Identity Steam link failed" }
-Write-Host ("OK: identity account {0}" -f $acct.accountId) -ForegroundColor Green
+
+if (-not $accountId) {
+    $acct = Invoke-NlApi POST "/api/v1/identity/accounts" @{ displayName = "Dogfood Player" }
+    if (-not $acct.accountId) { throw "Identity account create failed" }
+    $accountId = [string]$acct.accountId
+    try {
+        Invoke-NlApi POST "/api/v1/identity/link" @{
+            accountId = $accountId
+            platform = "steam"
+            externalUserId = $Steam64
+        } | Out-Null
+    } catch {
+        $resolved = Invoke-NlApi GET ("/api/v1/identity/accounts/by-platform/steam/{0}" -f $Steam64)
+        if (-not $resolved.accountId) { throw "Identity Steam link failed (409) and reverse lookup empty." }
+        $accountId = [string]$resolved.accountId
+        Write-Host ("  steam already linked - using account {0}" -f $accountId) -ForegroundColor DarkGray
+    }
+}
+Write-Host ("OK: identity account {0}" -f $accountId) -ForegroundColor Green
 
 $playerJoinVerified = $false
 $minecraftJoinVerified = $false
@@ -105,7 +127,7 @@ Write-Host "hello-fork Docker dogfood..." -ForegroundColor Yellow
     -ExpectProvisioner docker `
     -SkipImageBuild `
     -OperatorKey $OperatorKey `
-    -NlAccountId $acct.accountId
+    -NlAccountId $accountId
 if ($LASTEXITCODE -ne 0) { throw "hello-fork dogfood failed" }
 $playerJoinVerified = $true
 $forkTeardownVerified = $true
@@ -122,7 +144,7 @@ if ($AllGames) {
         -ExpectProvisioner docker `
         -SkipImageBuild `
         -OperatorKey $OperatorKey `
-        -NlAccountId $acct.accountId `
+        -NlAccountId $accountId `
         -VerifyRuleEvents
     if ($LASTEXITCODE -ne 0) { throw "minecraft dogfood failed" }
     $minecraftJoinVerified = $true
@@ -138,7 +160,7 @@ if ($AllGames) {
         -ExpectProvisioner docker `
         -SkipImageBuild `
         -OperatorKey $OperatorKey `
-        -NlAccountId $acct.accountId
+        -NlAccountId $accountId
     if ($LASTEXITCODE -ne 0) { throw "beamng dogfood failed" }
     $beamngJoinVerified = $true
     Write-Host "OK: beamng join + teardown" -ForegroundColor Green

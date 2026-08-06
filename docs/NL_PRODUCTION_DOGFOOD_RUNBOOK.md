@@ -40,6 +40,7 @@ powershell -File scripts/nl-production-dogfood-validate.ps1 -OperatorKey $op -Al
 | Port 27020 busy | `powershell -File scripts/nl-production-dogfood-stack-down.ps1` |
 | Docker provision fails | Docker Desktop running; images exist (`docker images nl-fork-hello`) |
 | Join denied — ownership | Validate script runs dogfood setup (mock matrix); use Steam64 `76561198000000001` |
+| Identity link 409 Conflict | Re-run is safe — validate reuses existing Steam link; or `stack-down -RemoveVolumes` to reset |
 | Fork container exits | Check `docker logs nl-fork-*`; rebuild with `scripts/build-fork-images.ps1` |
 | Minecraft port conflict | Stop other MC servers on 25565 |
 | Orchestrator mode Mock | Rebuild stack — compose sets `NL_FORK_ORCHESTRATOR_MODE=docker` |
