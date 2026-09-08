@@ -1,0 +1,146 @@
+# VPS production — public GA + Docker forks + all dev flags OFF
+#
+# First public title: RimWorld. hello-fork + minecraft stay as catalog smokes.
+# T2-lite: fork containers publish native game ports on the VPS host
+# (`docker run -p 25555:25555` for RimWorld). Open **25555/tcp** on the firewall.
+# Set NL_FORK_PUBLIC_CONNECT_HOST (play domain) so manifests are rimworld://play…:25555.
+# Forks are started via the host Docker daemon (socket mount) and call back
+# through host.docker.internal — session-host ports MUST be published on
+# loopback, and /data MUST be the same bind path as NL_FORK_DOCKER_WORKSPACE_HOST_ROOT.
+#
+# First-time on VPS:
+#   bash scripts/nl-vps-init-env.sh
+#   bash scripts/nl-vps-deploy.sh
+#
+# See docs/NL_VPS_DEPLOY.md and docs/NL_PUBLIC_LINE.md
+
+services:
+  session-host:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: session-host
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:27020:27020"
+      - "127.0.0.1:27021:27021"
+    env_file:
+      - vps-production-fleet.env
+    environment:
+      NL_BIND: "0.0.0.0"
+      NL_HTTP_PORT: "27020"
+      NL_WS_PORT: "27021"
+      NL_DATA_ROOT: "/data"
+      NL_PUBLIC_MODE: "true"
+      NL_HARDENING: "true"
+      NL_FLEET_ENABLED: "true"
+      NL_FLEET_MAX_CONCURRENT: "128"
+      NL_FLEET_STAGING_DEV: "false"
+      NL_FLEET_PRODUCTION_READY: "true"
+      NL_FORK_ORCHESTRATOR_ENABLED: "true"
+      NL_FORK_ORCHESTRATOR_MODE: "docker"
+      NL_FORK_DOCKER_IMAGE: "nl-fork-rimworld:latest"
+      NL_FORK_DOCKER_HOST: "host.docker.internal"
+      NL_FORK_CATALOG_ENABLED: "true"
+      NL_FORK_CATALOG_MANIFEST: "/app/samples/fork/catalog.json"
+      NL_IDENTITY_ENABLED: "true"
+      NL_OWNERSHIP_MODE: "live"
+      NL_SOCIAL_ENABLED: "true"
+      NL_SOCIAL_MODE: "live"
+      NL_BETA_ENABLED: "false"
+      NL_GA_ENABLED: "true"
+      NL_GA_OPEN_SIGNUP: "true"
+      NL_GA_REQUIRE_LIVE_IDENTITY: "true"
+      NL_GA_ALLOW_MOCK_IDENTITY: "false"
+      NL_GA_REQUIRE_PRODUCTION_READY: "true"
+      NL_GA_REQUIRE_BETA_DISABLED: "true"
+      NL_GA_MIN_CATALOG_GAMES: "3"
+      NL_GA_REQUIRED_GAMES: "hello-fork,minecraft,rimworld"
+      NL_LIVE_PRODUCTION_ENABLED: "true"
+      NL_LIVE_PRODUCTION_DEV: "false"
+      NL_MULTIGAME_PRODUCTION_ENABLED: "true"
+      NL_MULTIGAME_REQUIRED_GAMES: "hello-fork,minecraft,rimworld"
+      NL_PARTNERSHIP_ENABLED: "true"
+      NL_PARTNERSHIP_GATE_ADMIT: "1"
+      NL_LAUNCH_OPS_ENABLED: "true"
+      NL_LAUNCH_OPS_DEV: "false"
+      NL_LAUNCH_STATUS_PAGE_ENABLED: "true"
+      NL_LAUNCH_LEGAL_VERSION: "2026-08-01"
+      NL_LAUNCH_BACKUP_ROOT: "/data/backups"
+      NL_PRODUCTION_CUTOVER_ENABLED: "true"
+      NL_PRODUCTION_CUTOVER_DEV: "false"
+      NL_DISTRIBUTION_ENABLED: "true"
+      NL_DISTRIBUTION_DEV: "false"
+      NL_SCALE_RELIABILITY_ENABLED: "true"
+      NL_SCALE_RELIABILITY_DEV: "false"
+      NL_SCALE_RELIABILITY_MIN_CONCURRENT: "128"
+      NL_SCALE_RELIABILITY_MIN_REGIONS: "3"
+      NL_LEGAL_COMPLIANCE_ENABLED: "true"
+      NL_LEGAL_COMPLIANCE_DEV: "false"
+      NL_PUBLIC_GA_LAUNCH_ENABLED: "true"
+      NL_PUBLIC_GA_LAUNCH_DEV: "false"
+      NL_PRODUCTION_DOGFOOD_ENABLED: "true"
+      NL_PRODUCTION_DOGFOOD_DEV: "false"
+      NL_PRODUCTION_DOGFOOD_REQUIRED_GAMES: "hello-fork,minecraft,rimworld"
+      NL_PRODUCTION_DOGFOOD_REQUIRE_MULTIGAME: "true"
+    volumes:
+      - ${NL_FORK_DOCKER_WORKSPACE_HOST_ROOT:-/var/lib/nl/vps-fork-workspace}:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:27020/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 45s
+    networks:
+      - nl-vps
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      NL_VPS_DOMAIN: ${NL_VPS_DOMAIN:?Set NL_VPS_DOMAIN in docker/.env.vps}
+      NL_VPS_BASE_DOMAIN: ${NL_VPS_BASE_DOMAIN:?Set NL_VPS_BASE_DOMAIN in docker/.env.vps}
+      CADDY_ACME_EMAIL: ${CADDY_ACME_EMAIL:?Set CADDY_ACME_EMAIL for Let's Encrypt}
+    volumes:
+      - ./edge-vps/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      session-host:
+        condition: service_healthy
+    networks:
+      - nl-vps
+
+  coturn:
+    image: coturn/coturn:latest
+    restart: unless-stopped
+    ports:
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+    env_file:
+      - vps-production-fleet.env
+    command:
+      - -n
+      - --log-file=stdout
+      - --listening-port=3478
+      - --fingerprint
+      - --lt-cred-mech
+      - --user=nl:${TURN_SECRET:-change-me-turn-secret}
+      - --realm=nl.vps
+      - --no-cli
+    networks:
+      - nl-vps
+
+volumes:
+  caddy-data:
+  caddy-config:
+
+networks:
+  nl-vps:
+    driver: bridge

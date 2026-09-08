@@ -1,0 +1,19 @@
+# Scenario: combines all three v0.1 constructs into one config, matching the
+# built-in default the simulator uses when you run it with no arguments.
+# Useful as a copy/paste starting point for your own .nle file.
+
+# No PvP shooting allowed during this event.
+event shoot:
+    block
+
+# Respawning is fine if you're already dead; otherwise it's a rule-break.
+event respawn:
+    if player.health > 0:
+        block
+    else:
+        allow
+
+# Leaving the marked play area is discouraged but not run-ending.
+event leaveBoundary:
+    warn "stay within the zone"
+    block

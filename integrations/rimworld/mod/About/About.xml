@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <name>NexoraLive NL Bridge</name>
+  <author>NexoraLive</author>
+  <packageId>NexoraLive.NLBridge</packageId>
+  <supportedVersions>
+    <li>1.5</li>
+  </supportedVersions>
+  <description>
+    NL Integration Spec v1 bridge for RimWorld Together dedicated hosts.
+    Emits colony events to the NL session bus and applies warn/kick/tell.
+    Does not redistribute RimWorld; drop this folder into Mods/ next to a licensed install.
+  </description>
+</ModMetaData>

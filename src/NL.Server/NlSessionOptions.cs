@@ -1,0 +1,128 @@
+using NL.AntiCheat.Core;
+using NL.Core;
+using NL.Core.Sp;
+
+namespace NL.Server;
+
+/// <summary>Everything needed to run one NLServer session (CLI or Session Host).</summary>
+public sealed class NlSessionOptions
+{
+    public required string Game { get; init; }
+    public required string ConfigPath { get; init; }
+    public required string SourcePath { get; init; }
+    public bool Replay { get; init; }
+    public string? RconEndpoint { get; init; } // host:port:password
+    public string? RconCommandTemplate { get; init; }
+    public string? ActionCommand { get; init; }
+    /// <summary>BeamNG bridge command UDP endpoint (<c>host:port</c>), default <c>127.0.0.1:27022</c>.</summary>
+    public string? BeamngCommandEndpoint { get; init; }
+    /// <summary>NL integration action channel: <c>auto</c> (paired ws), or <c>tcp://host:port</c>.</summary>
+    public string? NlActionEndpoint { get; init; }
+    /// <summary>When set, WebSocket bridge connections must pass matching <c>?token=</c> query param.</summary>
+    public string? BusToken { get; init; }
+    public string StreamerId { get; init; } = NlPaths.DefaultStreamerId;
+    public string? ModerationLogPath { get; init; }
+    public string? SpStorePath { get; init; }
+    public string? JoinRequirementsPath { get; init; }
+    public bool AntiCheat { get; init; }
+    public bool JoinGate { get; init; }
+    public bool AnomalyAutoMod { get; init; }
+    public JoinRequirements? JoinRequirements { get; init; }
+    /// <summary>Optional override; when null and <see cref="BeamngCommandEndpoint"/> is set, BeamNG freeroam thresholds apply.</summary>
+    public AnomalyThresholds? AnomalyThresholds { get; init; }
+}
+
+/// <summary>Persisted Session Host profile under <see cref="NlPaths.SessionProfile"/>.</summary>
+public sealed class SessionProfileFile
+{
+    public string StreamerId { get; set; } = NlPaths.DefaultStreamerId;
+    public string Game { get; set; } = "minecraft";
+    public string ConfigPath { get; set; } = "";
+    public string SourcePath { get; set; } = "";
+    public string? RconEndpoint { get; set; }
+    public string? BeamngCommandEndpoint { get; set; }
+    public string? NlActionEndpoint { get; set; }
+    public bool UseSessionBus { get; set; }
+    public string? BusToken { get; set; }
+    public bool AntiCheat { get; set; } = true;
+    public bool JoinGate { get; set; } = true;
+    public bool AnomalyAutoMod { get; set; }
+    public bool UseDefaultDataPaths { get; set; } = true;
+
+    /// <summary>Phase L — require platform ownership proof at admit.</summary>
+    public bool RequireGameOwnership { get; set; }
+
+    public string? GameId { get; set; }
+
+    public string? PlatformAppId { get; set; }
+
+    public string? GameMajorVersion { get; set; }
+
+    public string OwnershipPlatform { get; set; } = "steam";
+
+    public bool StrictOwnershipUnknown { get; set; } = true;
+
+    /// <summary>Phase M — session may only start while streamer is live on a connected channel.</summary>
+    public bool RequireLiveStream { get; set; }
+
+    /// <summary>Phase M — enable live social gate hydration at admit time.</summary>
+    public bool SocialGateEnabled { get; set; } = true;
+
+    /// <summary>Phase N — reject admit/start for unknown or deprecated catalog majors.</summary>
+    public bool CatalogEnforced { get; set; }
+
+    /// <summary>Phase N — verified mod hub ids baked into fork instance.</summary>
+    public List<string> AttachedModIds { get; set; } = [];
+
+    public string? PartnershipTier { get; set; }
+
+    public bool NoProgressTransfer { get; set; } = true;
+
+    public string? CatalogLegalNotice { get; set; }
+
+    /// <summary>Phase O — provision ephemeral fork instance on session start.</summary>
+    public bool ForkOrchestratorEnabled { get; set; }
+
+    /// <summary>Phase O — override destroy grace (seconds); 0 = orchestrator default.</summary>
+    public int ForkDestroyGraceSeconds { get; set; }
+
+    /// <summary>Phase O — override max fork session hours; 0 = orchestrator default.</summary>
+    public double ForkMaxSessionHours { get; set; }
+
+    /// <summary>Phase O — reserved privileged mod/admin slots (nl.txt).</summary>
+    public int ForkReservedPrivilegedSlots { get; set; }
+
+    /// <summary>Phase O — active ephemeral fork session id (set at runtime).</summary>
+    public string? ForkSessionId { get; set; }
+
+    /// <summary>Phase Q — enforce partnership legal gate at admit (default on).</summary>
+    public bool PartnershipGateEnabled { get; set; } = true;
+
+    /// <summary>Phase S — preferred fleet region (us-east, us-west, eu-west).</summary>
+    public string? FleetPreferredRegion { get; set; }
+
+    /// <summary>Phase S — geo hint for placement (eu, west, etc.).</summary>
+    public string? FleetGeoHint { get; set; }
+
+    /// <summary>Phase S — region id assigned at last fork create.</summary>
+    public string? FleetPlacedRegionId { get; set; }
+
+    public NlSessionOptions ToSessionOptions(bool replay = false) => new()
+    {
+        Game = Game,
+        ConfigPath = ConfigPath,
+        SourcePath = SourcePath,
+        Replay = replay,
+        RconEndpoint = RconEndpoint,
+        BeamngCommandEndpoint = BeamngCommandEndpoint,
+        NlActionEndpoint = NlActionEndpoint,
+        BusToken = UseSessionBus ? BusToken : null,
+        StreamerId = string.IsNullOrWhiteSpace(StreamerId) ? NlPaths.DefaultStreamerId : StreamerId,
+        ModerationLogPath = UseDefaultDataPaths ? NlPaths.ModerationLog : null,
+        SpStorePath = UseDefaultDataPaths ? NlPaths.SpProfiles : null,
+        JoinRequirementsPath = UseDefaultDataPaths ? NlPaths.JoinRequirements : null,
+        AntiCheat = AntiCheat,
+        JoinGate = JoinGate,
+        AnomalyAutoMod = AnomalyAutoMod,
+    };
+}

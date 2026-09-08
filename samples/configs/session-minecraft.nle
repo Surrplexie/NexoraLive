@@ -1,0 +1,43 @@
+# Starter .nle for Session Host + live Minecraft (join gate / anti-cheat friendly).
+# Pair with docs/MINECRAFT_LIVE.md.
+
+event playerJoin:
+    warn "NL session active — join gate + NLEvents on."
+    allow
+
+event playerLeave:
+    allow
+
+event playerDeath:
+    allow
+
+event respawn:
+    allow
+
+event playerChat:
+    if chat.capsRatio > 0.8 and chat.length > 10:
+        warn "please avoid excessive caps"
+        block
+    else:
+        allow
+
+event playerAdvancement:
+    allow
+
+event anomalyImpossibleAction:
+    warn "impossible action"
+    block
+
+event anomalyRateSpike:
+    if anomaly.count >= 8:
+        warn "rate spike"
+        block
+    else:
+        allow
+
+event anomalyTeleport:
+    if anomaly.distance > 40:
+        warn "teleport / speed signal"
+        block
+    else:
+        allow

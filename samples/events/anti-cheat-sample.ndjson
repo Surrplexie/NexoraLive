@@ -1,0 +1,30 @@
+# Phase 5 anti-cheat sample stream (generic NDJSON).
+# Alice plays cleanly. Eve cheats: shoots while dead, fire-rate spike, then teleports.
+# Optional "ts" is Unix ms — used by detectors for deterministic rate/teleport windows in --replay.
+# Run with:
+#   dotnet run --project src/NL.Server -- --game generic --config samples/configs/anti-cheat.nle --source samples/events/anti-cheat-sample.ndjson --replay --anti-cheat
+
+{"event":"playerJoin","player":"Alice","ts":1700000000000}
+{"event":"playerJoin","player":"Eve","ts":1700000000100}
+{"event":"shoot","player":"Alice","ts":1700000001000,"props":{"weapon.damage":10}}
+{"event":"move","player":"Alice","ts":1700000001500,"props":{"player.x":0,"player.y":64,"player.z":0}}
+{"event":"move","player":"Alice","ts":1700000002000,"props":{"player.x":2,"player.y":64,"player.z":1}}
+
+{"event":"playerDeath","player":"Eve","ts":1700000003000}
+{"event":"shoot","player":"Eve","ts":1700000003100,"props":{"weapon.damage":99}}
+
+{"event":"respawn","player":"Eve","ts":1700000004000,"props":{"player.health":0}}
+{"event":"shoot","player":"Eve","ts":1700000005000,"props":{"weapon.damage":12}}
+{"event":"shoot","player":"Eve","ts":1700000005050,"props":{"weapon.damage":12}}
+{"event":"shoot","player":"Eve","ts":1700000005100,"props":{"weapon.damage":12}}
+{"event":"shoot","player":"Eve","ts":1700000005150,"props":{"weapon.damage":12}}
+{"event":"shoot","player":"Eve","ts":1700000005200,"props":{"weapon.damage":12}}
+{"event":"shoot","player":"Eve","ts":1700000005250,"props":{"weapon.damage":12}}
+{"event":"shoot","player":"Eve","ts":1700000005300,"props":{"weapon.damage":12}}
+{"event":"shoot","player":"Eve","ts":1700000005350,"props":{"weapon.damage":12}}
+
+{"event":"move","player":"Eve","ts":1700000006000,"props":{"player.x":10,"player.y":64,"player.z":10}}
+{"event":"move","player":"Eve","ts":1700000006050,"props":{"player.x":200,"player.y":64,"player.z":10}}
+
+{"event":"playerLeave","player":"Alice","ts":1700000007000}
+{"event":"playerLeave","player":"Eve","ts":1700000007100}

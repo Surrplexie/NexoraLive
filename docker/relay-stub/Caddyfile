@@ -1,0 +1,17 @@
+# Relay stub — masks fork WebSocket endpoints for staging validation
+# Routes wss://127.0.0.1:8443/fork/{session} → session-host WS bus
+{
+  auto_https disable_redirects
+}
+
+:8443 {
+  tls internal
+  @fork path /fork/*
+  handle @fork {
+    uri strip_prefix /fork
+    reverse_proxy session-host:27021
+  }
+  handle /health {
+    respond "ok" 200
+  }
+}

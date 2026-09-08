@@ -1,0 +1,17 @@
+# Relay — live production fork WebSocket masking
+# VPS: relay-us-east.yourdomain.com { handle /fork/* ... }
+{
+	auto_https disable_redirects
+}
+
+:8443 {
+	tls internal
+	@fork path /fork/*
+	handle @fork {
+		uri strip_prefix /fork
+		reverse_proxy session-host:27021
+	}
+	handle /health {
+		respond "ok" 200
+	}
+}

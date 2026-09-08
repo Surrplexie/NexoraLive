@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NL Login</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="operator-page">
+  <header>
+    <h1>NL Account</h1>
+    <p class="sub">One account for identity, player (SP), and streamer — sign in or register</p>
+    <nav class="nav">
+      <a href="/login.html" aria-current="page">Login</a>
+      <a href="/nl-client.html">NL Client</a>
+      <a href="/identity-link.html">Platforms</a>
+      <a href="/account-verify.html">Verify</a>
+      <a href="/join-gate.html">Join gate</a>
+    </nav>
+  </header>
+
+  <section class="card operator-panel" id="logged-in-panel" hidden>
+    <h2>Signed in</h2>
+    <pre id="me-block" class="code-block"></pre>
+    <div class="actions">
+      <button type="button" id="goto-client" class="primary">Open NL Client</button>
+      <button type="button" id="enable-streamer">Enable streamer mode</button>
+      <button type="button" id="logout">Sign out</button>
+    </div>
+  </section>
+
+  <section class="card operator-panel" id="auth-panel">
+    <h2>Register</h2>
+    <div class="grid">
+      <label>Display name <input id="reg-name" placeholder="Your name" /></label>
+      <label>Email <input id="reg-email" type="email" placeholder="you@example.com" /></label>
+      <label>Password <input id="reg-password" type="password" placeholder="8+ characters" /></label>
+    </div>
+    <button type="button" id="register" class="primary">Create NL account</button>
+
+    <h2>Sign in</h2>
+    <div class="grid">
+      <label>Email <input id="login-email" type="email" /></label>
+      <label>Password <input id="login-password" type="password" /></label>
+      <label>2FA code (if enabled) <input id="login-2fa" maxlength="6" placeholder="optional" /></label>
+    </div>
+    <button type="button" id="login">Sign in</button>
+  </section>
+
+  <p id="message" class="status muted"></p>
+  <script src="nl-auth.js"></script>
+  <script src="login-app.js"></script>
+</body>
+</html>

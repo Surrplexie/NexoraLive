@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nl-session-host
+  namespace: nl-fleet-production
+  labels:
+    app: nl-session-host
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nl-session-host
+  template:
+    metadata:
+      labels:
+        app: nl-session-host
+    spec:
+      serviceAccountName: nl-fork-provisioner
+      containers:
+        - name: session-host
+          image: your-registry/nl-session-host:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 27020
+              name: http
+            - containerPort: 27021
+              name: ws
+          envFrom:
+            - configMapRef:
+                name: nl-fleet-production-env
+          env:
+            - name: NL_BIND
+              value: "0.0.0.0"
+            - name: NL_HTTP_PORT
+              value: "27020"
+            - name: NL_WS_PORT
+              value: "27021"
+            - name: NL_DATA_ROOT
+              value: "/data"
+            - name: NL_PUBLIC_BASE_URL
+              value: "https://nl.yourdomain.com"
+          volumeMounts:
+            - name: nl-data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+      volumes:
+        - name: nl-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nl-session-host
+  namespace: nl-fleet-production
+spec:
+  selector:
+    app: nl-session-host
+  ports:
+    - name: http
+      port: 27020
+      targetPort: http
+    - name: ws
+      port: 27021
+      targetPort: ws

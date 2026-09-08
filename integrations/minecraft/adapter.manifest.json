@@ -1,0 +1,33 @@
+{
+  "gameId": "minecraft",
+  "displayName": "Minecraft Java",
+  "majorVersion": "1.0",
+  "tier": "AtOwnRisk",
+  "connectScheme": "minecraft",
+  "playerConnectPort": 25565,
+  "dockerImage": "nl-fork-minecraft:latest",
+  "dockerfile": "docker/fork-minecraft/Dockerfile",
+  "defaultNleTemplate": "samples/configs/minecraft.nle",
+  "integrationDir": "integrations/minecraft",
+  "dogfoodScript": "scripts/nl-dogfood-flow-docker-minecraft.ps1",
+  "buildImageKey": "minecraft",
+  "minClientVersion": "1.21",
+  "noProgressTransfer": true,
+  "steamAppIds": [],
+  "requiredEvents": [
+    "playerJoin",
+    "playerLeave",
+    "playerChat",
+    "playerDeath"
+  ],
+  "requiredActions": [
+    "warn",
+    "kick",
+    "tell"
+  ],
+  "health": {
+    "type": "file",
+    "path": "/data/fork-status.json",
+    "readyField": "sessionStarted"
+  }
+}

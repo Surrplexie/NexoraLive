@@ -1,0 +1,6 @@
+name: NLBridge
+main: nl.example.NLBridgePlugin
+version: 1.0.0
+api-version: '1.21'
+description: NL Integration Spec v1 fork runtime for Paper (Phase P)
+author: NexoraLive

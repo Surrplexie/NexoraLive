@@ -1,0 +1,5 @@
+# Scenario: a calm build/creative event - no PvP or weapons fire allowed at all.
+# Everything else (movement, items, respawning, etc.) is left unrestricted since
+# there's no rule authored for those events; the engine defaults to allow.
+event shoot:
+    block

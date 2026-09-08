@@ -1,0 +1,31 @@
+# Phase P hello-fork — blocks shooting server-side (no RCON/UDP).
+
+event sessionStart:
+    allow
+
+event playerJoin:
+    allow
+
+event shoot:
+    block
+
+event playerChat:
+    if chat.capsRatio > 0.8 and chat.length > 10:
+        block
+    else:
+        allow
+
+event respawn:
+    if player.health > 0:
+        block
+    else:
+        allow
+
+event playerLeave:
+    allow
+
+event leaveBoundary:
+    block
+
+event move:
+    allow

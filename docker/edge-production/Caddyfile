@@ -1,0 +1,14 @@
+# HTTPS edge — live production (Phase 7 local dev uses internal TLS)
+# VPS: replace with play.yourdomain.com { reverse_proxy session-host:27020 }
+{
+	auto_https disable_redirects
+}
+
+:443 {
+	tls internal
+	reverse_proxy session-host:27020
+}
+
+:80 {
+	reverse_proxy session-host:27020
+}

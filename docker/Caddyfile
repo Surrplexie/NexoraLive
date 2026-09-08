@@ -1,0 +1,27 @@
+# TLS + reverse proxy for NL public demo (Phase F + K edge headers).
+# Set NL_DEMO_DOMAIN to your hostname (Caddy auto-issues HTTPS for public domains).
+# For localhost dev, Caddy serves plain HTTP on :80.
+
+{
+	email {$CADDY_ACME_EMAIL:internal@localhost}
+}
+
+{$NL_DEMO_DOMAIN:localhost} {
+	encode gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	@websocket path /nl/v1*
+	handle @websocket {
+		reverse_proxy session-server:27021
+	}
+
+	handle {
+		reverse_proxy session-server:27020
+	}
+}

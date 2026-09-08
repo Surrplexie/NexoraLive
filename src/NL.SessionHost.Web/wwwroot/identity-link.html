@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NL Identity — Link platforms</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="operator-page">
+  <header>
+    <h1>Platform identity</h1>
+    <p class="sub">Link Steam, Epic, Xbox, and PlayStation for live ownership verification (Phase L.3)</p>
+    <nav class="nav">
+      <a href="/operator.html">Operator</a>
+      <a href="/identity-link.html" aria-current="page">Identity</a>
+      <a href="/account-verify.html">Verify account</a>
+      <a href="/social-link.html">Social link</a>
+      <a href="/nl-client.html">NL Client</a>
+    </nav>
+  </header>
+
+  <section class="card operator-panel">
+    <h2>Settings</h2>
+    <dl id="identity-settings"></dl>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>NL account</h2>
+    <div class="grid">
+      <label>Display name <input id="display-name" value="Demo Player" /></label>
+      <label>Account id <input id="account-id" readonly placeholder="Create account first" /></label>
+    </div>
+    <div class="actions">
+      <button type="button" id="create-account" class="primary">Create account</button>
+      <button type="button" id="refresh-account">Refresh links</button>
+    </div>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Link platforms</h2>
+    <p class="sub">Sign in to link platform accounts to this NL account. Used for ownership verification at admit.</p>
+    <div class="actions">
+      <button type="button" id="steam-sign-in" class="primary">Sign in with Steam</button>
+      <button type="button" id="epic-sign-in">Sign in with Epic</button>
+      <button type="button" id="xbox-sign-in">Sign in with Xbox</button>
+      <button type="button" id="playstation-sign-in">Sign in with PlayStation</button>
+    </div>
+    <h3>Linked platforms</h3>
+    <ul id="link-list"></ul>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Verify ownership (mock/live)</h2>
+    <div class="grid">
+      <label>Platform
+        <select id="verify-platform">
+          <option value="steam">Steam</option>
+          <option value="epic">Epic</option>
+          <option value="xbox">Xbox</option>
+          <option value="playstation">PlayStation</option>
+        </select>
+      </label>
+      <label>Platform user id <input id="verify-platform-user" placeholder="from linked account" /></label>
+      <label>App / title id <input id="verify-appid" value="440" /></label>
+    </div>
+    <button type="button" id="test-admit">Test admit with ownership</button>
+    <pre id="admit-result" class="code-block"></pre>
+  </section>
+
+  <p id="status" class="status muted"></p>
+  <script src="nl-auth.js"></script>
+  <script src="identity-app.js"></script>
+</body>
+</html>

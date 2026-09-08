@@ -1,0 +1,11 @@
+[
+  {
+    "streamerId": "dogfood-streamer",
+    "twitchBroadcasterId": "123456789",
+    "youTubeChannelId": null,
+    "kickSlug": "dogfood",
+    "discordGuildId": "987654321",
+    "requireLiveToStart": true,
+    "livePlatform": "Twitch"
+  }
+]

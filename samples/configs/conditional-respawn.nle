@@ -1,0 +1,9 @@
+# Scenario: respawning is only "legitimate" if the player actually died first.
+# Anyone trying to trigger a respawn while still alive (health > 0) is blocked,
+# since that usually means a glitch, exploit, or a player trying to reposition
+# for free instead of accepting the consequences of the event's rules.
+event respawn:
+    if player.health > 0:
+        block
+    else:
+        allow

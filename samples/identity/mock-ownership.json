@@ -1,0 +1,18 @@
+{
+  "defaultOwned": false,
+  "ownership": {
+    "steam:76561198000000001": { "440": "Owned", "730": "NotOwned", "294100": "Owned", "233860": "Owned", "hello-fork": "Owned", "rimworld": "Owned", "kenshi": "Owned" },
+    "epic:epic-account-001": { "hello-fork": "Owned", "rimworld": "Owned", "kenshi": "Owned" },
+    "xbox:2533274790360720": { "hello-fork": "Owned" },
+    "playstation:psn-account-001": { "hello-fork": "Owned" }
+  },
+  "banned": {
+    "steam:76561198999999999": true
+  },
+  "subscriptionRequired": {
+    "steam:76561198000000003": true
+  },
+  "multiplayerActive": {
+    "steam:76561198000000003": false
+  }
+}

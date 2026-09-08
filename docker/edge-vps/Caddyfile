@@ -1,0 +1,40 @@
+# VPS production edge — Let's Encrypt + session host + relay regions
+# Env: NL_VPS_DOMAIN (play.example.com), NL_VPS_BASE_DOMAIN (example.com), CADDY_ACME_EMAIL
+
+{
+	email {$CADDY_ACME_EMAIL}
+}
+
+{$NL_VPS_DOMAIN} {
+	encode gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options SAMEORIGIN
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	@websocket path /nl/v1*
+	handle @websocket {
+		reverse_proxy session-host:27021
+	}
+
+	handle {
+		reverse_proxy session-host:27020
+	}
+}
+
+relay-us-east.{$NL_VPS_BASE_DOMAIN}, relay-us-west.{$NL_VPS_BASE_DOMAIN}, relay-eu-west.{$NL_VPS_BASE_DOMAIN} {
+	encode gzip
+
+	@fork path /fork/*
+	handle @fork {
+		uri strip_prefix /fork
+		reverse_proxy session-host:27021
+	}
+
+	handle /health {
+		respond "ok" 200
+	}
+}

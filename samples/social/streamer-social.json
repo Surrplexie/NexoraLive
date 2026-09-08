@@ -1,0 +1,11 @@
+[
+  {
+    "streamerId": "default-streamer",
+    "twitchBroadcasterId": "123456789",
+    "youTubeChannelId": null,
+    "kickSlug": null,
+    "discordGuildId": "987654321",
+    "requireLiveToStart": true,
+    "livePlatform": "Twitch"
+  }
+]

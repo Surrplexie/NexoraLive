@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nl-session-host
+  namespace: nl-fleet-staging
+  labels:
+    app: nl-session-host
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nl-session-host
+  template:
+    metadata:
+      labels:
+        app: nl-session-host
+    spec:
+      serviceAccountName: nl-fork-provisioner
+      containers:
+        - name: session-host
+          image: nl-session-host:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 27020
+              name: http
+            - containerPort: 27021
+              name: ws
+          envFrom:
+            - configMapRef:
+                name: nl-fleet-staging-env
+          env:
+            - name: NL_BIND
+              value: "0.0.0.0"
+            - name: NL_HTTP_PORT
+              value: "27020"
+            - name: NL_WS_PORT
+              value: "27021"
+            - name: NL_DATA_ROOT
+              value: "/data"
+            - name: NL_PUBLIC_BASE_URL
+              value: "https://staging.nl.example.com"
+          volumeMounts:
+            - name: nl-data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 30
+      volumes:
+        - name: nl-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nl-session-host
+  namespace: nl-fleet-staging
+spec:
+  selector:
+    app: nl-session-host
+  ports:
+    - name: http
+      port: 27020
+      targetPort: http
+    - name: ws
+      port: 27021
+      targetPort: ws

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Subprocessors — NexoraLive</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Subprocessors</h1>
+    <p class="sub"><a href="/legal-center.html">Legal Center</a> · <a href="/dpa.html">DPA</a></p>
+  </header>
+
+  <section class="card">
+    <h2>Third-party processors</h2>
+    <p>NexoraLive may rely on the following subprocessors to operate the hosted fleet. Operators may extend this list via <code>NL_LEGAL_COMPLIANCE_SUBPROCESSORS</code>.</p>
+    <ul id="subprocessor-list"></ul>
+  </section>
+
+  <script>
+    fetch('/api/v1/legal-compliance/manifest').then(function (r) { return r.json(); }).then(function (m) {
+      var list = document.getElementById('subprocessor-list');
+      (m.subprocessors || []).forEach(function (name) {
+        var li = document.createElement('li');
+        li.textContent = name;
+        list.appendChild(li);
+      });
+    }).catch(function () {});
+  </script>
+  <script src="legal-consent.js"></script>
+</body>
+</html>

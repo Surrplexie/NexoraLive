@@ -1,0 +1,32 @@
+{
+  "relationships": {
+    "sp-dogfood-1": {
+      "dogfood-streamer": {
+        "isFollowing": true,
+        "isSubscribed": false,
+        "isDiscordMember": true
+      }
+    },
+    "sp-dogfood-sub": {
+      "dogfood-streamer": {
+        "isFollowing": true,
+        "isSubscribed": true,
+        "isDiscordMember": true
+      }
+    },
+    "sp-dogfood-stranger": {
+      "dogfood-streamer": {
+        "isFollowing": false,
+        "isSubscribed": false,
+        "isDiscordMember": false
+      }
+    }
+  },
+  "liveStatus": {
+    "dogfood-streamer": {
+      "isLive": true,
+      "platform": "twitch",
+      "title": "Live social dogfood stream"
+    }
+  }
+}

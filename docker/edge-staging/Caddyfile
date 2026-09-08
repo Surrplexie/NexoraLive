@@ -1,0 +1,14 @@
+# HTTPS edge — public API surface for hosted staging (Phase 3)
+# https://127.0.0.1/health → session-host:27020
+{
+	auto_https disable_redirects
+}
+
+:443 {
+	tls internal
+	reverse_proxy session-host:27020
+}
+
+:80 {
+	reverse_proxy session-host:27020
+}

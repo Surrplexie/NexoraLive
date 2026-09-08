@@ -1,0 +1,36 @@
+# NL cross-platform operator stack (Phase C)
+# Session Host web + Moderation web share one data volume via NL_DATA_ROOT.
+# For public demo security (Phase E), set NL_PUBLIC_MODE + secrets — see .env.example.
+services:
+  session-host:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: session-host
+    ports:
+      - "27020:27020"
+      - "27021:27021"
+    environment:
+      NL_BIND: "0.0.0.0"
+      NL_HTTP_PORT: "27020"
+      NL_WS_PORT: "27021"
+      NL_DATA_ROOT: "/data"
+    volumes:
+      - nl-data:/data
+
+  moderation:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: moderation
+    ports:
+      - "27030:27030"
+    environment:
+      NL_BIND: "0.0.0.0"
+      NL_MOD_HTTP_PORT: "27030"
+      NL_DATA_ROOT: "/data"
+    volumes:
+      - nl-data:/data
+
+volumes:
+  nl-data:

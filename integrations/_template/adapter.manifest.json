@@ -1,0 +1,37 @@
+{
+  "gameId": "{{GAME_ID}}",
+  "displayName": "{{DISPLAY_NAME}}",
+  "majorVersion": "{{MAJOR}}",
+  "tier": "AtOwnRisk",
+  "connectScheme": "{{CONNECT_SCHEME}}",
+  "playerConnectPort": {{PORT}},
+  "dockerImage": "{{DOCKER_IMAGE}}:latest",
+  "dockerfile": "docker/fork-{{GAME_ID}}/Dockerfile",
+  "defaultNleTemplate": "samples/configs/{{GAME_ID}}.nle",
+  "integrationDir": "integrations/{{GAME_ID}}",
+  "dogfoodScript": "scripts/nl-dogfood-flow-{{GAME_ID}}.ps1",
+  "buildImageKey": "{{GAME_ID}}",
+  "minClientVersion": "1.0.0",
+  "noProgressTransfer": true,
+  "steamAppIds": ["{{STEAM_APP_ID}}"],
+  "requiredEvents": [
+    "sessionStart",
+    "playerJoin",
+    "playerLeave",
+    "playerChat"
+  ],
+  "requiredActions": [
+    "warn",
+    "kick",
+    "tell"
+  ],
+  "health": {
+    "type": "file",
+    "path": "/data/fork-status.json",
+    "readyField": "sessionStarted"
+  },
+  "catalogSnippet": {
+    "imageDigest": "sha256:{{GAME_ID}}10",
+    "status": "Active"
+  }
+}

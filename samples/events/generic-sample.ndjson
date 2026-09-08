@@ -1,0 +1,10 @@
+# Sample NDJSON event stream for the Phase 3 "generic" adapter.
+# Any game/mod/plugin can emit these lines; NLServer enforces a .nle config against them.
+# Fields: event (required), player (optional), props (optional object of numbers).
+
+{"event":"playerJoin","player":"Alice","props":{"player.sessionJoinCount":1}}
+{"event":"shoot","player":"Alice","props":{"weapon.damage":12}}
+{"event":"playerChat","player":"Alice","props":{"chat.length":22,"chat.capsRatio":1,"chat.isCommand":0}}
+{"event":"respawn","player":"Bob","props":{"player.health":40}}
+{"event":"respawn","player":"Bob","props":{"player.health":0}}
+{"event":"playerLeave","player":"Alice"}

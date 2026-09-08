@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>NL.Kenshi.Bridge</RootNamespace>
+    <AssemblyName>NL.Kenshi.Bridge</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Description>NL Integration Spec v1 bridge for Kenshi community MP (Phase T1).</Description>
+  </PropertyGroup>
+
+</Project>

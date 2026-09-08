@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Live Social Dogfood</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="operator-page">
+  <header>
+    <h1>Live Social Dogfood</h1>
+    <p class="sub">Phase M social gate + dogfood fork — mock fixtures or live OAuth</p>
+    <nav class="nav">
+      <a href="/operator.html">Operator</a>
+      <a href="/join-gate.html">Join gate</a>
+      <a href="/social-link.html">Platform link</a>
+      <a href="/nl-client.html">NL Client</a>
+      <a href="/dogfood.html">Dogfood</a>
+      <a href="/live-social-dogfood.html" aria-current="page">Social dogfood</a>
+    </nav>
+  </header>
+
+  <section class="card operator-panel">
+    <h2>Social mode</h2>
+    <div class="grid">
+      <label><input type="radio" name="social-mode" value="mock" checked /> Mock (fixture follow/live)</label>
+      <label><input type="radio" name="social-mode" value="live" /> Live (real platform APIs)</label>
+    </div>
+    <p class="hint">Mock mode uses <code>dogfood-mock-social.json</code>. Live mode needs OAuth env vars — see docs.</p>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>1 — Install social fixtures</h2>
+    <p class="hint">Join requirements (follow required), streamer channels, mock live status for <code>dogfood-streamer</code>.</p>
+    <button type="button" id="btn-social-setup" class="primary">Run social setup</button>
+    <pre id="social-setup-result" class="code-block"></pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>2 — Dogfood profile + session</h2>
+    <p class="hint">Enables social gate, join gate, and live-only start on the dogfood profile.</p>
+    <button type="button" id="btn-full-setup">Full dogfood setup</button>
+    <button type="button" id="btn-start">Start session</button>
+    <button type="button" id="btn-stop">Stop session</button>
+    <pre id="session-result" class="code-block"></pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>3 — SP join tests</h2>
+    <p class="hint">
+      Follower <code>sp-dogfood-1</code> should join. Stranger <code>sp-dogfood-stranger</code> should be denied.
+      Steam64 <code>76561198000000001</code>.
+    </p>
+    <div class="actions">
+      <button type="button" id="btn-follower-join">Follower join flow</button>
+      <button type="button" id="btn-stranger-admit">Stranger admit (expect deny)</button>
+      <button type="button" id="btn-open-client">Open NL Client</button>
+    </div>
+    <pre id="join-result" class="code-block"></pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Status</h2>
+    <button type="button" id="btn-refresh">Refresh status</button>
+    <pre id="status-block" class="code-block"></pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>OAuth checklist (live mode)</h2>
+    <pre id="oauth-block" class="code-block muted"></pre>
+  </section>
+
+  <p id="message" class="status muted"></p>
+  <script src="nl-auth.js"></script>
+  <script src="live-social-dogfood-app.js"></script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+# NLEvents for Kenshi (Phase T1 — full squad / outpost vocabulary)
+# Pair with nl-fork-kenshi sidecar or licensed Kenshi + community MP + NL hook catalog.
+# Events: session, join, chat, combat, steal, raid, squad, trade, knockdown.
+
+event sessionStart:
+    warn "NL outpost rules active for Kenshi."
+    allow
+
+event sessionEnd:
+    allow
+
+event playerJoin:
+    allow
+
+event playerLeave:
+    allow
+
+event playerChat:
+    if chat.capsRatio > 0.8 and chat.length > 10:
+        warn "please avoid excessive caps in squad chat"
+        block
+    else:
+        allow
+
+event entityDamage:
+    if weapon.damage > 40:
+        warn "excessive character damage"
+        block
+    else:
+        allow
+
+event knockdown:
+    allow
+
+event respawn:
+    allow
+
+event move:
+    allow
+
+event squadOrder:
+    if player.downed > 0:
+        warn "cannot order a knocked-out character"
+        block
+    else:
+        allow
+
+event buildingDestroy:
+    if building.value > 1500:
+        warn "high-value outpost destroy blocked"
+        block
+    else:
+        allow
+
+event steal:
+    if steal.value > 800:
+        warn "high-value steal blocked"
+        block
+    else:
+        allow
+
+event raid:
+    if raid.severity > 8:
+        warn "mass raid blocked"
+        block
+    else:
+        allow
+
+event trade:
+    if trade.value > 5000:
+        warn "high-value trade blocked"
+        block
+    else:
+        allow
+
+event itemDestroy:
+    if item.value > 800:
+        warn "high-value item destroy blocked"
+        block
+    else:
+        allow

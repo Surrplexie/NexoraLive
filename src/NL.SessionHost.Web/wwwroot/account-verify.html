@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NL Account Verification</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="operator-page">
+  <header>
+    <h1>Account verification</h1>
+    <p class="sub">Verify email and enroll authenticator 2FA for join gate <code>SpVerification</code> checks</p>
+    <nav class="nav">
+      <a href="/identity-link.html">Identity</a>
+      <a href="/account-verify.html" aria-current="page">Verify account</a>
+      <a href="/join-gate.html">Join gate</a>
+      <a href="/social-link.html">Social link</a>
+    </nav>
+  </header>
+
+  <section class="card operator-panel">
+    <h2>NL account</h2>
+    <div class="grid">
+      <label>Account id <input id="account-id" placeholder="from identity-link" /></label>
+    </div>
+    <div class="actions">
+      <button type="button" id="refresh-status">Refresh status</button>
+    </div>
+    <pre id="status-block" class="code-block">No status loaded.</pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Email verification</h2>
+    <div class="grid">
+      <label>Email <input id="email" type="email" placeholder="you@example.com" /></label>
+      <label>Code <input id="email-code" placeholder="6-digit code" maxlength="6" /></label>
+    </div>
+    <div class="actions">
+      <button type="button" id="send-email-code" class="primary">Send verification code</button>
+      <button type="button" id="confirm-email">Confirm email</button>
+    </div>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Two-factor authentication (TOTP)</h2>
+    <p class="sub">Use Google Authenticator, Authy, or any TOTP app.</p>
+    <div class="grid">
+      <label>Authenticator code <input id="totp-code" placeholder="6-digit code" maxlength="6" /></label>
+    </div>
+    <div class="actions">
+      <button type="button" id="start-2fa" class="primary">Start 2FA enroll</button>
+      <button type="button" id="confirm-2fa">Confirm 2FA enroll</button>
+      <button type="button" id="verify-2fa">Test 2FA code</button>
+      <button type="button" id="disable-2fa">Disable 2FA</button>
+    </div>
+    <pre id="enroll-block" class="code-block"></pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Test admit with verification</h2>
+    <div class="grid">
+      <label>Player id <input id="player-id" placeholder="same as SP profile id" /></label>
+      <label>2FA code for admit <input id="admit-2fa" placeholder="if streamer requires 2FA" maxlength="6" /></label>
+    </div>
+    <button type="button" id="test-admit">Test admit</button>
+    <pre id="admit-result" class="code-block"></pre>
+  </section>
+
+  <p id="message" class="status muted"></p>
+  <script src="account-verify-app.js"></script>
+</body>
+</html>

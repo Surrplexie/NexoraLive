@@ -1,0 +1,34 @@
+{
+  "gameId": "beamng",
+  "displayName": "BeamNG.drive",
+  "majorVersion": "1.0",
+  "tier": "AtOwnRisk",
+  "connectScheme": "beamng-sidecar",
+  "playerConnectPort": null,
+  "dockerImage": "nl-fork-beamng:latest",
+  "dockerfile": "docker/fork-beamng/Dockerfile",
+  "defaultNleTemplate": "samples/configs/beamng.nle",
+  "integrationDir": "integrations/beamng",
+  "dogfoodScript": "scripts/nl-dogfood-flow.ps1",
+  "buildImageKey": "beamng",
+  "minClientVersion": "0.38",
+  "noProgressTransfer": true,
+  "steamAppIds": ["284160"],
+  "requiredEvents": [
+    "sessionStart",
+    "playerJoin",
+    "playerLeave",
+    "move",
+    "crash"
+  ],
+  "requiredActions": [
+    "warn",
+    "kick",
+    "recover"
+  ],
+  "health": {
+    "type": "file",
+    "path": "/data/fork-status.json",
+    "readyField": "sessionStarted"
+  }
+}

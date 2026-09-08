@@ -1,0 +1,32 @@
+{
+  "gameId": "minecraft-paper",
+  "displayName": "Minecraft Java (Paper dedicated)",
+  "majorVersion": "1.0",
+  "tier": "AtOwnRisk",
+  "connectScheme": "minecraft",
+  "playerConnectPort": 25565,
+  "dockerImage": "nl-fork-minecraft-paper:latest",
+  "dockerfile": "docker/fork-minecraft-paper/Dockerfile",
+  "defaultNleTemplate": "samples/configs/minecraft.nle",
+  "integrationDir": "integrations/minecraft-paper",
+  "dogfoodScript": "scripts/nl-dogfood-flow-docker-minecraft.ps1",
+  "buildImageKey": "minecraft-paper",
+  "minClientVersion": "1.21.1",
+  "noProgressTransfer": true,
+  "steamAppIds": [],
+  "requiredEvents": [
+    "playerJoin",
+    "playerLeave",
+    "playerChat"
+  ],
+  "requiredActions": [
+    "warn",
+    "kick",
+    "tell"
+  ],
+  "health": {
+    "type": "http",
+    "path": "/health",
+    "readyHttpStatus": 200
+  }
+}

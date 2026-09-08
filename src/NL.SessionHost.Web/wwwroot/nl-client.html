@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NL Client — Join</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="operator-page">
+  <header>
+    <h1>NL Client</h1>
+    <p class="sub">Sign in, pick a streamer, verify ownership, join fork session (Phase R)</p>
+    <nav class="nav">
+      <a href="/">Demo</a>
+      <a href="/login.html">Login</a>
+      <a href="/identity-link.html">Identity</a>
+      <a href="/nl-client.html" aria-current="page">NL Client</a>
+      <a href="/nl-client-mobile.html">Mobile companion</a>
+      <a href="/partnership.html">Partnership</a>
+    </nav>
+  </header>
+
+  <section class="card operator-panel" id="signed-in-panel" hidden>
+    <h2>Signed in</h2>
+    <pre id="me-block" class="code-block"></pre>
+    <p class="sub"><a href="/login.html">Account settings</a></p>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Mode</h2>
+    <div class="grid">
+      <label><input type="radio" name="mode" value="Player" checked /> Player</label>
+      <label><input type="radio" name="mode" value="Streamer" /> Streamer (elevated)</label>
+    </div>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Live streamers</h2>
+    <ul id="streamer-list"></ul>
+    <button type="button" id="refresh-streamers">Refresh</button>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Platform identity</h2>
+    <p class="sub">Link Steam via OpenID for ownership verification. <a href="/identity-link.html">Open identity linker</a></p>
+    <div class="grid">
+      <label>NL account id <input id="nl-account-id" placeholder="from identity linker" /></label>
+      <label>Platform user (Steam64) <input id="platform-user" placeholder="linked via Steam sign-in" /></label>
+    </div>
+    <button type="button" id="steam-sign-in">Sign in with Steam</button>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Join</h2>
+    <div class="grid">
+      <label>Player id <input id="player-id" value="sp-demo-1" /></label>
+      <label>Streamer <input id="streamer-id" value="default-streamer" /></label>
+      <label>2FA code (if required) <input id="join-2fa" maxlength="6" placeholder="optional" /></label>
+      <label class="wide"><input type="checkbox" id="at-own-risk-ack" /> At-own-risk acknowledged</label>
+    </div>
+    <div class="actions">
+      <button type="button" id="run-join" class="primary">Run join flow</button>
+      <button type="button" id="block-invite-test">Test block stray invite</button>
+    </div>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>In-session overlay</h2>
+    <pre id="overlay-state" class="code-block"></pre>
+    <button type="button" id="refresh-overlay">Refresh overlay</button>
+    <button type="button" id="clip-trigger">Clip trigger (stub)</button>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Join result</h2>
+    <p class="sub" id="native-connect-hint" hidden></p>
+    <pre id="join-result" class="code-block"></pre>
+  </section>
+
+  <p id="status" class="status muted"></p>
+  <script src="nl-auth.js"></script>
+  <script src="nl-client-app.js"></script>
+</body>
+</html>

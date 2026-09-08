@@ -1,0 +1,13 @@
+{
+  "gameId": "{{GAME_ID}}",
+  "displayName": "{{DISPLAY_NAME}}",
+  "majorVersion": "{{MAJOR}}",
+  "imageDigest": "sha256:{{GAME_ID}}10",
+  "tier": "AtOwnRisk",
+  "minClientVersion": "1.0.0",
+  "defaultNleTemplate": "configs/{{GAME_ID}}.nle",
+  "dockerImage": "{{DOCKER_IMAGE}}:latest",
+  "noProgressTransfer": true,
+  "status": "Active",
+  "registeredAtUtc": "2026-01-01T00:00:00Z"
+}

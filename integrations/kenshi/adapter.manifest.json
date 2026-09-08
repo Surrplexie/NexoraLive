@@ -1,0 +1,48 @@
+{
+  "gameId": "kenshi",
+  "displayName": "Kenshi",
+  "majorVersion": "1.0",
+  "tier": "AtOwnRisk",
+  "connectScheme": "kenshi",
+  "playerConnectPort": 23386,
+  "dockerImage": "nl-fork-kenshi:latest",
+  "dockerfile": "docker/fork-kenshi/Dockerfile",
+  "defaultNleTemplate": "samples/configs/kenshi.nle",
+  "integrationDir": "integrations/kenshi",
+  "dogfoodScript": "scripts/nl-dogfood-flow-kenshi.ps1",
+  "buildImageKey": "kenshi",
+  "minClientVersion": "1.0.0",
+  "noProgressTransfer": true,
+  "steamAppIds": ["233860"],
+  "requiredEvents": [
+    "sessionStart",
+    "playerJoin",
+    "playerLeave",
+    "playerChat",
+    "entityDamage",
+    "buildingDestroy",
+    "steal",
+    "squadOrder",
+    "raid",
+    "trade",
+    "itemDestroy",
+    "knockdown",
+    "respawn",
+    "move"
+  ],
+  "requiredActions": [
+    "warn",
+    "kick",
+    "tell"
+  ],
+  "health": {
+    "type": "file",
+    "path": "/data/fork-status.json",
+    "readyField": "sessionStarted"
+  },
+  "catalogSnippet": {
+    "imageDigest": "sha256:kenshi10",
+    "status": "Active"
+  },
+  "nativePlugin": "integrations/kenshi/mod"
+}

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NL GA Ops</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="operator-page">
+  <header>
+    <h1>General Availability Operations</h1>
+    <p class="sub">SLA monitoring, validation, compliance — see <code>docs/NL_GA_RUNBOOK.md</code></p>
+    <nav class="nav">
+      <a href="/operator.html">Operator</a>
+      <a href="/fleet-ops.html">Fleet ops</a>
+      <a href="/fork-catalog.html">Catalog</a>
+      <a href="/ga.html">Streamer signup</a>
+      <a href="/ga-ops.html" aria-current="page">GA ops</a>
+    </nav>
+  </header>
+
+  <section class="card operator-panel">
+    <h2>Operator key</h2>
+    <label>NL_OPERATOR_KEY <input id="operator-key" type="password" autocomplete="off" /></label>
+    <button type="button" id="save-key">Save key</button>
+    <span id="key-status"></span>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>GA validation</h2>
+    <p id="validation-summary"></p>
+    <button type="button" id="run-validation">Run GA validation</button>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Production SLA</h2>
+    <p id="sla-tier"></p>
+    <table id="sla-table">
+      <thead><tr><th>SLO</th><th>Target</th><th>Current</th><th>Met</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <button type="button" id="refresh-sla">Refresh SLA</button>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Registered streamers</h2>
+    <table id="streamers-table">
+      <thead><tr><th>Name</th><th>Contact</th><th>Streamer ID</th><th>Game</th><th>Registered</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <button type="button" id="refresh-streamers">Refresh</button>
+  </section>
+
+  <script src="nl-auth.js"></script>
+  <script src="ga-ops-app.js"></script>
+</body>
+</html>

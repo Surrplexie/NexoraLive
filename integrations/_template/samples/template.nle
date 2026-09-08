@@ -1,0 +1,27 @@
+# NLEvents template for {{DISPLAY_NAME}} ({{GAME_ID}})
+# Replace event names to match your sidecar vocabulary.
+# Spec: docs/NL_INTEGRATION_SPEC.md
+
+event sessionStart:
+    warn "NL rules active for {{DISPLAY_NAME}}."
+    allow
+
+event playerJoin:
+    allow
+
+event playerLeave:
+    allow
+
+event playerChat:
+    if chat.capsRatio > 0.8 and chat.length > 10:
+        warn "please avoid excessive caps"
+        block
+    else:
+        allow
+
+# Optional gameplay — keep or delete
+event shoot:
+    allow
+
+event move:
+    allow

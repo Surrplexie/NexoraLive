@@ -1,0 +1,135 @@
+{
+  "maxMajorsPerGame": 3,
+  "entries": [
+    {
+      "gameId": "minecraft",
+      "displayName": "Minecraft Java",
+      "majorVersion": "1.0",
+      "imageDigest": "sha256:minecraftfork10",
+      "tier": "AtOwnRisk",
+      "minClientVersion": "1.21",
+      "defaultNleTemplate": "configs/minecraft.nle",
+      "dockerImage": "nl-fork-minecraft:latest",
+      "noProgressTransfer": true,
+      "status": "Active",
+      "registeredAtUtc": "2026-01-01T00:00:00Z"
+    },
+    {
+      "gameId": "minecraft-paper",
+      "displayName": "Minecraft Java (Paper dedicated)",
+      "majorVersion": "1.0",
+      "imageDigest": "sha256:minecraftpaper10",
+      "tier": "AtOwnRisk",
+      "minClientVersion": "1.21.1",
+      "defaultNleTemplate": "configs/minecraft.nle",
+      "dockerImage": "nl-fork-minecraft-paper:latest",
+      "noProgressTransfer": true,
+      "status": "Active",
+      "registeredAtUtc": "2026-02-01T00:00:00Z"
+    },
+    {
+      "gameId": "beamng",
+      "displayName": "BeamNG.drive",
+      "majorVersion": "1.0",
+      "imageDigest": "sha256:beamngfork10",
+      "tier": "AtOwnRisk",
+      "minClientVersion": "0.38",
+      "defaultNleTemplate": "configs/beamng.nle",
+      "dockerImage": "nl-fork-beamng:latest",
+      "noProgressTransfer": true,
+      "status": "Active",
+      "registeredAtUtc": "2026-01-01T00:00:00Z"
+    },
+    {
+      "gameId": "gameA",
+      "displayName": "Game A (demo fork)",
+      "majorVersion": "1.0",
+      "imageDigest": "sha256:abc111gamea10",
+      "tier": "AtOwnRisk",
+      "minClientVersion": "1.0.0",
+      "defaultNleTemplate": "configs/fork-hello.nle",
+      "dockerImage": "nl-fork-hello:latest",
+      "noProgressTransfer": true,
+      "status": "Active",
+      "registeredAtUtc": "2026-01-01T00:00:00Z"
+    },
+    {
+      "gameId": "gameA",
+      "displayName": "Game A (demo fork)",
+      "majorVersion": "2.0",
+      "imageDigest": "sha256:abc222gamea20",
+      "tier": "Platform",
+      "minClientVersion": "2.0.0",
+      "defaultNleTemplate": "configs/fork-hello.nle",
+      "dockerImage": "nl-fork-hello:latest",
+      "noProgressTransfer": true,
+      "status": "Active",
+      "registeredAtUtc": "2026-06-01T00:00:00Z",
+      "isDefaultStable": true
+    },
+    {
+      "gameId": "hello-fork",
+      "displayName": "Hello Fork Runtime",
+      "majorVersion": "1.0",
+      "imageDigest": "sha256:hellofork10",
+      "tier": "Official",
+      "minClientVersion": "1.0.0",
+      "defaultNleTemplate": "configs/fork-hello.nle",
+      "dockerImage": "nl-fork-hello:latest",
+      "noProgressTransfer": true,
+      "status": "Active",
+      "registeredAtUtc": "2026-01-15T00:00:00Z",
+      "isDefaultStable": true
+    },
+    {
+      "gameId": "example-game",
+      "displayName": "Example Game (T0 template)",
+      "majorVersion": "1.0",
+      "imageDigest": "sha256:examplegame10",
+      "tier": "AtOwnRisk",
+      "minClientVersion": "1.0.0",
+      "defaultNleTemplate": "configs/example-game.nle",
+      "dockerImage": "nl-fork-example-game:latest",
+      "noProgressTransfer": true,
+      "status": "Active",
+      "registeredAtUtc": "2026-08-12T00:00:00Z"
+    },
+    {
+      "gameId": "rimworld",
+      "displayName": "RimWorld",
+      "majorVersion": "1.0",
+      "imageDigest": "sha256:rimworld10",
+      "tier": "AtOwnRisk",
+      "minClientVersion": "1.5.0",
+      "defaultNleTemplate": "configs/rimworld.nle",
+      "dockerImage": "nl-fork-rimworld:latest",
+      "noProgressTransfer": true,
+      "status": "Active",
+      "registeredAtUtc": "2026-08-12T00:00:00Z",
+      "isDefaultStable": true
+    },
+    {
+      "gameId": "kenshi",
+      "displayName": "Kenshi",
+      "majorVersion": "1.0",
+      "imageDigest": "sha256:kenshi10",
+      "tier": "AtOwnRisk",
+      "minClientVersion": "1.0.0",
+      "defaultNleTemplate": "configs/kenshi.nle",
+      "dockerImage": "nl-fork-kenshi:latest",
+      "noProgressTransfer": true,
+      "status": "Active",
+      "registeredAtUtc": "2026-08-30T00:00:00Z"
+    }
+  ],
+  "modHub": [
+    {
+      "id": "demo-boost",
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+      "description": "Example server-side damage multiplier (hash of empty string for smoke tests).",
+      "props": {
+        "weapon.damageMultiplier": 2
+      }
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "gameId": "rimworld",
+  "displayName": "RimWorld",
+  "majorVersion": "1.0",
+  "tier": "AtOwnRisk",
+  "connectScheme": "rimworld",
+  "playerConnectPort": 25555,
+  "dockerImage": "nl-fork-rimworld:latest",
+  "dockerfile": "docker/fork-rimworld/Dockerfile",
+  "defaultNleTemplate": "samples/configs/rimworld.nle",
+  "integrationDir": "integrations/rimworld",
+  "dogfoodScript": "scripts/nl-dogfood-flow-rimworld.ps1",
+  "buildImageKey": "rimworld",
+  "minClientVersion": "1.5.0",
+  "noProgressTransfer": true,
+  "steamAppIds": ["294100"],
+  "requiredEvents": [
+    "sessionStart",
+    "playerJoin",
+    "playerLeave",
+    "playerChat",
+    "entityDamage",
+    "buildingDestroy",
+    "zoneEdit",
+    "animalRelease",
+    "colonistDraft",
+    "trade",
+    "itemDestroy",
+    "colonistDown",
+    "respawn",
+    "move"
+  ],
+  "requiredActions": [
+    "warn",
+    "kick",
+    "tell"
+  ],
+  "health": {
+    "type": "file",
+    "path": "/data/fork-status.json",
+    "readyField": "sessionStarted"
+  },
+  "catalogSnippet": {
+    "imageDigest": "sha256:rimworld10",
+    "status": "Active"
+  },
+  "nativePlugin": "integrations/rimworld/mod"
+}

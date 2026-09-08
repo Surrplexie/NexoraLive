@@ -1,0 +1,75 @@
+# Phase G — local/CI demo loop (session server + sidecar bridge, no Caddy).
+# Usage:
+#   export NL_BUS_TOKEN=$(openssl rand -hex 16)
+#   export NL_OPERATOR_KEY=$(openssl rand -hex 16)
+#   docker compose -f docker/docker-compose.demo-local.yml up -d --build --wait
+#   bash scripts/nl-demo-smoke.sh
+
+services:
+  session-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: session-host
+    image: ${NL_SESSION_IMAGE:-nexoralive-session-server:local}
+    ports:
+      - "27020:27020"
+      - "27021:27021"
+    environment:
+      NL_BIND: "0.0.0.0"
+      NL_HTTP_PORT: "27020"
+      NL_WS_PORT: "27021"
+      NL_DATA_ROOT: "/data"
+      NL_PUBLIC_MODE: "true"
+      NL_DEMO_MODE: "true"
+      NL_DEMO_CONFIG: "demo.nle"
+      NL_DEMO_RESET_INTERVAL_MINUTES: ${NL_DEMO_RESET_INTERVAL_MINUTES:-0}
+      NL_DEMO_STARTUP_DELAY_MS: "500"
+      NL_BUS_TOKEN: ${NL_BUS_TOKEN:?Set NL_BUS_TOKEN}
+      NL_OPERATOR_KEY: ${NL_OPERATOR_KEY:?Set NL_OPERATOR_KEY}
+      NL_PUBLIC_HTTP: "http://127.0.0.1:27020"
+      NL_PUBLIC_WS: "ws://127.0.0.1:27021/nl/v1"
+      NL_PUBLIC_MOD_HTTP: "http://127.0.0.1:27020"
+      NL_CORS_ORIGINS: "http://127.0.0.1:27020"
+      NL_HARDENING: ${NL_HARDENING:-true}
+      NL_ADMIT_RATE_PER_MIN: ${NL_ADMIT_RATE_PER_MIN:-120}
+      NL_PUBLIC_READ_RATE_PER_MIN: ${NL_PUBLIC_READ_RATE_PER_MIN:-300}
+      NL_WS_MAX_CONNECTIONS: ${NL_WS_MAX_CONNECTIONS:-16}
+      NL_WS_MAX_CONNECTIONS_PER_IP: ${NL_WS_MAX_CONNECTIONS_PER_IP:-4}
+      NL_WS_CONNECT_RATE_PER_MIN: ${NL_WS_CONNECT_RATE_PER_MIN:-30}
+      NL_DEMO_SESSION_MAX_HOURS: ${NL_DEMO_SESSION_MAX_HOURS:-12}
+    volumes:
+      - nl-demo-local-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:27020/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+    networks:
+      - nl-demo-local
+
+  demo-bridge:
+    build:
+      context: ..
+      dockerfile: docker/demo-bridge/Dockerfile
+    image: ${NL_DEMO_BRIDGE_IMAGE:-nexoralive-demo-bridge:local}
+    restart: unless-stopped
+    environment:
+      NL_BRIDGE_URL: "ws://session-server:27021/nl/v1?token=${NL_BUS_TOKEN}"
+      NL_ADMIT_URL: "http://session-server:27020/api/v1/session/admit"
+      NL_BRIDGE_INTERVAL: ${NL_DEMO_BRIDGE_INTERVAL:-4}
+      NL_BRIDGE_RECONNECT_DELAY: "2"
+      NL_BRIDGE_WAIT_URL: "http://session-server:27020/api/v1/demo/status"
+    depends_on:
+      session-server:
+        condition: service_healthy
+    networks:
+      - nl-demo-local
+
+volumes:
+  nl-demo-local-data:
+
+networks:
+  nl-demo-local:
+    driver: bridge

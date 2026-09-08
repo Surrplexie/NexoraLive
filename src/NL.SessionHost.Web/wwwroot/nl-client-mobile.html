@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NL Client Mobile — Mod companion</title>
+  <link rel="stylesheet" href="styles.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+</head>
+<body class="operator-page">
+  <header>
+    <h1>NL Mobile Companion</h1>
+    <p class="sub">Mod notifications, warn, kick (Phase R subset)</p>
+    <nav class="nav">
+      <a href="/nl-client.html">Full client</a>
+      <a href="/nl-client-mobile.html" aria-current="page">Mobile</a>
+    </nav>
+  </header>
+
+  <section class="card operator-panel">
+    <label>Target player <input id="target-player" placeholder="player id" /></label>
+    <label>Streamer <input id="streamer-id" value="default-streamer" /></label>
+    <label>Reason <input id="reason" value="mobile mod action" /></label>
+    <div class="actions">
+      <button type="button" id="warn-btn" class="primary">Warn</button>
+      <button type="button" id="kick-btn">Kick (ban)</button>
+    </div>
+  </section>
+
+  <section class="card operator-panel">
+    <pre id="result" class="code-block"></pre>
+  </section>
+
+  <p id="status" class="status muted"></p>
+  <script src="nl-auth.js"></script>
+  <script src="nl-client-mobile-app.js"></script>
+</body>
+</html>

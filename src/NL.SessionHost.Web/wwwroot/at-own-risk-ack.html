@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>At own risk acknowledgment — NL</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="operator-page">
+  <header>
+    <h1>At own risk acknowledgment</h1>
+    <p class="sub">Required once per player per unpartnered title before first join</p>
+    <nav class="nav">
+      <a href="/partnership.html">Partnership</a>
+      <a href="/at-own-risk-ack.html" aria-current="page">Acknowledgment</a>
+    </nav>
+  </header>
+
+  <section class="card operator-panel">
+    <div class="grid">
+      <label>Player id <input id="player-id" value="sp-demo-1" /></label>
+      <label>Game id <input id="game-id" value="gameA" /></label>
+    </div>
+    <div class="actions">
+      <button type="button" id="load-legal" class="primary">Load legal copy</button>
+      <button type="button" id="acknowledge">I understand — acknowledge</button>
+      <button type="button" id="test-admit">Test admit</button>
+    </div>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Legal bundle</h2>
+    <pre id="legal-copy" class="code-block"></pre>
+  </section>
+
+  <section class="card operator-panel">
+    <h2>Admit result</h2>
+    <pre id="admit-result" class="code-block"></pre>
+  </section>
+
+  <p id="status" class="status muted"></p>
+  <script src="nl-auth.js"></script>
+  <script src="at-own-risk-ack-app.js"></script>
+</body>
+</html>

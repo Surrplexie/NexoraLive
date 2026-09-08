@@ -1,0 +1,15 @@
+{
+  "game": "generic",
+  "configPath": "samples/configs/fork-hello.nle",
+  "sourcePath": "ws://127.0.0.1:27021/nl/v1",
+  "nlActionEndpoint": "auto",
+  "useSessionBus": true,
+  "joinGate": false,
+  "antiCheat": true,
+  "streamerId": "fork-demo",
+  "forkRuntime": {
+    "enabled": true,
+    "modsPath": "samples/fork/hello-fork.mods.json",
+    "statusPath": "fork-status.json"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "_note": "DEPRECATED (Phase 0.6): hotkey bindings now live inside the .nle config file itself. See samples/configs/hotkeys.nle for the new unified format.",
+  "bindings": [
+    { "combo": "Ctrl+Alt+0", "action": "toggleMic" },
+    { "combo": "Ctrl+Alt+9", "action": "announce" },
+    { "combo": "Ctrl+Alt+8", "action": "toggleNlEvents" }
+  ]
+}

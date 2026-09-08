@@ -1,0 +1,14 @@
+{
+  "streamerId": "fork-demo",
+  "game": "generic",
+  "configPath": "samples/configs/fork-hello.nle",
+  "requireGameOwnership": true,
+  "gameId": "hello-fork",
+  "platformAppId": "440",
+  "gameMajorVersion": "1.0",
+  "ownershipPlatform": "steam",
+  "strictOwnershipUnknown": true,
+  "joinGate": false,
+  "antiCheat": true,
+  "useSessionBus": true
+}

@@ -1,0 +1,11 @@
+{
+  "mods": [
+    {
+      "id": "demo-boost",
+      "description": "Example server-side mod — doubles weapon.damage on events (SP clients unchanged).",
+      "props": {
+        "weapon.damageMultiplier": 2
+      }
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+# Installs NL_BeamNGBridge as a proper BeamNG zip (forward-slash paths) + unpacked copy.
+$ErrorActionPreference = "Stop"
+$repo = Split-Path $PSScriptRoot -Parent
+$src = Join-Path $repo "beamng-mod\NL_BeamNGBridge"
+$utf8NoBom = New-Object System.Text.UTF8Encoding $false
+
+function Write-Utf8NoBom([string]$Path, [string]$Content) {
+    [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
+}
+
+function Ensure-FileLink([string]$Link, [string]$Target) {
+    $linkDir = Split-Path $Link -Parent
+    New-Item -ItemType Directory -Force -Path $linkDir | Out-Null
+    New-Item -ItemType Directory -Force -Path (Split-Path $Target -Parent) | Out-Null
+    if (Test-Path $Link) {
+        Remove-Item $Link -Force
+    }
+    New-Item -ItemType HardLink -Path $Link -Target $Target | Out-Null
+}
+
+function Resolve-BeamNgUserFolder {
+    if ($env:BEAMNG_USER_FOLDER -and (Test-Path $env:BEAMNG_USER_FOLDER)) {
+        return (Resolve-Path $env:BEAMNG_USER_FOLDER).Path
+    }
+    $modernCurrent = Join-Path $env:LOCALAPPDATA "BeamNG\BeamNG.drive\current"
+    if (Test-Path (Join-Path $modernCurrent "mods")) {
+        return (Resolve-Path $modernCurrent).Path
+    }
+    $modernRoot = Join-Path $env:LOCALAPPDATA "BeamNG\BeamNG.drive"
+    if (Test-Path $modernRoot) {
+        $withMods = Get-ChildItem $modernRoot -Directory -ErrorAction SilentlyContinue |
+            Where-Object { Test-Path (Join-Path $_.FullName "mods") } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+        if ($withMods) { return $withMods.FullName }
+    }
+    $root = Join-Path $env:LOCALAPPDATA "BeamNG.drive"
+    if (Test-Path $root) {
+        $versionDirs = Get-ChildItem $root -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match '^\d+\.\d+' } |
+            Sort-Object { $_.Name } -Descending
+        foreach ($dir in $versionDirs) { return $dir.FullName }
+        if (Test-Path (Join-Path $root "mods")) { return (Resolve-Path $root).Path }
+    }
+    return $null
+}
+
+function Write-BeamNgZip([string]$SourceDir, [string]$ZipPath) {
+    Add-Type -AssemblyName System.IO.Compression
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    if (Test-Path $ZipPath) { Remove-Item -Force $ZipPath }
+    $zip = [System.IO.Compression.ZipFile]::Open($ZipPath, [System.IO.Compression.ZipArchiveMode]::Create)
+    try {
+        Get-ChildItem $SourceDir -Recurse -File | ForEach-Object {
+            $rel = $_.FullName.Substring($SourceDir.Length).TrimStart('\', '/').Replace('\', '/')
+            [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, $rel, [System.IO.Compression.CompressionLevel]::Optimal)
+        }
+    }
+    finally {
+        $zip.Dispose()
+    }
+}
+
+$user = Resolve-BeamNgUserFolder
+if (-not $user) {
+    Write-Host "Could not find BeamNG user folder under %LOCALAPPDATA%\BeamNG\BeamNG.drive\current"
+    exit 1
+}
+
+$modsDir = Join-Path $user "mods"
+$zipPath = Join-Path $modsDir "NL_BeamNGBridge.zip"
+$unpackedPath = Join-Path $modsDir "unpacked\NL_BeamNGBridge"
+
+New-Item -ItemType Directory -Force -Path $modsDir | Out-Null
+New-Item -ItemType Directory -Force -Path (Split-Path $unpackedPath) | Out-Null
+if (Test-Path $unpackedPath) { Remove-Item -Recurse -Force $unpackedPath }
+Copy-Item -Recurse -Force $src $unpackedPath
+
+# Real files live under BeamNG user folder (Lua sandbox can write here).
+$beamNgNl = Join-Path $user "NL"
+New-Item -ItemType Directory -Force -Path $beamNgNl | Out-Null
+$eventsReal = Join-Path $beamNgNl "beamng-events.ndjson"
+$kicksReal = Join-Path $beamNgNl "beamng-kicks.ndjson"
+if (-not (Test-Path $eventsReal)) {
+    Write-Utf8NoBom -Path $eventsReal -Content "# NL BeamNG events (appended by NL_BeamNGBridge)`n"
+}
+if (-not (Test-Path $kicksReal)) {
+    Write-Utf8NoBom -Path $kicksReal -Content "# NL BeamMP kick queue`n"
+}
+
+# Hard links so Session Host still reads %LOCALAPPDATA%\NL\ (same bytes on disk).
+$nl = Join-Path $env:LOCALAPPDATA "NL"
+$eventsLink = Join-Path $nl "beamng-events.ndjson"
+$kicksLink = Join-Path $nl "beamng-kicks.ndjson"
+Ensure-FileLink -Link $eventsLink -Target $eventsReal
+Ensure-FileLink -Link $kicksLink -Target $kicksReal
+
+# Relative paths — only these work inside BeamNG's Lua sandbox.
+$relEvents = "NL/beamng-events.ndjson"
+$relKicks = "NL/beamng-kicks.ndjson"
+
+$bridgeJsonPath = Join-Path $unpackedPath "bridge.json"
+$bridgeJson = @"
+{
+  "cmdPort": 27022,
+  "eventsPath": "$relEvents",
+  "kicksPath": "$relKicks",
+  "moveInterval": 0.35,
+  "crashDvThreshold": 8.0,
+  "crashWindow": 0.45,
+  "crashCooldown": 1.25,
+  "airtimeThreshold": 1.5,
+  "rolloverThreshold": 1.75,
+  "boundary": {
+    "minX": -5000,
+    "maxX": 5000,
+    "minY": -5000,
+    "maxY": 5000,
+    "minZ": -200,
+    "maxZ": 2000
+  }
+}
+"@
+Write-Utf8NoBom -Path $bridgeJsonPath -Content $bridgeJson.TrimEnd()
+
+$modScriptPath = Join-Path $unpackedPath "scripts\NL_BeamNGBridge\modScript.lua"
+$modScript = @"
+-- Auto-generated by install-beamng-bridge.ps1 (paths relative to BeamNG user folder).
+NL_BRIDGE_EVENTS_PATH = [[$relEvents]]
+NL_BRIDGE_KICKS_PATH = [[$relKicks]]
+load("NL_bridge")
+setExtensionUnloadMode("NL_bridge", "manual")
+"@
+Write-Utf8NoBom -Path $modScriptPath -Content $modScript.TrimEnd()
+
+Write-BeamNgZip -SourceDir $unpackedPath -ZipPath $zipPath
+Remove-Item -Recurse -Force $unpackedPath
+
+Write-Host "Installed zip (forward slashes) -> $zipPath"
+Write-Host "Events (real file)            -> $eventsReal"
+Write-Host "Events (Session Host link)    -> $eventsLink"
+Write-Host ""
+Write-Host "NEXT: fully quit BeamNG, restart, enable NL_BeamNGBridge, load a map, drive ~30s."
+Write-Host "Then run in CMD:"
+Write-Host "  findstr /i ""NL_BeamNGBridge Events path writable Failed append"" ""$user\beamng.log"""
+Write-Host "  type ""$eventsLink"""

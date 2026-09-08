@@ -1,0 +1,107 @@
+# NL public demo stack (Phase F + G): session server + demo bridge + Caddy TLS.
+#
+# Setup:
+#   cp docker/.env.demo.example docker/.env
+#   # edit docker/.env — set NL_DEMO_DOMAIN, NL_BUS_TOKEN, NL_OPERATOR_KEY
+#   docker compose -f docker/docker-compose.demo.yml --env-file docker/.env up -d --build
+#
+# Phase G auto-starts a live demo session and loops sample game events — no manual bridge setup.
+#
+# Verify:
+#   curl -fsS https://YOUR_DOMAIN/health
+#   curl -fsS https://YOUR_DOMAIN/api/v1/demo/status
+#
+# Local HTTP-only (no real domain):
+#   NL_DEMO_DOMAIN=localhost docker compose -f docker/docker-compose.demo.yml up -d --build
+#   curl -fsS http://localhost/health
+
+services:
+  session-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: session-host
+    image: ${NL_SESSION_IMAGE:-nexoralive-session-server:local}
+    restart: unless-stopped
+    expose:
+      - "27020"
+      - "27021"
+    environment:
+      NL_BIND: "0.0.0.0"
+      NL_HTTP_PORT: "27020"
+      NL_WS_PORT: "27021"
+      NL_DATA_ROOT: "/data"
+      NL_PUBLIC_MODE: "true"
+      NL_DEMO_MODE: "true"
+      NL_DEMO_CONFIG: ${NL_DEMO_CONFIG:-demo.nle}
+      NL_DEMO_RESET_INTERVAL_MINUTES: ${NL_DEMO_RESET_INTERVAL_MINUTES:-60}
+      NL_DEMO_STARTUP_DELAY_MS: ${NL_DEMO_STARTUP_DELAY_MS:-750}
+      NL_BUS_TOKEN: ${NL_BUS_TOKEN:?Set NL_BUS_TOKEN in docker/.env}
+      NL_OPERATOR_KEY: ${NL_OPERATOR_KEY:?Set NL_OPERATOR_KEY in docker/.env}
+      NL_PUBLIC_HTTP: ${NL_PUBLIC_HTTP:-http://${NL_DEMO_DOMAIN:-localhost}}
+      NL_PUBLIC_WS: ${NL_PUBLIC_WS:-ws://${NL_DEMO_DOMAIN:-localhost}/nl/v1}
+      NL_PUBLIC_MOD_HTTP: ${NL_PUBLIC_MOD_HTTP:-http://${NL_DEMO_DOMAIN:-localhost}}
+      NL_CORS_ORIGINS: ${NL_CORS_ORIGINS:-http://${NL_DEMO_DOMAIN:-localhost}}
+      NL_HARDENING: ${NL_HARDENING:-true}
+      NL_ADMIT_RATE_PER_MIN: ${NL_ADMIT_RATE_PER_MIN:-120}
+      NL_PUBLIC_READ_RATE_PER_MIN: ${NL_PUBLIC_READ_RATE_PER_MIN:-300}
+      NL_WS_MAX_CONNECTIONS: ${NL_WS_MAX_CONNECTIONS:-16}
+      NL_WS_MAX_CONNECTIONS_PER_IP: ${NL_WS_MAX_CONNECTIONS_PER_IP:-4}
+      NL_WS_CONNECT_RATE_PER_MIN: ${NL_WS_CONNECT_RATE_PER_MIN:-30}
+      NL_DEMO_SESSION_MAX_HOURS: ${NL_DEMO_SESSION_MAX_HOURS:-12}
+    volumes:
+      - nl-demo-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:27020/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+    networks:
+      - nl-demo
+
+  demo-bridge:
+    build:
+      context: ..
+      dockerfile: docker/demo-bridge/Dockerfile
+    image: ${NL_DEMO_BRIDGE_IMAGE:-nexoralive-demo-bridge:local}
+    restart: unless-stopped
+    environment:
+      NL_BRIDGE_URL: "ws://session-server:27021/nl/v1?token=${NL_BUS_TOKEN}"
+      NL_ADMIT_URL: "http://session-server:27020/api/v1/session/admit"
+      NL_BRIDGE_INTERVAL: ${NL_DEMO_BRIDGE_INTERVAL:-8}
+      NL_BRIDGE_RECONNECT_DELAY: "3"
+      NL_BRIDGE_WAIT_URL: "http://session-server:27020/api/v1/demo/status"
+    depends_on:
+      session-server:
+        condition: service_healthy
+    networks:
+      - nl-demo
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "${NL_DEMO_HTTP_PORT:-80}:80"
+      - "${NL_DEMO_HTTPS_PORT:-443}:443"
+    environment:
+      NL_DEMO_DOMAIN: ${NL_DEMO_DOMAIN:-localhost}
+      CADDY_ACME_EMAIL: ${CADDY_ACME_EMAIL:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      session-server:
+        condition: service_healthy
+    networks:
+      - nl-demo
+
+volumes:
+  nl-demo-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  nl-demo:
+    driver: bridge

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NexoraLive — Rule Editor</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="editor-page">
+  <header>
+    <p class="eyebrow">Phase I — Web rule authoring</p>
+    <h1>NLEvent rule editor</h1>
+    <p class="lead">
+      Build <code>.nle</code> rules in the browser: event blocks, allow/block/warn, and basic
+      <code>if</code> conditions. Evaluate mock events live, then save and apply to the demo session
+      (operator key required for writes).
+    </p>
+    <nav class="nav">
+      <a href="/">Watch demo</a>
+      <a href="/editor.html" aria-current="page">Rule editor</a>
+      <a href="/operator.html">Operator</a>
+      <a href="/moderation.html">Moderation</a>
+    </nav>
+  </header>
+
+  <section class="card" id="editor-status">
+    <p class="status muted" id="editor-meta">Loading …</p>
+  </section>
+
+  <section class="card" id="operator-auth" hidden>
+    <h2>Operator authentication</h2>
+    <p class="hint">Saving, applying, and resetting sandbox rules requires an operator key in public mode.</p>
+    <div class="grid">
+      <label class="wide">Operator key
+        <input id="operator-key" type="password" autocomplete="off" placeholder="NL_OPERATOR_KEY value" />
+      </label>
+    </div>
+    <div class="actions">
+      <button type="button" id="save-operator-key">Save key (this browser)</button>
+    </div>
+    <p id="operator-auth-status" class="status muted"></p>
+  </section>
+
+  <div class="editor-layout">
+    <section class="card editor-panel">
+      <div class="panel-head">
+        <h2>Events</h2>
+        <div class="actions compact">
+          <button type="button" id="add-event">+ Event</button>
+          <button type="button" id="remove-event" class="danger">Remove</button>
+        </div>
+      </div>
+      <ul id="event-list" class="event-list"></ul>
+    </section>
+
+    <section class="card editor-panel">
+      <div class="panel-head">
+        <h2>Statements</h2>
+        <div class="actions compact">
+          <button type="button" id="add-stmt">+ Statement</button>
+          <button type="button" id="edit-stmt">Edit</button>
+          <button type="button" id="remove-stmt" class="danger">Remove</button>
+          <button type="button" id="move-stmt-up" title="Move up">↑</button>
+          <button type="button" id="move-stmt-down" title="Move down">↓</button>
+        </div>
+      </div>
+      <ul id="stmt-list" class="stmt-list"></ul>
+      <div id="stmt-editor" class="stmt-editor" hidden>
+        <h3 id="stmt-editor-title">Edit statement</h3>
+        <div class="grid">
+          <label>Type
+            <select id="stmt-type">
+              <option value="allow">Allow</option>
+              <option value="block">Block</option>
+              <option value="deny">Deny</option>
+              <option value="warn">Warn</option>
+              <option value="if">If / else</option>
+            </select>
+          </label>
+          <label class="wide" id="warn-wrap" hidden>Warn message
+            <input id="stmt-warn-msg" placeholder="stay within the zone" />
+          </label>
+        </div>
+        <div id="if-wrap" hidden>
+          <p class="hint">Condition (simple comparisons joined by and/or)</p>
+          <div id="cond-parts"></div>
+          <div class="actions compact">
+            <button type="button" id="add-cond-part">+ Comparison</button>
+          </div>
+          <div class="grid if-branches">
+            <label>Then branch
+              <select id="then-action">
+                <option value="allow">allow</option>
+                <option value="block">block</option>
+                <option value="deny">deny</option>
+                <option value="warn">warn</option>
+              </select>
+            </label>
+            <label id="then-warn-wrap" hidden>Then warn message
+              <input id="then-warn-msg" />
+            </label>
+            <label>Else branch
+              <select id="else-action">
+                <option value="allow">allow</option>
+                <option value="block">block</option>
+                <option value="deny">deny</option>
+                <option value="warn">warn</option>
+                <option value="none">(none)</option>
+              </select>
+            </label>
+            <label id="else-warn-wrap" hidden>Else warn message
+              <input id="else-warn-msg" />
+            </label>
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" id="save-stmt" class="primary">Save statement</button>
+          <button type="button" id="cancel-stmt">Cancel</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="card split-card">
+    <div>
+      <h2>Generated <code>.nle</code></h2>
+      <textarea id="nle-preview" class="nle-preview" readonly spellcheck="false"></textarea>
+    </div>
+    <div>
+      <h2>Live evaluate</h2>
+      <p class="hint">Test the current rules against a mock event (same engine as the WinForms Config Editor).</p>
+      <div class="grid">
+        <label>Event name
+          <select id="eval-event"></select>
+        </label>
+        <label class="wide">Properties <span class="muted-inline">one per line: key=value</span>
+          <textarea id="eval-props" rows="4" spellcheck="false">player.health=100</textarea>
+        </label>
+      </div>
+      <div class="actions">
+        <button type="button" id="run-evaluate" class="primary">Evaluate</button>
+      </div>
+      <div id="eval-result" class="eval-result muted">Enter an event and click Evaluate.</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Sandbox actions</h2>
+    <p class="hint">
+      <strong>Save</strong> writes your rules to a server sandbox file.
+      <strong>Apply to session</strong> points the live session at that sandbox and restarts it.
+      <strong>Reset</strong> restores the demo template (also runs on demo loop reset).
+    </p>
+    <div class="actions">
+      <button type="button" id="save-config" class="primary">Save sandbox</button>
+      <button type="button" id="apply-config">Apply to live session</button>
+      <button type="button" id="reset-config" class="danger">Reset to template</button>
+      <button type="button" id="reload-config">Reload</button>
+    </div>
+    <p id="sandbox-status" class="status muted"></p>
+  </section>
+
+  <script src="nl-auth.js"></script>
+  <script src="editor-app.js"></script>
+</body>
+</html>

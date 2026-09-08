@@ -1,0 +1,37 @@
+{
+  "gameId": "example-game",
+  "displayName": "Example Game (T0 template)",
+  "majorVersion": "1.0",
+  "tier": "AtOwnRisk",
+  "connectScheme": "example",
+  "playerConnectPort": 27000,
+  "dockerImage": "nl-fork-example-game:latest",
+  "dockerfile": "docker/fork-example-game/Dockerfile",
+  "defaultNleTemplate": "samples/configs/example-game.nle",
+  "integrationDir": "integrations/example-game",
+  "dogfoodScript": "scripts/nl-dogfood-flow-example-game.ps1",
+  "buildImageKey": "example-game",
+  "minClientVersion": "1.0.0",
+  "noProgressTransfer": true,
+  "steamAppIds": [],
+  "requiredEvents": [
+    "sessionStart",
+    "playerJoin",
+    "playerLeave",
+    "playerChat"
+  ],
+  "requiredActions": [
+    "warn",
+    "kick",
+    "tell"
+  ],
+  "health": {
+    "type": "file",
+    "path": "/data/fork-status.json",
+    "readyField": "sessionStarted"
+  },
+  "catalogSnippet": {
+    "imageDigest": "sha256:examplegame10",
+    "status": "Active"
+  }
+}

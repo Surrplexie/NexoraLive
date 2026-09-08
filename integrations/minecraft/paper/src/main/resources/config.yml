@@ -1,0 +1,6 @@
+# NL session bus WebSocket (set via env NL_FORK_WS_URL in Docker, or edit here for local Paper)
+websocketUrl: "ws://127.0.0.1:27021/nl/v1?token=change-me"
+admitUrl: "http://127.0.0.1:27020/api/v1/session/admit"
+gameId: "minecraft"
+enforceJoinGate: true
+writeStatusPath: "/data/fork-status.json"

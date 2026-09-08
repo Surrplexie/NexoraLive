@@ -1,0 +1,326 @@
+using System.Diagnostics;
+using System.Text.Json;
+using NL.Fork.Core;
+using NL.Fork.Orchestrator.Core;
+
+namespace NL.Fork.Orchestrator;
+
+public sealed class MockForkProvisioner : IForkProvisioner
+{
+    public ForkProvisionerKind Kind => ForkProvisionerKind.Mock;
+
+    public Task<ForkProvisionerStartResult> StartAsync(
+        ForkProvisionerStartRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var status = new
+        {
+            connected = true,
+            provisioner = "mock",
+            sessionId = request.SessionId,
+            bridgeUrl = request.BridgeWebSocketUrl,
+            checkedAtUtc = DateTimeOffset.UtcNow,
+        };
+        File.WriteAllText(
+            Path.Combine(request.WorkspacePath, "fork-status.json"),
+            JsonSerializer.Serialize(status, new JsonSerializerOptions { WriteIndented = true }));
+
+        return Task.FromResult(new ForkProvisionerStartResult(
+            true,
+            ContainerOrProcessId: $"mock-{request.SessionId}",
+            ForkConnectEndpoint: $"mock://fork/{request.SessionId}"));
+    }
+
+    public Task StopAsync(ForkOrchestratorSession session, CancellationToken cancellationToken = default)
+    {
+        var statusPath = Path.Combine(session.WorkspacePath, "fork-status.json");
+        if (File.Exists(statusPath))
+        {
+            File.Delete(statusPath);
+        }
+
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class ProcessForkProvisioner : IForkProvisioner
+{
+    private readonly string? _runtimeProjectPath;
+    private readonly Action<string>? _log;
+
+    public ProcessForkProvisioner(string? runtimeProjectPath = null, Action<string>? log = null)
+    {
+        _runtimeProjectPath = runtimeProjectPath;
+        _log = log;
+    }
+
+    public ForkProvisionerKind Kind => ForkProvisionerKind.Process;
+
+    public async Task<ForkProvisionerStartResult> StartAsync(
+        ForkProvisionerStartRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var runtimeDll = ResolveRuntimeDll();
+        if (runtimeDll is null)
+        {
+            return new ForkProvisionerStartResult(false, Error: "NL.Fork.Runtime not found.");
+        }
+
+        var statusPath = Path.Combine(request.WorkspacePath, "fork-status.json");
+        var profile = ForkGameProfiles.Resolve(request.GameId);
+        var gameArg = profile.GameArg;
+        var connectArg = profile.PlayerConnectPort is int cp ? $" --connect-port {cp}" : "";
+        var args =
+            $"\"{runtimeDll}\" --game {gameArg} --url \"{request.BridgeWebSocketUrl}\" " +
+            $"--mods \"{request.ModsJsonPath}\" --status \"{statusPath}\" " +
+            $"--admit-url \"{request.AdmitUrl}\" --loop --interval 8{connectArg}";
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = "dotnet",
+            Arguments = args,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            WorkingDirectory = Path.GetDirectoryName(runtimeDll) ?? request.WorkspacePath,
+        };
+
+        var process = Process.Start(psi);
+        if (process is null)
+        {
+            return new ForkProvisionerStartResult(false, Error: "Failed to start fork process.");
+        }
+
+        _log?.Invoke($"[orchestrator] started process fork pid={process.Id} session={request.SessionId}");
+        await Task.Delay(500, cancellationToken);
+
+        return new ForkProvisionerStartResult(
+            true,
+            ContainerOrProcessId: process.Id.ToString(),
+            ForkConnectEndpoint: $"process://localhost/{process.Id}");
+    }
+
+    public Task StopAsync(ForkOrchestratorSession session, CancellationToken cancellationToken = default)
+    {
+        if (int.TryParse(session.ContainerOrProcessId, out var pid))
+        {
+            try
+            {
+                var proc = Process.GetProcessById(pid);
+                proc.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+                // already exited
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private string? ResolveRuntimeDll()
+    {
+        if (!string.IsNullOrWhiteSpace(_runtimeProjectPath))
+        {
+            var built = Path.Combine(_runtimeProjectPath, "bin", "Release", "net8.0", "NL.Fork.Runtime.dll");
+            if (File.Exists(built))
+            {
+                return built;
+            }
+        }
+
+        var dir = AppContext.BaseDirectory;
+        for (var i = 0; i < 8 && !string.IsNullOrEmpty(dir); i++)
+        {
+            var candidate = Path.Combine(dir, "src", "NL.Fork.Runtime", "bin", "Release", "net8.0", "NL.Fork.Runtime.dll");
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            dir = Directory.GetParent(dir)?.FullName ?? "";
+        }
+
+        return null;
+    }
+}
+
+public sealed class DockerForkProvisioner : IForkProvisioner
+{
+    private readonly Action<string>? _log;
+
+    public DockerForkProvisioner(Action<string>? log = null) => _log = log;
+
+    public ForkProvisionerKind Kind => ForkProvisionerKind.Docker;
+
+    public async Task<ForkProvisionerStartResult> StartAsync(
+        ForkProvisionerStartRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await DockerAvailableAsync(cancellationToken))
+        {
+            return new ForkProvisionerStartResult(false, Error: "Docker CLI not available.");
+        }
+
+        var image = string.IsNullOrWhiteSpace(request.DockerImage) ? "nl-fork-hello:latest" : request.DockerImage;
+        var name = $"nl-fork-{request.SessionId}".ToLowerInvariant();
+        var ws = ResolveWorkspaceMountPath(request.WorkspacePath);
+        var profile = ForkGameProfiles.Resolve(request.GameId);
+        var gameArg = profile.GameArg;
+        var portMap = profile.PlayerConnectPort is int port
+            ? $"-p {port}:{port} "
+            : "";
+        var connectEnv = profile.PlayerConnectPort is int connectPort
+            ? $"-e NL_FORK_CONNECT_PORT={connectPort} "
+            : "";
+
+        var dockerHost = Environment.GetEnvironmentVariable("NL_FORK_DOCKER_HOST") ?? "host.docker.internal";
+        var bridgeUrl = RewriteLocalHostForDocker(request.BridgeWebSocketUrl, dockerHost);
+        var admitUrl = RewriteLocalHostForDocker(request.AdmitUrl, dockerHost);
+        var extraHosts = BuildExtraHostsArg(dockerHost);
+
+        var args =
+            $"run -d --rm --name {name} " +
+            extraHosts +
+            portMap +
+            $"-v \"{ws}:/data\" " +
+            $"-e NL_FORK_WS_URL=\"{bridgeUrl}\" " +
+            $"-e NL_FORK_MODS=/data/mods.json " +
+            $"-e NL_FORK_STATUS=/data/fork-status.json " +
+            $"-e NL_FORK_ADMIT_URL=\"{admitUrl}\" " +
+            $"-e NL_FORK_GAME={gameArg} " +
+            connectEnv +
+            $"-e NL_DATA_ROOT=/data " +
+            $"{image} --game {gameArg} --loop --interval 8";
+
+        var (code, output, err) = await RunDockerAsync(args, cancellationToken);
+        if (code != 0)
+        {
+            return new ForkProvisionerStartResult(false, Error: err.Trim().Length > 0 ? err : output);
+        }
+
+        var containerId = output.Trim();
+        _log?.Invoke($"[orchestrator] docker container {name} id={containerId}");
+        var connect = PublicForkConnect.RewriteForPublic(
+            BuildConnectEndpoint(profile, name, port: profile.PlayerConnectPort));
+        return new ForkProvisionerStartResult(
+            true,
+            ContainerOrProcessId: containerId,
+            ForkConnectEndpoint: connect);
+    }
+
+    private static string BuildExtraHostsArg(string dockerHost)
+    {
+        if (string.Equals(dockerHost, "host.docker.internal", StringComparison.OrdinalIgnoreCase))
+        {
+            return "--add-host=host.docker.internal:host-gateway ";
+        }
+
+        return "";
+    }
+
+    public static string RewriteLocalHostForDocker(string url, string dockerHost)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return url;
+        }
+
+        return url
+            .Replace("127.0.0.1", dockerHost, StringComparison.Ordinal)
+            .Replace("://localhost", "://" + dockerHost, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// When session-host runs in Docker but forks are started via the host daemon (docker.sock),
+    /// workspace paths inside the container must be rewritten to the host bind-mount root.
+    /// </summary>
+    public static string ResolveWorkspaceMountPath(string workspacePath)
+    {
+        var normalized = workspacePath.Replace('\\', '/');
+        var hostRoot = Environment.GetEnvironmentVariable("NL_FORK_DOCKER_WORKSPACE_HOST_ROOT");
+        if (string.IsNullOrWhiteSpace(hostRoot))
+        {
+            return normalized;
+        }
+
+        var dataRoot = (Environment.GetEnvironmentVariable("NL_DATA_ROOT") ?? "/data").Replace('\\', '/').TrimEnd('/');
+        if (!normalized.StartsWith(dataRoot + "/", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(normalized, dataRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            return normalized;
+        }
+
+        var relative = normalized.Length > dataRoot.Length
+            ? normalized[(dataRoot.Length + 1)..]
+            : "";
+        var hostPath = string.IsNullOrEmpty(relative)
+            ? hostRoot
+            : Path.Combine(hostRoot, relative.Replace('/', Path.DirectorySeparatorChar));
+        return hostPath.Replace('\\', '/');
+    }
+
+    private static string BuildConnectEndpoint(ForkGameProfile profile, string containerName, int? port)
+    {
+        if (port is int p && string.Equals(profile.ConnectScheme, "minecraft", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"minecraft://127.0.0.1:{p}";
+        }
+
+        if (port is int rimPort && string.Equals(profile.ConnectScheme, "rimworld", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"rimworld://127.0.0.1:{rimPort}";
+        }
+
+        if (port is int kenPort && string.Equals(profile.ConnectScheme, "kenshi", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"kenshi://127.0.0.1:{kenPort}";
+        }
+
+        if (string.Equals(profile.ConnectScheme, "beamng-sidecar", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"beamng-sidecar://127.0.0.1/udp/27022";
+        }
+
+        return $"docker://{containerName}";
+    }
+
+    public async Task StopAsync(ForkOrchestratorSession session, CancellationToken cancellationToken = default)
+    {
+        var name = $"nl-fork-{session.SessionId}".ToLowerInvariant();
+        await RunDockerAsync($"rm -f {name}", cancellationToken);
+    }
+
+    private static async Task<bool> DockerAvailableAsync(CancellationToken cancellationToken)
+    {
+        var (code, _, _) = await RunDockerAsync("version", cancellationToken);
+        return code == 0;
+    }
+
+    private static async Task<(int Code, string Output, string Error)> RunDockerAsync(
+        string args,
+        CancellationToken cancellationToken)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = "docker",
+            Arguments = args,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+
+        using var process = Process.Start(psi);
+        if (process is null)
+        {
+            return (-1, "", "docker start failed");
+        }
+
+        var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        var errTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        await process.WaitForExitAsync(cancellationToken);
+        return (process.ExitCode, await outputTask, await errTask);
+    }
+}

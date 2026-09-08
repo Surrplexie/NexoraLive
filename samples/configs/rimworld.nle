@@ -1,0 +1,84 @@
+# NLEvents for RimWorld (Phase T1 — full colony vocabulary)
+# Pair with nl-fork-rimworld sidecar or RimWorld Together dedicated + NL Harmony mod.
+# Events: session, join, chat, combat, grief, draft, trade, rescue.
+
+event sessionStart:
+    warn "NL colony rules active for RimWorld."
+    allow
+
+event sessionEnd:
+    allow
+
+event playerJoin:
+    allow
+
+event playerLeave:
+    allow
+
+event playerChat:
+    if chat.capsRatio > 0.8 and chat.length > 10:
+        warn "please avoid excessive caps in colony chat"
+        block
+    else:
+        allow
+
+event entityDamage:
+    if weapon.damage > 40:
+        warn "excessive pawn damage"
+        block
+    else:
+        allow
+
+event colonistDown:
+    allow
+
+event respawn:
+    allow
+
+event move:
+    allow
+
+event colonistDraft:
+    if player.downed > 0:
+        warn "cannot draft a downed colonist"
+        block
+    else:
+        allow
+
+# Grief: destroying high-value buildings / walls
+event buildingDestroy:
+    if building.value > 1500:
+        warn "high-value building destroy blocked"
+        block
+    else:
+        allow
+
+# Grief: mass zone / stockpile edits
+event zoneEdit:
+    if zone.tiles > 80:
+        warn "mass zone edit blocked"
+        block
+    else:
+        allow
+
+# Grief: dumping animals
+event animalRelease:
+    if animal.count > 3:
+        warn "mass animal release blocked"
+        block
+    else:
+        allow
+
+event trade:
+    if trade.value > 5000:
+        warn "high-value trade blocked"
+        block
+    else:
+        allow
+
+event itemDestroy:
+    if item.value > 800:
+        warn "high-value item destroy blocked"
+        block
+    else:
+        allow

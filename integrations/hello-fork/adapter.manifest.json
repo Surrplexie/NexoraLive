@@ -1,0 +1,37 @@
+{
+  "gameId": "hello-fork",
+  "displayName": "Hello Fork Runtime",
+  "majorVersion": "1.0",
+  "tier": "Official",
+  "connectScheme": "hello",
+  "playerConnectPort": null,
+  "dockerImage": "nl-fork-hello:latest",
+  "dockerfile": "docker/fork-hello/Dockerfile",
+  "defaultNleTemplate": "samples/configs/fork-hello.nle",
+  "integrationDir": "integrations/hello-fork",
+  "dogfoodScript": "scripts/nl-dogfood-flow.ps1",
+  "buildImageKey": "hello-fork",
+  "minClientVersion": "1.0.0",
+  "noProgressTransfer": true,
+  "steamAppIds": [],
+  "requiredEvents": [
+    "sessionStart",
+    "playerJoin",
+    "playerLeave",
+    "playerChat",
+    "shoot",
+    "move",
+    "respawn"
+  ],
+  "requiredActions": [
+    "warn",
+    "kick",
+    "tell",
+    "recover"
+  ],
+  "health": {
+    "type": "file",
+    "path": "/data/fork-status.json",
+    "readyField": "sessionStarted"
+  }
+}

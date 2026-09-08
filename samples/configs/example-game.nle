@@ -1,0 +1,24 @@
+# NLEvents for Example Game (T0 reference)
+
+event sessionStart:
+    warn "NL rules active for Example Game."
+    allow
+
+event playerJoin:
+    allow
+
+event playerLeave:
+    allow
+
+event playerChat:
+    if chat.capsRatio > 0.8 and chat.length > 10:
+        warn "please avoid excessive caps"
+        block
+    else:
+        allow
+
+event shoot:
+    allow
+
+event move:
+    allow

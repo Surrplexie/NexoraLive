@@ -1,0 +1,3823 @@
+using System.Text.Json.Serialization;
+using NL.Core;
+using NL.Core.Security;
+using NL.Core.Sp;
+using NL.Fork.Core;
+using NL.Fork.Catalog;
+using NL.Partnership;
+using NL.Partnership.Core;
+using NL.Client;
+using NL.Client.Core;
+using NL.Fleet;
+using NL.Fleet.Core;
+using NL.Fork.Catalog.Core;
+using NL.Fork.Orchestrator;
+using NL.Fork.Orchestrator.Core;
+using NL.Identity;
+using NL.Identity.Core;
+using NL.Moderation;
+using NL.Moderation.Core;
+using NL.NleEditor;
+using NL.NleEditor.Model;
+using NL.Server;
+using NL.Server.Core.Integration;
+using NL.Server.Core.Security;
+using NL.SessionHost.Web;
+using NL.Social;
+using NL.Social.Core;
+using NL.Web.Shared;
+
+var security = NlSecuritySettings.LoadFromEnvironment();
+var demoSettings = NlDemoSettings.LoadFromEnvironment();
+var spectatorSettings = NlSpectatorSettings.LoadFromEnvironment();
+var hardeningSettings = NlHardeningSettings.LoadFromEnvironment(security.PublicMode);
+NlWebSocketConnectionGuard.Configure(hardeningSettings);
+var bindHost = security.BindHost;
+var httpPort = int.Parse(Environment.GetEnvironmentVariable("NL_HTTP_PORT") ?? NlSessionBusDefaults.HttpPort.ToString());
+var wsPort = int.Parse(Environment.GetEnvironmentVariable("NL_WS_PORT") ?? NlSessionBusDefaults.WebSocketPort.ToString());
+var modPort = int.Parse(Environment.GetEnvironmentVariable("NL_MOD_HTTP_PORT") ?? NlSessionServerDefaults.ModerationPort.ToString());
+var busToken = NlSecuritySettings.ResolveBusToken(security);
+var moderationLog = Environment.GetEnvironmentVariable("NL_MODERATION_LOG");
+var spStore = Environment.GetEnvironmentVariable("NL_SP_STORE");
+
+NlPaths.EnsureRoot();
+DogfoodSetup.EnsureMockOwnership(DogfoodSetup.FindRepoRoot());
+
+var identitySettings = NlIdentitySettings.LoadFromEnvironment();
+var identityHost = new NlIdentityHost(identitySettings);
+var socialSettings = NlSocialSettings.LoadFromEnvironment();
+var socialHost = new NlSocialHost(socialSettings);
+var catalogSettings = NlForkCatalogSettings.LoadFromEnvironment();
+var catalogHost = new NlForkCatalogHost(catalogSettings);
+var orchestratorSettings = NlForkOrchestratorSettings.LoadFromEnvironment();
+var orchestratorHost = new NlForkOrchestratorHost(orchestratorSettings, catalogHost);
+var partnershipSettings = NlPartnershipSettings.LoadFromEnvironment();
+var partnershipHost = new NlPartnershipHost(partnershipSettings);
+var fleetSettings = NlFleetSettings.LoadFromEnvironment();
+var fleetHost = new NlFleetHost(fleetSettings);
+var samplesRoot = ResolveSamplesRoot();
+
+var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.UseUrls($"http://{bindHost}:{httpPort}");
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
+
+var bus = new BusHostState(bindHost, httpPort, wsPort, busToken, modPort);
+var moderation = new ModerationHostState(moderationLog, spStore);
+var clientHost = CreateClientHost(bus, moderation, identityHost, socialHost, catalogHost, partnershipHost, orchestratorHost, fleetHost);
+identityHost.AttachUnifiedProvisioner(new NlUnifiedAccountProvisioner(moderation, socialHost));
+if (File.Exists(NlPaths.SessionProfile))
+{
+    bus.SaveProfile(NlSessionRunner.LoadProfile(NlPaths.SessionProfile));
+}
+
+builder.Services.AddSingleton(bus);
+builder.Services.AddSingleton(moderation);
+builder.Services.AddSingleton(identitySettings);
+builder.Services.AddSingleton(identityHost);
+builder.Services.AddSingleton(socialSettings);
+builder.Services.AddSingleton(socialHost);
+builder.Services.AddSingleton(catalogSettings);
+builder.Services.AddSingleton(catalogHost);
+builder.Services.AddSingleton(orchestratorSettings);
+builder.Services.AddSingleton(orchestratorHost);
+builder.Services.AddSingleton(partnershipSettings);
+builder.Services.AddSingleton(partnershipHost);
+builder.Services.AddSingleton(fleetSettings);
+builder.Services.AddSingleton(fleetHost);
+builder.Services.AddSingleton(clientHost);
+builder.Services.AddSingleton(demoSettings);
+builder.Services.AddSingleton(spectatorSettings);
+builder.Services.AddSingleton(hardeningSettings);
+builder.Services.AddSingleton(new NlPublicRateLimitService(hardeningSettings));
+builder.Services.AddSingleton(new NlSpectatorService(spectatorSettings));
+builder.Services.AddSingleton(new NlWebEditorStore());
+builder.Services.AddNlWebSecurity(security);
+if (demoSettings.Enabled)
+{
+    builder.Services.AddHostedService<NlDemoHostedService>();
+}
+
+if (socialSettings.Enabled && socialSettings.Mode != NlSocialMode.Off)
+{
+    builder.Services.AddHostedService<NlLiveOnlyHostedService>();
+}
+
+if (orchestratorSettings.Enabled)
+{
+    builder.Services.AddHostedService<NlForkOrchestratorLifecycleHostedService>();
+}
+
+if (fleetSettings.Enabled)
+{
+    builder.Services.AddHostedService<NlFleetLifecycleHostedService>();
+}
+
+var app = builder.Build();
+app.UseCors();
+app.UseNlPublicRateLimits();
+app.UseNlOperatorAuth();
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
+app.MapGet("/api/v1/security", (NlSecuritySettings s) => Results.Json(s.ToPublicInfo()));
+
+app.MapGet("/api/v1/bus", (BusHostState b, HttpContext ctx) =>
+    Results.Json(NlSecurityRedaction.RedactBusInfo(b.BusInfo, NlWebSecurityExtensions.IsAuthorized(ctx))));
+
+app.MapGet("/api/v1/session/manifest", (BusHostState b, NlForkOrchestratorHost orchestrator, NlFleetHost fleet, HttpContext ctx) =>
+    Results.Json(NlSecurityRedaction.RedactManifest(b.GetManifest(orchestrator, fleet), NlWebSecurityExtensions.IsAuthorized(ctx))));
+
+app.MapGet("/api/v1/session", (BusHostState b, NlForkOrchestratorHost orchestrator, NlFleetHost fleet, HttpContext ctx) =>
+    Results.Json(b.GetStatus(NlWebSecurityExtensions.IsAuthorized(ctx), orchestrator, fleet)));
+
+app.MapPost("/api/v1/session/admit", async (BusHostState b, NlIdentityHost identity, NlSocialHost social, NlForkCatalogHost catalog, NlPartnershipHost partnership, NlFleetHost fleet, NlAdmitPlayerRequest body, HttpContext ctx, CancellationToken ct) =>
+{
+    ApplyUnifiedSession(identity, ctx, body);
+    if (string.IsNullOrWhiteSpace(body.PlayerId))
+    {
+        return Results.BadRequest(new { error = "playerId required." });
+    }
+
+    try
+    {
+        var result = await b.AdmitAsync(body, identity, social, catalog, partnership, ct);
+        if (fleet.Settings.Enabled)
+        {
+            fleet.Metrics.RecordAdmit(result.Admit, body.StreamerId ?? b.GetProfile().StreamerId);
+            fleet.Metrics.RecordDecision(b.Sessions.DecisionCount);
+        }
+
+        return Results.Json(result);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/api/v1/identity/settings", (NlIdentitySettings s) => Results.Json(s.ToPublicInfo()));
+
+app.MapPost("/api/v1/identity/accounts", (NlIdentityHost host, NlIdentitySettings settings, CreateIdentityAccountRequest request) =>
+{
+    if (!settings.Enabled)
+    {
+        return Results.Json(new { error = "Identity service disabled." }, statusCode: 503);
+    }
+
+    if (string.IsNullOrWhiteSpace(request.DisplayName))
+    {
+        return Results.BadRequest(new { error = "displayName required." });
+    }
+
+    var account = host.Identity.CreateAccount(request.DisplayName.Trim());
+    host.UnifiedAccounts.EnsurePlayerProfile(account.Id, account.DisplayName);
+    return Results.Json(new { accountId = account.Id, displayName = account.DisplayName, playerId = account.Id });
+});
+
+app.MapPost("/api/v1/identity/link", (NlIdentityHost host, NlIdentitySettings settings, LinkPlatformRequest request) =>
+{
+    if (!settings.Enabled)
+    {
+        return Results.Json(new { error = "Identity service disabled." }, statusCode: 503);
+    }
+
+    if (string.IsNullOrWhiteSpace(request.AccountId) || string.IsNullOrWhiteSpace(request.ExternalUserId))
+    {
+        return Results.BadRequest(new { error = "accountId and externalUserId required." });
+    }
+
+    if (!NlPlatformNames.TryParse(request.Platform, out var platform))
+    {
+        return Results.BadRequest(new { error = "Invalid platform." });
+    }
+
+    try
+    {
+        var account = host.Identity.LinkPlatform(
+            request.AccountId.Trim(),
+            platform,
+            request.ExternalUserId.Trim(),
+            request.RefreshToken);
+        return Results.Json(new
+        {
+            accountId = account.Id,
+            links = account.Links.Select(l => new { platform = l.Platform.ToString(), externalUserId = l.ExternalUserId }),
+        });
+    }
+    catch (PlatformLinkConflictException ex)
+    {
+        return Results.Conflict(new { error = ex.Message, existingAccountId = ex.ExistingAccountId });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+});
+
+app.MapDelete("/api/v1/identity/link", (
+    NlIdentityHost host,
+    NlIdentitySettings settings,
+    string accountId,
+    string platform,
+    string externalUserId) =>
+{
+    if (!settings.Enabled)
+    {
+        return Results.Json(new { error = "Identity service disabled." }, statusCode: 503);
+    }
+
+    if (string.IsNullOrWhiteSpace(accountId) || string.IsNullOrWhiteSpace(externalUserId))
+    {
+        return Results.BadRequest(new { error = "accountId and externalUserId required." });
+    }
+
+    if (!NlPlatformNames.TryParse(platform, out var parsedPlatform))
+    {
+        return Results.BadRequest(new { error = "Invalid platform." });
+    }
+
+    try
+    {
+        host.Identity.UnlinkPlatform(accountId.Trim(), parsedPlatform, externalUserId.Trim());
+        return Results.Ok(new { ok = true });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/api/v1/identity/accounts/{accountId}", (NlIdentityHost host, string accountId) =>
+{
+    var account = host.Identity.GetAccount(accountId);
+    return account is null
+        ? Results.NotFound(new { error = "Account not found." })
+        : Results.Json(new
+        {
+            account.Id,
+            account.DisplayName,
+            account.CreatedAtUtc,
+            links = account.Links.Select(l => new
+            {
+                platform = l.Platform.ToString(),
+                l.ExternalUserId,
+                l.LinkedAtUtc,
+                hasToken = !string.IsNullOrWhiteSpace(l.ProtectedRefreshToken),
+            }),
+        });
+});
+
+app.MapGet("/api/v1/identity/accounts/by-platform/{platform}/{externalUserId}", (NlIdentityHost host, string platform, string externalUserId) =>
+{
+    if (!NlPlatformNames.TryParse(platform, out var parsed))
+    {
+        return Results.BadRequest(new { error = "Invalid platform." });
+    }
+
+    var account = host.Identity.GetAccountByPlatform(parsed, externalUserId);
+    return account is null
+        ? Results.NotFound(new { error = "No NL account linked to this platform user." })
+        : Results.Json(new { accountId = account.Id, account.DisplayName });
+});
+
+app.MapGet("/api/v1/identity/oauth/steam/authorize", (
+    NlIdentityHost host,
+    NlIdentitySettings settings,
+    HttpContext ctx,
+    string accountId,
+    string? returnUrl) =>
+{
+    if (!settings.Enabled)
+    {
+        return Results.Json(new { error = "Identity service disabled." }, statusCode: 503);
+    }
+
+    if (string.IsNullOrWhiteSpace(accountId))
+    {
+        return Results.BadRequest(new { error = "accountId required." });
+    }
+
+    if (host.Identity.GetAccount(accountId.Trim()) is null)
+    {
+        return Results.NotFound(new { error = "Account not found." });
+    }
+
+    var publicBase = ResolveIdentityPublicBase(ctx, settings);
+    var redirect = host.SteamOpenId.BuildAuthorizeRedirect(accountId.Trim(), returnUrl, publicBase);
+    return Results.Redirect(redirect);
+});
+
+app.MapGet("/api/v1/identity/oauth/steam/callback", async (
+    NlIdentityHost host,
+    NlIdentitySettings settings,
+    HttpContext ctx,
+    CancellationToken ct) =>
+{
+    if (!settings.Enabled)
+    {
+        return Results.Content("Identity service disabled.", "text/plain", statusCode: 503);
+    }
+
+    var query = ctx.Request.Query.ToDictionary(
+        kv => kv.Key,
+        kv => kv.Value.ToString(),
+        StringComparer.OrdinalIgnoreCase);
+
+    var result = await host.SteamOpenId.HandleCallbackAsync(query, host.Identity, ct);
+    var landing = string.IsNullOrWhiteSpace(result.ReturnUrl)
+        ? "/identity-link.html"
+        : result.ReturnUrl!;
+
+    var sep = landing.Contains('?') ? "&" : "?";
+    if (result.Success)
+    {
+        return Results.Redirect(
+            $"{landing}{sep}linked=steam&accountId={Uri.EscapeDataString(result.AccountId!)}&steamId={Uri.EscapeDataString(result.SteamId!)}");
+    }
+
+    return Results.Redirect(
+        $"{landing}{sep}error={Uri.EscapeDataString(result.Error ?? "Steam sign-in failed.")}");
+});
+
+app.MapGet("/api/v1/identity/oauth/epic/authorize", (
+    NlIdentityHost host,
+    NlIdentitySettings settings,
+    HttpContext ctx,
+    string accountId,
+    string? returnUrl) =>
+    MapIdentityPlatformAuthorize(host, settings, ctx, accountId, returnUrl, host.EpicOAuth.IsConfigured, "Epic", () =>
+    {
+        var publicBase = ResolveIdentityPublicBase(ctx, settings);
+        return host.EpicOAuth.BuildAuthorizeRedirect(accountId.Trim(), returnUrl, publicBase);
+    }));
+
+app.MapGet("/api/v1/identity/oauth/epic/callback", (NlIdentityHost host, NlIdentitySettings settings, HttpContext ctx, CancellationToken ct) =>
+    MapIdentityPlatformCallback(host, settings, ctx, ct, NlPlatform.Epic, "epic", host.EpicOAuth.HandleCallbackAsync));
+
+app.MapGet("/api/v1/identity/oauth/xbox/authorize", (
+    NlIdentityHost host,
+    NlIdentitySettings settings,
+    HttpContext ctx,
+    string accountId,
+    string? returnUrl) =>
+    MapIdentityPlatformAuthorize(host, settings, ctx, accountId, returnUrl, host.XboxOAuth.IsConfigured, "Xbox", () =>
+    {
+        var publicBase = ResolveIdentityPublicBase(ctx, settings);
+        return host.XboxOAuth.BuildAuthorizeRedirect(accountId.Trim(), returnUrl, publicBase);
+    }));
+
+app.MapGet("/api/v1/identity/oauth/xbox/callback", (NlIdentityHost host, NlIdentitySettings settings, HttpContext ctx, CancellationToken ct) =>
+    MapIdentityPlatformCallback(host, settings, ctx, ct, NlPlatform.Xbox, "xbox", host.XboxOAuth.HandleCallbackAsync));
+
+app.MapGet("/api/v1/identity/oauth/playstation/authorize", (
+    NlIdentityHost host,
+    NlIdentitySettings settings,
+    HttpContext ctx,
+    string accountId,
+    string? returnUrl) =>
+    MapIdentityPlatformAuthorize(host, settings, ctx, accountId, returnUrl, host.PlayStationOAuth.IsConfigured, "PlayStation", () =>
+    {
+        var publicBase = ResolveIdentityPublicBase(ctx, settings);
+        return host.PlayStationOAuth.BuildAuthorizeRedirect(accountId.Trim(), returnUrl, publicBase);
+    }));
+
+app.MapGet("/api/v1/identity/oauth/playstation/callback", (NlIdentityHost host, NlIdentitySettings settings, HttpContext ctx, CancellationToken ct) =>
+    MapIdentityPlatformCallback(host, settings, ctx, ct, NlPlatform.PlayStation, "playstation", host.PlayStationOAuth.HandleCallbackAsync));
+
+app.MapGet("/api/v1/identity/platform-oauth/{platform}/{accountId}", (NlIdentityHost host, string platform, string accountId) =>
+{
+    if (!NlPlatformNames.TryParse(platform, out var parsed))
+    {
+        return Results.BadRequest(new { error = "Invalid platform." });
+    }
+
+    var credential = host.PlatformCredentials.Get(parsed, accountId);
+    if (credential is null)
+    {
+        return Results.NotFound(new { error = "No OAuth link for this account/platform." });
+    }
+
+    return Results.Json(new
+    {
+        accountId = credential.AccountId,
+        platform = NlPlatformNames.Normalize(parsed),
+        externalUserId = credential.ExternalUserId,
+        displayName = credential.DisplayName,
+        linked = true,
+    });
+});
+
+app.MapGet("/api/v1/identity/audit", (NlIdentityHost host, int? count) =>
+    Results.Json(host.Audit.ReadRecent(count ?? 50)));
+
+app.MapPost("/api/v1/auth/register", (NlIdentityHost host, NlIdentitySettings settings, AuthRegisterRequest request) =>
+{
+    if (!settings.Enabled)
+    {
+        return Results.Json(new { error = "Identity service disabled." }, statusCode: 503);
+    }
+
+    var result = host.UnifiedAccounts.Register(request.DisplayName ?? "", request.Email ?? "", request.Password ?? "");
+    if (!result.Success)
+    {
+        return Results.BadRequest(new { error = result.Error });
+    }
+
+    return Results.Json(new
+    {
+        sessionToken = result.SessionToken,
+        account = result.Account,
+    });
+});
+
+app.MapPost("/api/v1/auth/login", (NlIdentityHost host, NlIdentitySettings settings, AuthLoginRequest request) =>
+{
+    if (!settings.Enabled)
+    {
+        return Results.Json(new { error = "Identity service disabled." }, statusCode: 503);
+    }
+
+    var result = host.UnifiedAccounts.Login(request.Email ?? "", request.Password ?? "", request.TwoFactorCode);
+    if (!result.Success)
+    {
+        return Results.Json(new
+        {
+            error = result.Error,
+            requiresTwoFactor = result.RequiresTwoFactor,
+        }, statusCode: result.RequiresTwoFactor ? 401 : 400);
+    }
+
+    return Results.Json(new
+    {
+        sessionToken = result.SessionToken,
+        expiresAtUtc = result.ExpiresAtUtc,
+        account = result.Account,
+    });
+});
+
+app.MapPost("/api/v1/auth/logout", (NlIdentityHost host, HttpContext ctx) =>
+{
+    var token = ExtractSessionToken(ctx);
+    if (string.IsNullOrWhiteSpace(token))
+    {
+        return Results.BadRequest(new { error = "No session token." });
+    }
+
+    host.UnifiedAccounts.Logout(token);
+    return Results.Json(new { ok = true });
+});
+
+app.MapGet("/api/v1/auth/me", (NlIdentityHost host, HttpContext ctx) =>
+{
+    var summary = host.UnifiedAccounts.GetSummaryFromSession(ExtractSessionToken(ctx));
+    if (summary is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var account = host.UnifiedAccounts.GetAccountFromSession(ExtractSessionToken(ctx));
+    return Results.Json(new
+    {
+        account = summary,
+        verification = account is null ? null : host.Verification.GetStatus(account),
+        platformLinks = account?.Links.Select(l => new { platform = l.Platform.ToString(), externalUserId = l.ExternalUserId }),
+    });
+});
+
+app.MapPost("/api/v1/auth/streamer/enable", (NlIdentityHost host, HttpContext ctx, EnableStreamerRequest body) =>
+{
+    var account = host.UnifiedAccounts.GetAccountFromSession(ExtractSessionToken(ctx));
+    if (account is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var result = host.UnifiedAccounts.EnableStreamer(account.Id, body.StreamerSlug);
+    if (!result.Success)
+    {
+        return Results.BadRequest(new { error = result.Error });
+    }
+
+    return Results.Json(new { account = result.Account });
+});
+
+app.MapGet("/api/v1/identity/verification/{accountId}", (NlIdentityHost host, NlIdentitySettings settings, string accountId) =>
+{
+    if (!settings.VerificationEnabled)
+    {
+        return Results.Json(new { error = "Account verification disabled." }, statusCode: 503);
+    }
+
+    var account = host.Identity.GetAccount(accountId);
+    if (account is null)
+    {
+        return Results.NotFound(new { error = "Account not found." });
+    }
+
+    return Results.Json(host.Verification.GetStatus(account));
+});
+
+app.MapPost("/api/v1/identity/verification/email/request", async (
+    NlIdentityHost host,
+    NlIdentitySettings settings,
+    EmailVerificationRequest request,
+    CancellationToken ct) =>
+{
+    if (!settings.VerificationEnabled)
+    {
+        return Results.Json(new { error = "Account verification disabled." }, statusCode: 503);
+    }
+
+    if (string.IsNullOrWhiteSpace(request.AccountId) || string.IsNullOrWhiteSpace(request.Email))
+    {
+        return Results.BadRequest(new { error = "accountId and email required." });
+    }
+
+    try
+    {
+        var result = await host.Verification.RequestEmailVerificationAsync(request.AccountId.Trim(), request.Email.Trim(), ct);
+        if (!result.Success)
+        {
+            return Results.BadRequest(new { error = result.Error });
+        }
+
+        return Results.Json(new { ok = true, devCode = result.DevCode });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/v1/identity/verification/email/confirm", (
+    NlIdentityHost host,
+    NlIdentitySettings settings,
+    EmailConfirmRequest request) =>
+{
+    if (!settings.VerificationEnabled)
+    {
+        return Results.Json(new { error = "Account verification disabled." }, statusCode: 503);
+    }
+
+    if (string.IsNullOrWhiteSpace(request.AccountId) || string.IsNullOrWhiteSpace(request.Code))
+    {
+        return Results.BadRequest(new { error = "accountId and code required." });
+    }
+
+    try
+    {
+        var result = host.Verification.ConfirmEmailVerification(request.AccountId.Trim(), request.Code.Trim());
+        return result.Success
+            ? Results.Json(new { ok = true, verification = result.Verification.ToString() })
+            : Results.BadRequest(new { error = result.Error, verification = result.Verification.ToString() });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/v1/identity/verification/2fa/enroll/start", (
+    NlIdentityHost host,
+    NlIdentitySettings settings,
+    AccountIdRequest request) =>
+{
+    if (!settings.VerificationEnabled)
+    {
+        return Results.Json(new { error = "Account verification disabled." }, statusCode: 503);
+    }
+
+    if (string.IsNullOrWhiteSpace(request.AccountId))
+    {
+        return Results.BadRequest(new { error = "accountId required." });
+    }
+
+    try
+    {
+        var result = host.Verification.StartTwoFactorEnrollment(request.AccountId.Trim());
+        return result.Success
+            ? Results.Json(new { ok = true, secretBase32 = result.SecretBase32, otpAuthUri = result.OtpAuthUri })
+            : Results.BadRequest(new { error = result.Error });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/v1/identity/verification/2fa/enroll/confirm", (
+    NlIdentityHost host,
+    NlIdentitySettings settings,
+    TwoFactorCodeRequest request) =>
+{
+    if (!settings.VerificationEnabled)
+    {
+        return Results.Json(new { error = "Account verification disabled." }, statusCode: 503);
+    }
+
+    if (string.IsNullOrWhiteSpace(request.AccountId) || string.IsNullOrWhiteSpace(request.Code))
+    {
+        return Results.BadRequest(new { error = "accountId and code required." });
+    }
+
+    try
+    {
+        var result = host.Verification.ConfirmTwoFactorEnrollment(request.AccountId.Trim(), request.Code.Trim());
+        return result.Success
+            ? Results.Json(new { ok = true, verification = result.Verification.ToString() })
+            : Results.BadRequest(new { error = result.Error, verification = result.Verification.ToString() });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/v1/identity/verification/2fa/verify", (
+    NlIdentityHost host,
+    NlIdentitySettings settings,
+    TwoFactorCodeRequest request) =>
+{
+    if (!settings.VerificationEnabled)
+    {
+        return Results.Json(new { error = "Account verification disabled." }, statusCode: 503);
+    }
+
+    if (string.IsNullOrWhiteSpace(request.AccountId) || string.IsNullOrWhiteSpace(request.Code))
+    {
+        return Results.BadRequest(new { error = "accountId and code required." });
+    }
+
+    var account = host.Identity.GetAccount(request.AccountId.Trim());
+    if (account is null)
+    {
+        return Results.NotFound(new { error = "Account not found." });
+    }
+
+    var ok = host.Verification.VerifyTwoFactorCode(account, request.Code.Trim());
+    return ok
+        ? Results.Json(new { ok = true })
+        : Results.BadRequest(new { error = "Invalid authenticator code." });
+});
+
+app.MapDelete("/api/v1/identity/verification/2fa", async (
+    NlIdentityHost host,
+    NlIdentitySettings settings,
+    HttpRequest req) =>
+{
+    if (!settings.VerificationEnabled)
+    {
+        return Results.Json(new { error = "Account verification disabled." }, statusCode: 503);
+    }
+
+    var request = await req.ReadFromJsonAsync<TwoFactorCodeRequest>();
+    if (request is null || string.IsNullOrWhiteSpace(request.AccountId) || string.IsNullOrWhiteSpace(request.Code))
+    {
+        return Results.BadRequest(new { error = "accountId and code required." });
+    }
+
+    try
+    {
+        var result = host.Verification.DisableTwoFactor(request.AccountId.Trim(), request.Code.Trim());
+        return result.Success
+            ? Results.Json(new { ok = true, verification = result.Verification.ToString() })
+            : Results.BadRequest(new { error = result.Error, verification = result.Verification.ToString() });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/api/v1/social/settings", (NlSocialSettings s) => Results.Json(s.ToPublicInfo()));
+
+app.MapGet("/api/v1/social/join-requirements", () =>
+    Results.Json(JoinRequirementsStore.LoadOrDefault(NlPaths.JoinRequirements)));
+
+app.MapPut("/api/v1/social/join-requirements", async (HttpRequest req) =>
+{
+    var body = await req.ReadFromJsonAsync<JoinRequirements>();
+    if (body is null)
+    {
+        return Results.BadRequest(new { error = "Invalid join requirements JSON." });
+    }
+
+    JoinRequirementsStore.Save(NlPaths.JoinRequirements, body);
+    return Results.Json(body);
+});
+
+app.MapGet("/api/v1/social/streamer-config", (NlSocialHost host, string? streamer) =>
+{
+    var streamerId = string.IsNullOrWhiteSpace(streamer) ? NlPaths.DefaultStreamerId : streamer.Trim();
+    return Results.Json(host.StreamerStore.GetOrDefault(streamerId));
+});
+
+app.MapPut("/api/v1/social/streamer-config", (NlSocialHost host, StreamerSocialConfig body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.StreamerId))
+    {
+        return Results.BadRequest(new { error = "streamerId required." });
+    }
+
+    host.StreamerStore.Save(body);
+    host.Cache.InvalidateAll();
+    return Results.Json(body);
+});
+
+app.MapGet("/api/v1/social/live-status", async (NlSocialHost host, string? streamer, CancellationToken ct) =>
+{
+    var streamerId = string.IsNullOrWhiteSpace(streamer) ? NlPaths.DefaultStreamerId : streamer.Trim();
+    var config = host.Gate.GetStreamerConfig(streamerId);
+    var status = await host.LiveMonitor.GetStatusAsync(config, ct);
+    host.Cache.SetLive(streamerId, status);
+    return Results.Json(status);
+});
+
+app.MapPost("/api/v1/social/link", (NlSocialHost host, SocialLinkRequest body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.PlayerId))
+    {
+        return Results.BadRequest(new { error = "playerId required." });
+    }
+
+    var links = host.Gate.ResolveLinks(body.PlayerId.Trim(), new SocialLinkInput
+    {
+        TwitchUserId = body.TwitchUserId,
+        YouTubeChannelId = body.YouTubeChannelId,
+        KickUserId = body.KickUserId,
+        DiscordUserId = body.DiscordUserId,
+    });
+    host.Cache.InvalidateAll();
+    return Results.Json(links);
+});
+
+app.MapGet("/api/v1/social/links/{playerId}", (NlSocialHost host, string playerId) =>
+    Results.Json(host.LinkStore.GetOrDefault(playerId)));
+
+app.MapGet("/api/v1/social/oauth/twitch/authorize", (
+    NlSocialHost host,
+    NlSocialSettings settings,
+    HttpContext ctx,
+    string playerId,
+    string? returnUrl) =>
+{
+    if (!settings.Enabled)
+    {
+        return Results.Json(new { error = "Social gate disabled." }, statusCode: 503);
+    }
+
+    if (!host.TwitchOAuth.IsConfigured)
+    {
+        return Results.Json(new { error = "TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET required." }, statusCode: 503);
+    }
+
+    if (string.IsNullOrWhiteSpace(playerId))
+    {
+        return Results.BadRequest(new { error = "playerId required." });
+    }
+
+    var publicBase = ResolveSocialPublicBase(ctx);
+    var redirect = host.TwitchOAuth.BuildAuthorizeRedirect(playerId.Trim(), returnUrl, publicBase);
+    return Results.Redirect(redirect);
+});
+
+app.MapGet("/api/v1/social/oauth/twitch/callback", async (
+    NlSocialHost host,
+    NlSocialSettings settings,
+    HttpContext ctx,
+    CancellationToken ct) =>
+{
+    if (!settings.Enabled)
+    {
+        return Results.Content("Social gate disabled.", "text/plain", statusCode: 503);
+    }
+
+    var query = ctx.Request.Query.ToDictionary(
+        kv => kv.Key,
+        kv => kv.Value.ToString(),
+        StringComparer.OrdinalIgnoreCase);
+
+    var publicBase = ResolveSocialPublicBase(ctx);
+    var result = await host.TwitchOAuth.HandleCallbackAsync(query, publicBase, ct);
+    var landing = string.IsNullOrWhiteSpace(result.ReturnUrl)
+        ? "/social-link.html"
+        : result.ReturnUrl!;
+
+    var sep = landing.Contains('?') ? "&" : "?";
+    if (result.Success)
+    {
+        return Results.Redirect(
+            $"{landing}{sep}linked=twitch&playerId={Uri.EscapeDataString(result.PlayerId!)}&twitchUserId={Uri.EscapeDataString(result.TwitchUserId!)}&twitchLogin={Uri.EscapeDataString(result.TwitchLogin ?? "")}");
+    }
+
+    return Results.Redirect(
+        $"{landing}{sep}error={Uri.EscapeDataString(result.Error ?? "Twitch sign-in failed.")}");
+});
+
+app.MapGet("/api/v1/social/twitch-oauth/{playerId}", (NlSocialHost host, string playerId) =>
+{
+    var credential = host.TwitchCredentials.GetByPlayer(playerId);
+    if (credential is null)
+    {
+        return Results.NotFound(new { error = "No Twitch OAuth link for this player." });
+    }
+
+    return Results.Json(new
+    {
+        playerId = credential.PlayerId,
+        twitchUserId = credential.TwitchUserId,
+        twitchLogin = credential.TwitchLogin,
+        linked = true,
+    });
+});
+
+app.MapGet("/api/v1/social/oauth/discord/authorize", (
+    NlSocialHost host,
+    NlSocialSettings settings,
+    HttpContext ctx,
+    string playerId,
+    string? returnUrl) =>
+{
+    if (!settings.Enabled)
+    {
+        return Results.Json(new { error = "Social gate disabled." }, statusCode: 503);
+    }
+
+    if (!host.DiscordOAuth.IsConfigured)
+    {
+        return Results.Json(new { error = "DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET required." }, statusCode: 503);
+    }
+
+    if (string.IsNullOrWhiteSpace(playerId))
+    {
+        return Results.BadRequest(new { error = "playerId required." });
+    }
+
+    var publicBase = ResolveSocialPublicBase(ctx);
+    var redirect = host.DiscordOAuth.BuildAuthorizeRedirect(playerId.Trim(), returnUrl, publicBase);
+    return Results.Redirect(redirect);
+});
+
+app.MapGet("/api/v1/social/oauth/discord/callback", async (
+    NlSocialHost host,
+    NlSocialSettings settings,
+    HttpContext ctx,
+    CancellationToken ct) =>
+{
+    if (!settings.Enabled)
+    {
+        return Results.Content("Social gate disabled.", "text/plain", statusCode: 503);
+    }
+
+    var query = ctx.Request.Query.ToDictionary(
+        kv => kv.Key,
+        kv => kv.Value.ToString(),
+        StringComparer.OrdinalIgnoreCase);
+
+    var publicBase = ResolveSocialPublicBase(ctx);
+    var result = await host.DiscordOAuth.HandleCallbackAsync(query, publicBase, ct);
+    var landing = string.IsNullOrWhiteSpace(result.ReturnUrl)
+        ? "/social-link.html"
+        : result.ReturnUrl!;
+
+    var sep = landing.Contains('?') ? "&" : "?";
+    if (result.Success)
+    {
+        return Results.Redirect(
+            $"{landing}{sep}linked=discord&playerId={Uri.EscapeDataString(result.PlayerId!)}&discordUserId={Uri.EscapeDataString(result.DiscordUserId!)}&discordUsername={Uri.EscapeDataString(result.DiscordUsername ?? "")}");
+    }
+
+    return Results.Redirect(
+        $"{landing}{sep}error={Uri.EscapeDataString(result.Error ?? "Discord sign-in failed.")}");
+});
+
+app.MapGet("/api/v1/social/discord-oauth/{playerId}", (NlSocialHost host, string playerId) =>
+{
+    var credential = host.DiscordCredentials.GetByPlayer(playerId);
+    if (credential is null)
+    {
+        return Results.NotFound(new { error = "No Discord OAuth link for this player." });
+    }
+
+    return Results.Json(new
+    {
+        playerId = credential.PlayerId,
+        discordUserId = credential.DiscordUserId,
+        discordUsername = credential.DiscordUsername,
+        linked = true,
+    });
+});
+
+app.MapGet("/api/v1/social/oauth/youtube/authorize", (
+    NlSocialHost host,
+    NlSocialSettings settings,
+    HttpContext ctx,
+    string playerId,
+    string? returnUrl) =>
+{
+    if (!settings.Enabled)
+    {
+        return Results.Json(new { error = "Social gate disabled." }, statusCode: 503);
+    }
+
+    if (!host.YouTubeOAuth.IsConfigured)
+    {
+        return Results.Json(new { error = "YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET required." }, statusCode: 503);
+    }
+
+    if (string.IsNullOrWhiteSpace(playerId))
+    {
+        return Results.BadRequest(new { error = "playerId required." });
+    }
+
+    var publicBase = ResolveSocialPublicBase(ctx);
+    var redirect = host.YouTubeOAuth.BuildAuthorizeRedirect(playerId.Trim(), returnUrl, publicBase);
+    return Results.Redirect(redirect);
+});
+
+app.MapGet("/api/v1/social/oauth/youtube/callback", async (
+    NlSocialHost host,
+    NlSocialSettings settings,
+    HttpContext ctx,
+    CancellationToken ct) =>
+{
+    if (!settings.Enabled)
+    {
+        return Results.Content("Social gate disabled.", "text/plain", statusCode: 503);
+    }
+
+    var query = ctx.Request.Query.ToDictionary(
+        kv => kv.Key,
+        kv => kv.Value.ToString(),
+        StringComparer.OrdinalIgnoreCase);
+
+    var publicBase = ResolveSocialPublicBase(ctx);
+    var result = await host.YouTubeOAuth.HandleCallbackAsync(query, publicBase, ct);
+    var landing = string.IsNullOrWhiteSpace(result.ReturnUrl)
+        ? "/social-link.html"
+        : result.ReturnUrl!;
+
+    var sep = landing.Contains('?') ? "&" : "?";
+    if (result.Success)
+    {
+        return Results.Redirect(
+            $"{landing}{sep}linked=youtube&playerId={Uri.EscapeDataString(result.PlayerId!)}&youtubeChannelId={Uri.EscapeDataString(result.YouTubeChannelId!)}&youtubeChannelTitle={Uri.EscapeDataString(result.YouTubeChannelTitle ?? "")}");
+    }
+
+    return Results.Redirect(
+        $"{landing}{sep}error={Uri.EscapeDataString(result.Error ?? "YouTube sign-in failed.")}");
+});
+
+app.MapGet("/api/v1/social/youtube-oauth/{playerId}", (NlSocialHost host, string playerId) =>
+{
+    var credential = host.YouTubeCredentials.GetByPlayer(playerId);
+    if (credential is null)
+    {
+        return Results.NotFound(new { error = "No YouTube OAuth link for this player." });
+    }
+
+    return Results.Json(new
+    {
+        playerId = credential.PlayerId,
+        youtubeChannelId = credential.YouTubeChannelId,
+        youtubeChannelTitle = credential.YouTubeChannelTitle,
+        linked = true,
+    });
+});
+
+app.MapGet("/api/v1/social/oauth/kick/authorize", (
+    NlSocialHost host,
+    NlSocialSettings settings,
+    HttpContext ctx,
+    string playerId,
+    string? returnUrl) =>
+{
+    if (!settings.Enabled)
+    {
+        return Results.Json(new { error = "Social gate disabled." }, statusCode: 503);
+    }
+
+    if (!host.KickOAuth.IsConfigured)
+    {
+        return Results.Json(new { error = "KICK_CLIENT_ID and KICK_CLIENT_SECRET required." }, statusCode: 503);
+    }
+
+    if (string.IsNullOrWhiteSpace(playerId))
+    {
+        return Results.BadRequest(new { error = "playerId required." });
+    }
+
+    var publicBase = ResolveSocialPublicBase(ctx);
+    var redirect = host.KickOAuth.BuildAuthorizeRedirect(playerId.Trim(), returnUrl, publicBase);
+    return Results.Redirect(redirect);
+});
+
+app.MapGet("/api/v1/social/oauth/kick/callback", async (
+    NlSocialHost host,
+    NlSocialSettings settings,
+    HttpContext ctx,
+    CancellationToken ct) =>
+{
+    if (!settings.Enabled)
+    {
+        return Results.Content("Social gate disabled.", "text/plain", statusCode: 503);
+    }
+
+    var query = ctx.Request.Query.ToDictionary(
+        kv => kv.Key,
+        kv => kv.Value.ToString(),
+        StringComparer.OrdinalIgnoreCase);
+
+    var publicBase = ResolveSocialPublicBase(ctx);
+    var result = await host.KickOAuth.HandleCallbackAsync(query, publicBase, ct);
+    var landing = string.IsNullOrWhiteSpace(result.ReturnUrl)
+        ? "/social-link.html"
+        : result.ReturnUrl!;
+
+    var sep = landing.Contains('?') ? "&" : "?";
+    if (result.Success)
+    {
+        return Results.Redirect(
+            $"{landing}{sep}linked=kick&playerId={Uri.EscapeDataString(result.PlayerId!)}&kickUserId={Uri.EscapeDataString(result.KickUserId!)}&kickUsername={Uri.EscapeDataString(result.KickUsername ?? "")}");
+    }
+
+    return Results.Redirect(
+        $"{landing}{sep}error={Uri.EscapeDataString(result.Error ?? "Kick sign-in failed.")}");
+});
+
+app.MapGet("/api/v1/social/kick-oauth/{playerId}", (NlSocialHost host, string playerId) =>
+{
+    var credential = host.KickCredentials.GetByPlayer(playerId);
+    if (credential is null)
+    {
+        return Results.NotFound(new { error = "No Kick OAuth link for this player." });
+    }
+
+    return Results.Json(new
+    {
+        playerId = credential.PlayerId,
+        kickUserId = credential.KickUserId,
+        kickUsername = credential.KickUsername,
+        linked = true,
+    });
+});
+
+app.MapGet("/api/v1/fork/catalog/settings", (NlForkCatalogHost host) => Results.Json(host.Settings.ToPublicInfo()));
+
+app.MapGet("/api/v1/fork/catalog/version-policy", (BusHostState bus, NlForkCatalogHost host, NlFleetHost fleet, string? streamerId) =>
+{
+    var sid = string.IsNullOrWhiteSpace(streamerId) ? bus.GetProfile().StreamerId : streamerId.Trim();
+    var requirements = fleet.StreamerRequirements.GetOrDefault(sid);
+    return Results.Json(new
+    {
+        defaultToLatestStable = host.VersionPolicy.DefaultToLatestStable,
+        customMajorVersionBetaEnabled = host.VersionPolicy.CustomMajorVersionBetaEnabled,
+        allowCustomMajorForStreamer = requirements.AllowCustomMajorVersion,
+        streamerId = sid,
+        latestStableByGame = host.VersionPolicy.BuildLatestStableIndex(),
+    });
+});
+
+app.MapGet("/api/v1/fork/catalog/entries", (NlForkCatalogHost host, bool? includeDeprecated) =>
+    Results.Json(host.Catalog.ListGames(includeDeprecated ?? false)));
+
+app.MapGet("/api/v1/fork/catalog/mod-hub", (NlForkCatalogHost host) =>
+    Results.Json(host.Catalog.GetManifest().ModHub));
+
+app.MapGet("/api/v1/fork/catalog/entries/{gameId}/{majorVersion}", (NlForkCatalogHost host, string gameId, string majorVersion) =>
+{
+    var entry = host.Catalog.GetEntry(gameId, majorVersion);
+    return entry is null ? Results.NotFound(new { error = $"Unknown entry '{gameId}@{majorVersion}'." }) : Results.Json(entry);
+});
+
+app.MapPost("/api/v1/fork/catalog/register", (NlForkCatalogHost host, ForkCatalogEntry body) =>
+{
+    try
+    {
+        var registered = host.Catalog.RegisterEntry(body);
+        return Results.Json(registered);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/v1/fork/catalog/select", (BusHostState bus, NlForkCatalogHost host, NlFleetHost fleet, CatalogSelectRequest body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.GameId))
+    {
+        return Results.BadRequest(new { error = "gameId required." });
+    }
+
+    try
+    {
+        var profile = bus.GetProfile();
+        var streamerId = string.IsNullOrWhiteSpace(profile.StreamerId)
+            ? NL.Core.NlPaths.DefaultStreamerId
+            : profile.StreamerId;
+        var requirements = fleet.StreamerRequirements.GetOrDefault(streamerId);
+        var selection = host.VersionPolicy.ResolveSelection(
+            body.GameId.Trim(),
+            body.MajorVersion,
+            body.ModIds ?? [],
+            requirements.AllowCustomMajorVersion);
+        var resolved = host.Catalog.ResolveSelection(selection, samplesRoot);
+        profile = bus.ApplyCatalogSelection(resolved, samplesRoot);
+        if (body.EnableOrchestrator == true)
+        {
+            profile.ForkOrchestratorEnabled = true;
+            bus.SaveProfile(profile);
+        }
+
+        return Results.Json(new
+        {
+            profile,
+            entry = resolved.Entry,
+            nleTemplate = resolved.ResolvedNleTemplate,
+            mods = resolved.ResolvedMods,
+            resolvedMajorVersion = selection.MajorVersion,
+            latestStable = host.VersionPolicy.IsLatestStable(selection.GameId, selection.MajorVersion),
+        });
+    }
+    catch (ForkCatalogVersionAccessException ex)
+    {
+        return Results.Json(new { error = ex.Message, code = "custom_major_entitlement_required" }, statusCode: 403);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/api/v1/fork/orchestrator/settings", (NlForkOrchestratorSettings s) => Results.Json(s.ToPublicInfo()));
+
+app.MapGet("/api/v1/fork/orchestrator/sessions", (NlForkOrchestratorHost host) =>
+    Results.Json(host.Orchestrator.ListActive()));
+
+app.MapGet("/api/v1/fork/orchestrator/sessions/{sessionId}", (NlForkOrchestratorHost host, string sessionId) =>
+{
+    var session = host.Orchestrator.GetSession(sessionId);
+    return session is null ? Results.NotFound(new { error = "Session not found." }) : Results.Json(session);
+});
+
+app.MapPost("/api/v1/fork/orchestrator/create", async (
+    BusHostState bus,
+    NlForkCatalogHost catalogHost,
+    NlForkOrchestratorHost host,
+    NlFleetHost fleet,
+    ForkOrchestratorCreateRequest body,
+    CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(body.StreamerId) || string.IsNullOrWhiteSpace(body.NlePath))
+    {
+        return Results.BadRequest(new { error = "streamerId and nlePath required." });
+    }
+
+    var profile = bus.GetProfile();
+    profile.StreamerId = body.StreamerId.Trim();
+    profile.ConfigPath = body.NlePath.Trim();
+    profile.GameId = body.GameId?.Trim() ?? profile.GameId ?? "generic";
+    profile.AttachedModIds = body.ModIds ?? [];
+    profile.ForkReservedPrivilegedSlots = body.ReservedPrivilegedSlots ?? host.Settings.DefaultReservedPrivilegedSlots;
+    if (!string.IsNullOrWhiteSpace(body.PreferredRegion))
+    {
+        profile.FleetPreferredRegion = body.PreferredRegion.Trim();
+    }
+
+    try
+    {
+        if (catalogHost.Settings.Enabled)
+        {
+            var requirements = fleet.StreamerRequirements.GetOrDefault(profile.StreamerId);
+            var selection = catalogHost.VersionPolicy.ResolveSelection(
+                profile.GameId,
+                body.MajorVersion ?? profile.GameMajorVersion,
+                profile.AttachedModIds,
+                requirements.AllowCustomMajorVersion);
+            profile.GameId = selection.GameId;
+            profile.GameMajorVersion = selection.MajorVersion;
+        }
+        else
+        {
+            profile.GameMajorVersion = body.MajorVersion?.Trim() ?? profile.GameMajorVersion ?? "1.0";
+        }
+    }
+    catch (ForkCatalogVersionAccessException ex)
+    {
+        return Results.Json(new { error = ex.Message, code = "custom_major_entitlement_required" }, statusCode: 403);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+
+    var result = await bus.ProvisionForkSessionAsync(profile, host, fleet, body.TwitchFollowers, ct);
+    if (!result.Success)
+    {
+        return Results.BadRequest(new { error = result.Error });
+    }
+
+    profile.ForkOrchestratorEnabled = true;
+    profile.ForkSessionId = result.SessionId;
+    profile.FleetPlacedRegionId = result.RegionId;
+    bus.SaveProfile(profile);
+
+    return Results.Json(new
+    {
+        sessionId = result.SessionId,
+        regionId = result.RegionId,
+        manifest = bus.GetManifest(host, fleet),
+    });
+});
+
+app.MapPost("/api/v1/fork/orchestrator/destroy/{sessionId}", async (
+    NlForkOrchestratorHost host,
+    string sessionId,
+    CancellationToken ct) =>
+{
+    var result = await host.Orchestrator.DestroySessionAsync(sessionId, ct);
+    return result.Success ? Results.Ok(new { ok = true }) : Results.BadRequest(new { error = result.Error });
+});
+
+app.MapGet("/api/v1/fleet/settings", (NlFleetSettings s) => Results.Json(s.ToPublicInfo()));
+
+app.MapGet("/api/v1/fleet/regions", (NlFleetHost fleet) => Results.Json(fleet.Regions.ListRegions()));
+
+app.MapGet("/api/v1/fleet/observability", (NlFleetHost fleet, NlForkOrchestratorHost orchestrator, BusHostState bus) =>
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    return Results.Json(fleet.Metrics.BuildSnapshot(activeForks, activeNls));
+});
+
+app.MapGet("/api/v1/fleet/slos", (NlFleetHost fleet, NlForkOrchestratorHost orchestrator, BusHostState bus) =>
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    return Results.Json(fleet.Slo.Evaluate(snap, loadTest: null, fleet.Metrics, fleet.Incidents));
+});
+
+app.MapGet("/api/v1/fleet/validation", (NlFleetHost fleet, NlForkOrchestratorHost orchestrator, BusHostState bus) =>
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    var last = fleet.ValidationStore.GetLast();
+    var report = fleet.Validation.Evaluate(
+        fleet.Settings,
+        orchestrator.Settings.Mode.ToString(),
+        snap,
+        fleet.Metrics,
+        fleet.Incidents,
+        last?.LastLoadTest);
+    return Results.Json(report);
+});
+
+app.MapPost("/api/v1/fleet/validation/run", (NlFleetHost fleet, NlForkOrchestratorHost orchestrator, BusHostState bus) =>
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    var last = fleet.ValidationStore.GetLast();
+    var report = fleet.Validation.Evaluate(
+        fleet.Settings,
+        orchestrator.Settings.Mode.ToString(),
+        snap,
+        fleet.Metrics,
+        fleet.Incidents,
+        last?.LastLoadTest);
+    fleet.ValidationStore.Save(report);
+    return Results.Json(report);
+});
+
+app.MapGet("/api/v1/fleet/incidents", (NlFleetHost fleet, int? count) =>
+    Results.Json(fleet.Incidents.ListRecent(count ?? 50)));
+
+app.MapGet("/api/v1/t2-lite/status", () => Results.Json(PublicForkConnect.Status()));
+
+app.MapGet("/api/v1/fleet/autoscale", (NlFleetHost fleet, NlForkOrchestratorHost orchestrator, BusHostState bus) =>
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    return Results.Json(fleet.Autoscale.Evaluate(activeForks, activeNls > 0, null));
+});
+
+app.MapGet("/api/v1/fleet/streamer-requirements/{streamerId}", (NlFleetHost fleet, string streamerId) =>
+    Results.Json(fleet.StreamerRequirements.GetOrDefault(streamerId)));
+
+app.MapPut("/api/v1/fleet/streamer-requirements", (NlFleetHost fleet, FleetStreamerRequirements body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.StreamerId))
+    {
+        return Results.BadRequest(new { error = "streamerId required." });
+    }
+
+    fleet.StreamerRequirements.Save(body with { StreamerId = body.StreamerId.Trim() });
+    return Results.Ok(body);
+});
+
+app.MapGet("/api/v1/beta/settings", (NlFleetHost fleet) => Results.Json(fleet.BetaSettings.ToPublicInfo()));
+
+app.MapGet("/api/v1/beta/status", (NlFleetHost fleet) => Results.Json(fleet.Beta.GetStatus()));
+
+app.MapPost("/api/v1/beta/waitlist", (NlFleetHost fleet, BetaWaitlistSignupRequest body) =>
+{
+    try
+    {
+        var entry = fleet.Beta.SignUp(body.DisplayName ?? "", body.Contact ?? "", body.TwitchHandle, body.RequestedGameId);
+        return Results.Json(entry);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/api/v1/beta/waitlist", (NlFleetHost fleet, HttpContext ctx) =>
+{
+    if (!NlWebSecurityExtensions.IsAuthorized(ctx))
+    {
+        return Results.Unauthorized();
+    }
+
+    return Results.Json(fleet.Beta.ListWaitlist());
+});
+
+app.MapPost("/api/v1/beta/waitlist/{entryId}/approve", (NlFleetHost fleet, HttpContext ctx, string entryId, BetaWaitlistApproveRequest? body) =>
+{
+    if (!NlWebSecurityExtensions.IsAuthorized(ctx))
+    {
+        return Results.Unauthorized();
+    }
+
+    try
+    {
+        var entry = fleet.Beta.Approve(entryId, body?.StreamerId);
+        return Results.Json(entry);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/v1/beta/waitlist/{entryId}/reject", (NlFleetHost fleet, HttpContext ctx, string entryId) =>
+{
+    if (!NlWebSecurityExtensions.IsAuthorized(ctx))
+    {
+        return Results.Unauthorized();
+    }
+
+    try
+    {
+        return Results.Json(fleet.Beta.Reject(entryId));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/api/v1/beta/validation", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security) =>
+    Results.Json(BuildBetaValidationReport(fleet, orchestrator, bus, identity, security)));
+
+app.MapPost("/api/v1/beta/validation/run", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security) =>
+    Results.Json(BuildBetaValidationReport(fleet, orchestrator, bus, identity, security)));
+
+app.MapGet("/api/v1/ga/settings", (NlFleetHost fleet) => Results.Json(fleet.GaSettings.ToPublicInfo()));
+
+app.MapGet("/api/v1/ga/status", (NlFleetHost fleet, NlForkCatalogHost catalog) =>
+{
+    var gameIds = catalog.Settings.Enabled
+        ? catalog.Catalog.ListGames()
+            .Select(e => e.GameId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList()
+        : (IReadOnlyList<string>)[];
+    return Results.Json(fleet.Ga.GetStatus(gameIds.Count));
+});
+
+app.MapGet("/api/v1/ga/catalog", (NlForkCatalogHost catalog) =>
+{
+    if (!catalog.Settings.Enabled)
+    {
+        return Results.Json(new { enabled = false, games = Array.Empty<object>() });
+    }
+
+    var games = catalog.Catalog.ListGames()
+        .GroupBy(e => e.GameId, StringComparer.OrdinalIgnoreCase)
+        .Select(g =>
+        {
+            var stable = catalog.Catalog.ResolveLatestStableEntry(g.Key);
+            return new
+            {
+                gameId = g.Key,
+                displayName = stable?.DisplayName ?? g.First().DisplayName,
+                majorVersion = stable?.MajorVersion,
+                tier = stable?.Tier.ToString(),
+                dockerImage = stable?.DockerImage,
+                status = stable?.Status.ToString(),
+            };
+        })
+        .OrderBy(g => g.gameId)
+        .ToList();
+    return Results.Json(new { enabled = true, games });
+});
+
+app.MapPost("/api/v1/ga/streamers/register", (NlFleetHost fleet, GaStreamerRegisterRequest body) =>
+{
+    try
+    {
+        if (fleet.LegalComplianceSettings.Enabled
+            && fleet.LegalComplianceSettings.RequireStreamerTerms
+            && body.TermsAccepted != true)
+        {
+            return Results.BadRequest(new { error = "termsAccepted required for GA signup." });
+        }
+
+        var entry = fleet.Ga.Register(
+            body.DisplayName ?? "",
+            body.Contact ?? "",
+            body.TwitchHandle,
+            body.PreferredGameId,
+            body.StreamerId);
+        if (fleet.LegalComplianceSettings.Enabled && body.TermsAccepted == true)
+        {
+            fleet.LegalComplianceAudit.Record("streamer_terms_accepted", entry.StreamerId, fleet.LaunchOpsSettings.LegalVersion);
+        }
+
+        return Results.Json(entry);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/api/v1/ga/streamers", (NlFleetHost fleet, HttpContext ctx) =>
+{
+    if (!NlWebSecurityExtensions.IsAuthorized(ctx))
+    {
+        return Results.Unauthorized();
+    }
+
+    return Results.Json(fleet.Ga.ListStreamers());
+});
+
+app.MapGet("/api/v1/ga/sla", (NlFleetHost fleet, NlForkOrchestratorHost orchestrator, BusHostState bus) =>
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    var slos = fleet.Slo.EvaluateProduction(
+        snap,
+        fleet.ValidationStore.GetLast()?.LastLoadTest,
+        fleet.Metrics,
+        fleet.Incidents);
+    return Results.Json(new
+    {
+        tier = fleet.GaSettings.SlaTier,
+        definitions = FleetSloCatalog.ProductionDefaults,
+        status = slos,
+    });
+});
+
+app.MapGet("/api/v1/ga/validation", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog) =>
+    Results.Json(BuildGaValidationReport(fleet, orchestrator, bus, identity, security, catalog)));
+
+app.MapPost("/api/v1/ga/validation/run", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog) =>
+    Results.Json(BuildGaValidationReport(fleet, orchestrator, bus, identity, security, catalog)));
+
+app.MapGet("/api/v1/live-production/settings", (NlFleetHost fleet) =>
+    Results.Json(fleet.LiveProductionSettings.ToPublicInfo()));
+
+app.MapGet("/api/v1/live-production/status", (
+    NlFleetHost fleet,
+    NlIdentitySettings identity) =>
+    Results.Json(new LiveProductionStatus(
+        fleet.LiveProductionSettings.Enabled,
+        fleet.LiveProductionSettings.DevMode,
+        fleet.GaSettings.Enabled,
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY")),
+        identity.Mode.ToString(),
+        identity.PublicBaseUrl ?? Environment.GetEnvironmentVariable("NL_PUBLIC_BASE_URL"),
+        fleet.Settings.Relay.RelayWebSocketTemplate,
+        fleet.Settings.Relay.TurnUri,
+        DateTimeOffset.UtcNow)));
+
+app.MapGet("/api/v1/live-production/validation", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog) =>
+    Results.Json(BuildLiveProductionValidationReport(fleet, orchestrator, bus, identity, security, catalog)));
+
+app.MapPost("/api/v1/live-production/validation/run", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog) =>
+    Results.Json(BuildLiveProductionValidationReport(fleet, orchestrator, bus, identity, security, catalog)));
+
+app.MapGet("/api/v1/multigame/settings", (NlFleetHost fleet) =>
+    Results.Json(fleet.MultiGameSettings.ToPublicInfo()));
+
+app.MapGet("/api/v1/multigame/status", (
+    NlFleetHost fleet,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership) =>
+    Results.Json(new MultiGameStatus(
+        fleet.MultiGameSettings.Enabled,
+        fleet.LiveProductionSettings.Enabled,
+        fleet.GaSettings.Enabled,
+        catalog.Settings.Enabled,
+        partnership.Settings.Enabled,
+        fleet.MultiGameSettings.RequiredGameIds,
+        DateTimeOffset.UtcNow)));
+
+app.MapGet("/api/v1/multigame/catalog", (NlFleetHost fleet, NlForkCatalogHost catalog) =>
+{
+    if (!catalog.Settings.Enabled)
+    {
+        return Results.Json(new { enabled = false, games = Array.Empty<object>() });
+    }
+
+    var games = fleet.MultiGameSettings.RequiredGameIds
+        .Select(gameId =>
+        {
+            var stable = catalog.Catalog.ResolveLatestStableEntry(gameId);
+            return new
+            {
+                gameId,
+                displayName = stable?.DisplayName,
+                majorVersion = stable?.MajorVersion,
+                dockerImage = stable?.DockerImage ?? ForkGameProfiles.Resolve(gameId).DockerImage,
+                nleTemplate = stable?.DefaultNleTemplate ?? ForkGameProfiles.Resolve(gameId).DefaultNleTemplate,
+            };
+        })
+        .ToList();
+    return Results.Json(new { enabled = true, games });
+});
+
+app.MapGet("/api/v1/multigame/validation", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership) =>
+    Results.Json(BuildMultiGameValidationReport(fleet, orchestrator, bus, identity, security, catalog, partnership, null)));
+
+app.MapPost("/api/v1/multigame/validation/run", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    MultiGameValidationRunRequest? body) =>
+    Results.Json(BuildMultiGameValidationReport(fleet, orchestrator, bus, identity, security, catalog, partnership, body)));
+
+app.MapGet("/api/v1/launch-ops/settings", (NlFleetHost fleet) =>
+    Results.Json(fleet.LaunchOpsSettings.ToPublicInfo()));
+
+app.MapGet("/api/v1/launch-ops/status", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    NlIdentitySettings identity,
+    NlForkCatalogHost catalog,
+    NlHardeningSettings hardening) =>
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var recentIncidents = fleet.Incidents.ListRecent(100)
+        .Count(i => i.DetectedAtUtc >= DateTimeOffset.UtcNow.AddHours(-24));
+    var snapshot = fleet.LaunchStatus.BuildSnapshot(
+        sessionHealthy: true,
+        orchestrator.Settings.Enabled,
+        activeForks,
+        identity.Enabled,
+        identity.Mode.ToString(),
+        catalog.Settings.Enabled,
+        fleet.GaSettings.Enabled,
+        hardening.Enabled,
+        recentIncidents);
+    return Results.Json(snapshot);
+});
+
+app.MapGet("/api/v1/launch-ops/health-summary", (
+    NlFleetHost fleet,
+    NlIdentitySettings identity,
+    NlHardeningSettings hardening) =>
+    Results.Json(new LaunchOpsStatus(
+        fleet.LaunchOpsSettings.Enabled,
+        fleet.LaunchOpsSettings.DevMode,
+        fleet.LaunchOpsSettings.StatusPageEnabled,
+        hardening.Enabled,
+        fleet.MultiGameSettings.Enabled,
+        fleet.LaunchAlerting.IsConfigured(fleet.LaunchOpsSettings),
+        fleet.LaunchOpsSettings.LegalVersion,
+        fleet.LaunchOpsSettings.BackupRoot,
+        DateTimeOffset.UtcNow)));
+
+app.MapGet("/api/v1/launch-ops/validation", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening) =>
+    Results.Json(BuildLaunchOpsValidationReport(fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, null)));
+
+app.MapPost("/api/v1/launch-ops/validation/run", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    LaunchOpsValidationRunRequest? body) =>
+    Results.Json(BuildLaunchOpsValidationReport(fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, body)));
+
+app.MapPost("/api/v1/launch-ops/alert/test", async (
+    NlFleetHost fleet,
+    NlSecuritySettings security,
+    HttpContext ctx,
+    CancellationToken ct) =>
+{
+    if (!NlOperatorAuth.IsAuthorized(security, ctx.Request.Headers[NlOperatorAuth.HeaderName], ctx.Request.Headers.Authorization))
+    {
+        return Results.Unauthorized();
+    }
+
+    var ok = await fleet.LaunchAlerting.SendTestAlertAsync(fleet.LaunchOpsSettings, ct);
+    return ok
+        ? Results.Json(new { sent = true })
+        : Results.BadRequest(new { error = "Alert webhook not configured or delivery failed." });
+});
+
+app.MapPost("/api/v1/launch-ops/backup/run", (
+    NlFleetHost fleet,
+    NlSecuritySettings security,
+    HttpContext ctx) =>
+{
+    if (!NlOperatorAuth.IsAuthorized(security, ctx.Request.Headers[NlOperatorAuth.HeaderName], ctx.Request.Headers.Authorization))
+    {
+        return Results.Unauthorized();
+    }
+
+    var dataRoot = NL.Core.NlPaths.Root;
+    var paths = new List<string> { "fleet" };
+    var partnership = Path.Combine(dataRoot, "partnership");
+    if (Directory.Exists(partnership))
+    {
+        paths.Add("partnership");
+    }
+
+    var backupRoot = fleet.LaunchOpsSettings.BackupRoot ?? Path.Combine(dataRoot, "backups");
+    var snapshotDir = fleet.LaunchBackup.WriteManifest(backupRoot, dataRoot, paths);
+    return Results.Json(new { snapshotDir, backupRoot });
+});
+
+app.MapGet("/api/v1/production-cutover/settings", (NlFleetHost fleet) =>
+    Results.Json(fleet.ProductionCutoverSettings.ToPublicInfo()));
+
+app.MapGet("/api/v1/production-cutover/status", (
+    NlFleetHost fleet,
+    NlIdentitySettings identity,
+    NlHardeningSettings hardening) =>
+    Results.Json(new ProductionCutoverStatus(
+        fleet.ProductionCutoverSettings.Enabled,
+        fleet.ProductionCutoverSettings.DevMode,
+        !fleet.LiveProductionSettings.DevMode,
+        !fleet.LaunchOpsSettings.DevMode,
+        !fleet.GaSettings.AllowMockIdentity,
+        fleet.GaSettings.RequireProductionReady,
+        fleet.GaSettings.RequireLiveIdentity,
+        identity.PublicBaseUrl ?? Environment.GetEnvironmentVariable("NL_PUBLIC_BASE_URL"),
+        hardening.Enabled,
+        DateTimeOffset.UtcNow)));
+
+app.MapGet("/api/v1/production-cutover/validation", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening) =>
+    Results.Json(BuildProductionCutoverValidationReport(
+        fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, null)));
+
+app.MapPost("/api/v1/production-cutover/validation/run", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    ProductionCutoverValidationRunRequest? body) =>
+    Results.Json(BuildProductionCutoverValidationReport(
+        fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, body)));
+
+app.MapGet("/api/v1/distribution/settings", (NlFleetHost fleet) =>
+    Results.Json(fleet.DistributionSettings.ToPublicInfo()));
+
+app.MapGet("/api/v1/distribution/status", (
+    NlFleetHost fleet,
+    NlIdentitySettings identity,
+    IWebHostEnvironment env) =>
+{
+    var wwwroot = Path.Combine(env.ContentRootPath, "wwwroot");
+    var manifest = fleet.DistributionClient.Build(
+        fleet.DistributionSettings,
+        identity.PublicBaseUrl ?? Environment.GetEnvironmentVariable("NL_PUBLIC_BASE_URL"),
+        wwwroot);
+    var win = manifest.Releases.FirstOrDefault();
+    return Results.Json(new DistributionStatus(
+        fleet.DistributionSettings.Enabled,
+        fleet.DistributionSettings.DevMode,
+        fleet.GaSettings.OpenSignup,
+        fleet.DistributionSettings.ClientVersion,
+        identity.PublicBaseUrl ?? Environment.GetEnvironmentVariable("NL_PUBLIC_BASE_URL"),
+        win?.PackageAvailable ?? false,
+        DateTimeOffset.UtcNow));
+});
+
+app.MapGet("/api/v1/distribution/onboarding", (NlFleetHost fleet) =>
+    Results.Json(fleet.DistributionClient.BuildOnboardingPaths(fleet.GaSettings)));
+
+app.MapGet("/api/v1/distribution/client-manifest", (
+    NlFleetHost fleet,
+    NlIdentitySettings identity,
+    IWebHostEnvironment env) =>
+{
+    var wwwroot = Path.Combine(env.ContentRootPath, "wwwroot");
+    return Results.Json(fleet.DistributionClient.Build(
+        fleet.DistributionSettings,
+        identity.PublicBaseUrl ?? Environment.GetEnvironmentVariable("NL_PUBLIC_BASE_URL"),
+        wwwroot));
+});
+
+app.MapGet("/api/v1/distribution/validation", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env) =>
+    Results.Json(BuildDistributionValidationReport(
+        fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, env, null)));
+
+app.MapPost("/api/v1/distribution/validation/run", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env,
+    DistributionValidationRunRequest? body) =>
+    Results.Json(BuildDistributionValidationReport(
+        fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, env, body)));
+
+app.MapGet("/api/v1/scale-reliability/settings", (NlFleetHost fleet) =>
+    Results.Json(fleet.ScaleReliabilitySettings.ToPublicInfo()));
+
+app.MapGet("/api/v1/scale-reliability/status", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus) =>
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var last = fleet.ValidationStore.GetLast();
+    return Results.Json(new ScaleReliabilityStatus(
+        fleet.ScaleReliabilitySettings.Enabled,
+        fleet.ScaleReliabilitySettings.DevMode,
+        fleet.ScaleReliabilitySettings.MinConcurrentSessions,
+        fleet.Regions.ListRegions().Count,
+        fleet.Settings.Autoscale.MaxConcurrentSessions,
+        last?.LastLoadTest is not null,
+        last?.LastLoadTest?.ConcurrentSessionsTarget,
+        fleet.DistributionSettings.Enabled,
+        DateTimeOffset.UtcNow));
+});
+
+app.MapGet("/api/v1/scale-reliability/regions", (NlFleetHost fleet) =>
+    Results.Json(fleet.Regions.ListRegions()));
+
+app.MapGet("/api/v1/scale-reliability/production-slos", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus) =>
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    var last = fleet.ValidationStore.GetLast()?.LastLoadTest;
+    return Results.Json(fleet.Slo.EvaluateProduction(snap, last, fleet.Metrics, fleet.Incidents));
+});
+
+app.MapGet("/api/v1/scale-reliability/validation", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env) =>
+    Results.Json(BuildScaleReliabilityValidationReport(
+        fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, env, null)));
+
+app.MapPost("/api/v1/scale-reliability/validation/run", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env,
+    ScaleReliabilityValidationRunRequest? body) =>
+    Results.Json(BuildScaleReliabilityValidationReport(
+        fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, env, body)));
+
+app.MapGet("/api/v1/legal-compliance/settings", (NlFleetHost fleet) =>
+    Results.Json(fleet.LegalComplianceSettings.ToPublicInfo()));
+
+app.MapGet("/api/v1/legal-compliance/status", (NlFleetHost fleet) =>
+{
+    var manifest = fleet.LegalComplianceManifest.Build(fleet.LegalComplianceSettings, fleet.LaunchOpsSettings);
+    var auditCount = fleet.LegalComplianceAudit.ListRecent(500).Count;
+    return Results.Json(new LegalComplianceStatus(
+        fleet.LegalComplianceSettings.Enabled,
+        fleet.LegalComplianceSettings.DevMode,
+        manifest.LegalVersion,
+        manifest.Documents.Count,
+        manifest.Subprocessors.Count,
+        auditCount,
+        fleet.ScaleReliabilitySettings.Enabled,
+        DateTimeOffset.UtcNow));
+});
+
+app.MapGet("/api/v1/legal-compliance/manifest", (NlFleetHost fleet) =>
+    Results.Json(fleet.LegalComplianceManifest.Build(fleet.LegalComplianceSettings, fleet.LaunchOpsSettings)));
+
+app.MapGet("/api/v1/legal-compliance/onboarding", (NlFleetHost fleet) =>
+    Results.Json(fleet.LegalComplianceManifest.BuildOnboardingPaths()));
+
+app.MapGet("/api/v1/legal-compliance/audit/recent", (NlFleetHost fleet, HttpContext ctx) =>
+{
+    if (!NlWebSecurityExtensions.IsAuthorized(ctx))
+    {
+        return Results.Unauthorized();
+    }
+
+    return Results.Json(fleet.LegalComplianceAudit.ListRecent(50));
+});
+
+app.MapGet("/api/v1/legal-compliance/validation", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env) =>
+    Results.Json(BuildLegalComplianceValidationReport(
+        fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, env, null)));
+
+app.MapPost("/api/v1/legal-compliance/validation/run", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env,
+    LegalComplianceValidationRunRequest? body) =>
+    Results.Json(BuildLegalComplianceValidationReport(
+        fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, env, body)));
+
+app.MapGet("/api/v1/public-ga-launch/settings", (NlFleetHost fleet) =>
+    Results.Json(fleet.PublicGaLaunchSettings.ToPublicInfo()));
+
+app.MapGet("/api/v1/public-ga-launch/status", (NlFleetHost fleet) =>
+{
+    var signoffs = fleet.PublicGaLaunchSignoff.ListRecent(10).Count;
+    return Results.Json(new PublicGaLaunchStatus(
+        fleet.PublicGaLaunchSettings.Enabled,
+        fleet.PublicGaLaunchSettings.DevMode,
+        fleet.GaSettings.OpenSignup,
+        fleet.PublicGaLaunchSettings.SupportContact,
+        fleet.PublicGaLaunchSettings.LaunchVersion,
+        fleet.LegalComplianceSettings.Enabled,
+        fleet.GaSettings.Enabled
+            && fleet.DistributionSettings.Enabled
+            && fleet.ScaleReliabilitySettings.Enabled
+            && fleet.LegalComplianceSettings.Enabled
+            && fleet.LaunchOpsSettings.Enabled
+            && fleet.ProductionCutoverSettings.Enabled,
+        DateTimeOffset.UtcNow));
+});
+
+app.MapGet("/api/v1/public-ga-launch/checklist", (NlFleetHost fleet) =>
+    Results.Json(fleet.PublicGaLaunchChecklist.Build(fleet.PublicGaLaunchSettings)));
+
+app.MapGet("/api/v1/public-ga-launch/signoffs", (NlFleetHost fleet, HttpContext ctx) =>
+{
+    if (!NlWebSecurityExtensions.IsAuthorized(ctx))
+    {
+        return Results.Unauthorized();
+    }
+
+    return Results.Json(fleet.PublicGaLaunchSignoff.ListRecent(20));
+});
+
+app.MapPost("/api/v1/public-ga-launch/signoff", (NlFleetHost fleet, HttpContext ctx) =>
+{
+    if (!NlWebSecurityExtensions.IsAuthorized(ctx))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!fleet.PublicGaLaunchSettings.Enabled)
+    {
+        return Results.BadRequest(new { error = "NL_PUBLIC_GA_LAUNCH_ENABLED is not true." });
+    }
+
+    var operatorId = ctx.Request.Headers["X-NL-Operator-Key"].FirstOrDefault() ?? "operator";
+    var entry = fleet.PublicGaLaunchSignoff.Record(operatorId, fleet.PublicGaLaunchSettings.LaunchVersion);
+    return Results.Json(entry);
+});
+
+app.MapGet("/api/v1/public-ga-launch/validation", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env) =>
+    Results.Json(BuildPublicGaLaunchValidationReport(
+        fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, env, null)));
+
+app.MapPost("/api/v1/public-ga-launch/validation/run", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env,
+    PublicGaLaunchValidationRunRequest? body) =>
+    Results.Json(BuildPublicGaLaunchValidationReport(
+        fleet, orchestrator, bus, identity, security, catalog, partnership, hardening, env, body)));
+
+app.MapPost("/api/v1/fleet/compliance/export/{playerId}", (NlFleetHost fleet, ModerationHostState mod, string playerId) =>
+{
+    try
+    {
+        var profile = mod.Moderation.GetOrCreateProfile(playerId.Trim(), playerId.Trim());
+        var export = fleet.Compliance.ExportSpProfile(playerId.Trim(), new { profile.Id, profile.DisplayName });
+        if (fleet.LegalComplianceSettings.Enabled)
+        {
+            fleet.LegalComplianceAudit.Record("gdpr_export", playerId.Trim());
+        }
+
+        return Results.Json(new { export.PlayerId, export.ExportedAtUtc, path = NlFleetPaths.ComplianceExports });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapDelete("/api/v1/fleet/compliance/sp/{playerId}", (NlFleetHost fleet, string playerId) =>
+{
+    try
+    {
+        fleet.Compliance.DeleteSpProfile(NlPaths.SpProfiles, playerId.Trim());
+        if (fleet.LegalComplianceSettings.Enabled)
+        {
+            fleet.LegalComplianceAudit.Record("gdpr_delete", playerId.Trim());
+        }
+
+        return Results.Ok(new { deleted = playerId.Trim() });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/v1/fleet/load-test/report", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    FleetLoadTestReportRequest body) =>
+{
+    var activeForks = body.ActiveForkSessions > 0
+        ? body.ActiveForkSessions
+        : (orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0);
+    var activeNls = body.ActiveNlsSessions > 0 ? body.ActiveNlsSessions : (bus.Sessions.IsRunning ? 1 : 0);
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    var forkP99 = body.ForkCreateP99Ms > 0 ? body.ForkCreateP99Ms : fleet.Metrics.GetForkCreateP99Ms();
+    var slos = fleet.Slo.Evaluate(snap, null, fleet.Metrics, fleet.Incidents);
+    var load = new FleetLoadTestResult(
+        body.ConcurrentSessionsTarget,
+        body.AdmitsPerSecondTarget,
+        body.AdmitsSucceeded,
+        body.AdmitsFailed,
+        body.ElapsedSeconds,
+        forkP99,
+        slos);
+    load = load with
+    {
+        Slos = fleet.Slo.Evaluate(snap, load, fleet.Metrics, fleet.Incidents),
+    };
+    var report = fleet.Validation.Evaluate(
+        fleet.Settings,
+        orchestrator.Settings.Mode.ToString(),
+        snap,
+        fleet.Metrics,
+        fleet.Incidents,
+        load);
+    fleet.ValidationStore.Save(report);
+    return Results.Json(new
+    {
+        loadTest = load,
+        slos = load.Slos,
+        validation = report,
+    });
+});
+
+app.MapGet("/api/v1/partnership/settings", (NlPartnershipSettings s) => Results.Json(s.ToPublicInfo()));
+
+app.MapGet("/api/v1/partnership/legal/{gameId}", (NlPartnershipHost host, NlForkCatalogHost catalog, string gameId) =>
+{
+    var entry = catalog.Catalog.GetEntry(gameId, "1.0") ?? catalog.Catalog.ListGames(true).FirstOrDefault(e =>
+        string.Equals(e.GameId, gameId, StringComparison.OrdinalIgnoreCase));
+    var tier = entry?.Tier ?? PartnershipTier.AtOwnRisk;
+    var legal = host.Gate.GetLegal(gameId, tier, entry?.EffectiveLegalNotice);
+    return Results.Json(legal);
+});
+
+app.MapGet("/api/v1/partnership/acknowledgment/{playerId}/{gameId}", (NlPartnershipHost host, string playerId, string gameId) =>
+{
+    var ack = host.Acknowledgments.Get(playerId, gameId);
+    return ack is null ? Results.NotFound(new { acknowledged = false }) : Results.Json(ack);
+});
+
+app.MapPost("/api/v1/partnership/acknowledge", (NlPartnershipHost host, NlForkCatalogHost catalog, PartnershipAcknowledgeRequest body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.PlayerId) || string.IsNullOrWhiteSpace(body.GameId))
+    {
+        return Results.BadRequest(new { error = "playerId and gameId required." });
+    }
+
+    var entry = catalog.Catalog.ListGames(true).FirstOrDefault(e =>
+        string.Equals(e.GameId, body.GameId, StringComparison.OrdinalIgnoreCase));
+    var tier = entry?.Tier ?? PartnershipTier.AtOwnRisk;
+    var ack = host.Gate.RecordAcknowledgment(body.PlayerId.Trim(), body.GameId.Trim(), tier);
+    return Results.Json(ack);
+});
+
+app.MapGet("/api/v1/partnership/publishers", (NlPartnershipHost host) =>
+    Results.Json(host.Publishers.List()));
+
+app.MapPost("/api/v1/partnership/publishers/register", (NlPartnershipHost host, PublisherRegistration body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.PublisherId) || string.IsNullOrWhiteSpace(body.DisplayName))
+    {
+        return Results.BadRequest(new { error = "publisherId and displayName required." });
+    }
+
+    return Results.Json(host.Publishers.Save(body));
+});
+
+app.MapPut("/api/v1/partnership/publishers/{publisherId}/titles/{gameId}", (
+    NlPartnershipHost host,
+    string publisherId,
+    string gameId,
+    PublisherTitleStatusRequest body) =>
+{
+    try
+    {
+        var pub = host.Publishers.SetTitleStatus(publisherId, gameId, body.Status);
+        return Results.Json(pub);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/api/v1/partnership/platform-opt-in", (NlPartnershipHost host) =>
+    Results.Json(host.PlatformOptIn.List()));
+
+app.MapPost("/api/v1/partnership/platform-opt-in", (NlPartnershipHost host, PlatformOptInEntry body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.Platform) || string.IsNullOrWhiteSpace(body.AppId) || string.IsNullOrWhiteSpace(body.GameId))
+    {
+        return Results.BadRequest(new { error = "platform, appId, and gameId required." });
+    }
+
+    host.PlatformOptIn.Save(body);
+    return Results.Json(body);
+});
+
+app.MapPost("/api/v1/partnership/ban-sync", (NlPartnershipHost host, NlPartnershipSettings settings, HttpRequest req, BanSyncWebhookRequest body) =>
+{
+    if (!string.IsNullOrWhiteSpace(settings.WebhookSecret))
+    {
+        var header = req.Headers["X-NL-Partnership-Secret"].FirstOrDefault()
+            ?? req.Headers["Authorization"].FirstOrDefault()?.Replace("Bearer ", "", StringComparison.OrdinalIgnoreCase);
+        if (!string.Equals(header, settings.WebhookSecret, StringComparison.Ordinal))
+        {
+            return Results.Unauthorized();
+        }
+    }
+
+    try
+    {
+        host.BanSync.Apply(body);
+        return Results.Ok(new { ok = true });
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/api/v1/partnership/dashboard/{publisherId}", (NlPartnershipHost host, string publisherId) =>
+{
+    try
+    {
+        return Results.Json(host.Dashboard.GetSnapshot(publisherId));
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/api/v1/partnership/sdk/spec", (BusHostState bus) =>
+{
+    var httpBase = bus.GetManifest().HttpBaseUrl;
+    return Results.Json(PlayOnNlSdkSpecProvider.Create(httpBase));
+});
+
+app.MapPost("/api/v1/partnership/sdk/ownership-token", (PartnershipOwnershipTokenRequest body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.PlatformUserId) || string.IsNullOrWhiteSpace(body.GameId))
+    {
+        return Results.BadRequest(new { error = "platformUserId and gameId required." });
+    }
+
+    var exp = DateTimeOffset.UtcNow.AddMinutes(15);
+    return Results.Json(new
+    {
+        token = Convert.ToBase64String(Guid.NewGuid().ToByteArray()),
+        sub = body.PlatformUserId,
+        game_id = body.GameId,
+        app_id = body.AppId,
+        platform_user_id = body.PlatformUserId,
+        platform = body.Platform ?? "steam",
+        exp = exp.ToUnixTimeSeconds(),
+        note = "Stub ownership token for Play on NL SDK integration (Phase Q).",
+    });
+});
+
+app.MapGet("/api/v1/client/settings", (NlClientHost client) => Results.Json(client.ToPublicSettings()));
+
+app.MapGet("/api/v1/client/streamers", async (NlClientHost client, NlIdentityHost identity, HttpContext ctx, CancellationToken ct) =>
+{
+    var account = identity.UnifiedAccounts.GetAccountFromSession(ExtractSessionToken(ctx));
+    IEnumerable<string>? extra = account?.StreamerId is { Length: > 0 } sid ? [sid] : null;
+    return Results.Json(await client.ListStreamersAsync(extra, ct));
+});
+
+app.MapPost("/api/v1/client/join-flow", async (NlClientHost client, NlIdentityHost identity, NlClientJoinRequest body, HttpContext ctx, CancellationToken ct) =>
+{
+    body = ApplyUnifiedClientSession(identity, ctx, body);
+    var result = await client.JoinFlow.ExecuteAsync(body, ct);
+    return Results.Json(result);
+});
+
+app.MapPost("/api/v1/client/launch-params", (NlClientManifest body) =>
+{
+    var launch = NlClientLaunchBuilder.Build(body);
+    return Results.Json(launch);
+});
+
+app.MapPost("/api/v1/client/block-invite", (NlClientBlockInviteRequest body, BusHostState bus) =>
+{
+    var host = bus.GetManifest().HttpBaseUrl;
+    var result = NlInviteBlocker.Evaluate(body.InviteUrl ?? "", body.ExpectedHost ?? host);
+    return Results.Json(result);
+});
+
+app.MapGet("/api/v1/client/overlay/{playerId}", (NlClientHost client, ModerationHostState mod, string playerId, string? streamer, BusHostState bus) =>
+{
+    var streamerId = string.IsNullOrWhiteSpace(streamer) ? bus.GetProfile().StreamerId : streamer.Trim();
+    var profile = mod.Moderation.GetOrCreateProfile(playerId, playerId);
+    return Results.Json(NlClientOverlayBuilder.Build(profile, streamerId));
+});
+
+app.MapPost("/api/v1/client/mobile/action", async (ModerationHostState mod, NlClientMobileActionRequest body, CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(body.PlayerId) || string.IsNullOrWhiteSpace(body.Action))
+    {
+        return Results.BadRequest(new { error = "playerId and action required." });
+    }
+
+    var streamerId = string.IsNullOrWhiteSpace(body.StreamerId) ? NL.Core.NlPaths.DefaultStreamerId : body.StreamerId.Trim();
+    var action = body.Action.Trim().ToLowerInvariant();
+    var reason = string.IsNullOrWhiteSpace(body.Reason) ? "mobile-companion" : body.Reason.Trim();
+
+    try
+    {
+        if (action is "warn" or "warning")
+        {
+            await mod.Moderation.IssueWarningAsync(streamerId, body.PlayerId.Trim(), "nl-client-mobile", reason, null, ct);
+        }
+        else if (action is "kick" or "ban")
+        {
+            await mod.Moderation.IssueBanAsync(streamerId, body.PlayerId.Trim(), "nl-client-mobile", reason, null, ct);
+        }
+        else
+        {
+            return Results.BadRequest(new { error = "Unknown action. Use warn or kick." });
+        }
+
+        return Results.Json(new NlClientMobileActionResult(true));
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/v1/dogfood/setup", async (BusHostState bus, NlForkOrchestratorHost orchestrator, NlFleetHost fleet, NlIdentityHost identity, NlSocialHost social, HttpRequest req) =>
+{
+    try
+    {
+        DogfoodSetupRequest? body = null;
+        if (req.ContentLength is > 0)
+        {
+            body = await req.ReadFromJsonAsync<DogfoodSetupRequest>();
+        }
+
+        var root = DogfoodSetup.FindRepoRoot();
+        DogfoodSetup.EnsureMockOwnership(root);
+        identity.ReloadMockOwnership();
+
+        SocialDogfoodAssetsStatus? socialAssets = null;
+        if (!string.IsNullOrWhiteSpace(body?.SocialMode))
+        {
+            socialAssets = DogfoodSetup.EnsureSocialDogfoodAssets(
+                root,
+                body.SocialMode!,
+                "dogfood-streamer");
+            social.ReloadFixtures();
+        }
+
+        var profile = DogfoodSetup.BuildProfile(root, body?.GameId, body?.SocialMode);
+        bus.SaveProfile(profile);
+        NlSessionBusHelper.ApplyBusSource(profile, bus.BusInfo);
+        bus.SaveProfile(profile);
+        var status = bus.GetStatus(includeSecrets: true, orchestrator, fleet);
+        return Results.Ok(new
+        {
+            status,
+            social = socialAssets,
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/v1/dogfood/social/setup", async (NlSocialHost social, HttpRequest req) =>
+{
+    try
+    {
+        SocialDogfoodSetupRequest? body = null;
+        if (req.ContentLength is > 0)
+        {
+            body = await req.ReadFromJsonAsync<SocialDogfoodSetupRequest>();
+        }
+
+        if (string.IsNullOrWhiteSpace(body?.SocialMode))
+        {
+            return Results.BadRequest(new { error = "socialMode required (mock or live)." });
+        }
+
+        var root = DogfoodSetup.FindRepoRoot();
+        var assets = DogfoodSetup.EnsureSocialDogfoodAssets(root, body.SocialMode, "dogfood-streamer");
+        social.ReloadFixtures();
+        return Results.Ok(assets);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/api/v1/dogfood/status", (BusHostState bus, NlForkOrchestratorHost orchestrator, NlSocialHost social) =>
+{
+    var profile = bus.GetProfile();
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var socialMode = social.Settings.Enabled ? social.Settings.Mode.ToString().ToLowerInvariant() : null;
+    return Results.Json(new DogfoodStatus(
+        bus.Sessions.IsRunning,
+        profile.ForkOrchestratorEnabled,
+        profile.ForkSessionId,
+        activeForks,
+        profile.StreamerId,
+        File.Exists(NlIdentityPaths.MockOwnershipConfig),
+        profile.SocialGateEnabled,
+        profile.JoinGate,
+        profile.RequireLiveStream,
+        socialMode,
+        File.Exists(NlPaths.JoinRequirements),
+        File.Exists(NlSocialPaths.StreamerConfig),
+        File.Exists(NlSocialPaths.MockData)));
+});
+
+app.MapGet("/api/v1/production-dogfood/settings", (NlFleetHost fleet) =>
+    Results.Json(fleet.ProductionDogfoodSettings.ToPublicInfo()));
+
+app.MapGet("/api/v1/production-dogfood/status", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator) =>
+{
+    var last = fleet.ProductionDogfoodRuns.GetLast();
+    return Results.Json(new ProductionDogfoodStatus(
+        fleet.ProductionDogfoodSettings.Enabled,
+        fleet.ProductionDogfoodSettings.DevMode,
+        orchestrator.Settings.Enabled,
+        orchestrator.Settings.Mode.ToString(),
+        fleet.ProductionDogfoodSettings.RequiredGames,
+        last));
+});
+
+app.MapGet("/api/v1/production-dogfood/validation", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    NlIdentityHost identity) =>
+    Results.Json(BuildProductionDogfoodValidationReport(fleet, orchestrator, identity.Settings.Enabled, null)));
+
+app.MapPost("/api/v1/production-dogfood/validation/run", (
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    NlIdentityHost identity,
+    ProductionDogfoodValidationRunRequest? body) =>
+{
+    var report = BuildProductionDogfoodValidationReport(fleet, orchestrator, identity.Settings.Enabled, body);
+    if (report.ProductionDogfoodPassed)
+    {
+        var games = new List<string> { "hello-fork" };
+        if (body?.MinecraftJoinVerified == true)
+        {
+            games.Add("minecraft");
+        }
+
+        if (body?.BeamngJoinVerified == true)
+        {
+            games.Add("beamng");
+        }
+
+        if (body?.VerifiedGames is { Count: > 0 })
+        {
+            games = body.VerifiedGames.Where(g => !string.IsNullOrWhiteSpace(g)).Select(g => g.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        fleet.ProductionDogfoodRuns.Save(new ProductionDogfoodLastRun(
+            true,
+            report.EvaluatedAtUtc,
+            body?.StreamerId,
+            games));
+    }
+
+    return Results.Json(report);
+});
+
+app.MapPut("/api/v1/session/profile", async (BusHostState b, HttpRequest req) =>
+{
+    var profile = await req.ReadFromJsonAsync<SessionProfileFile>();
+    if (profile is null)
+    {
+        return Results.BadRequest(new { error = "Invalid profile JSON." });
+    }
+
+    b.SaveProfile(profile);
+    return Results.Ok(b.GetStatus(includeSecrets: true));
+});
+
+app.MapPost("/api/v1/session/bus-defaults", (BusHostState b, string? config) =>
+{
+    b.LoadBusDefaults(config);
+    return Results.Ok(b.GetStatus(includeSecrets: true));
+});
+
+app.MapPost("/api/v1/session/start", async (BusHostState b, NlSocialHost social, NlForkCatalogHost catalog, NlForkOrchestratorHost orchestrator, NlFleetHost fleet, HttpRequest req, CancellationToken ct) =>
+{
+    var body = await req.ReadFromJsonAsync<StartSessionRequest>();
+    return await b.StartAsync(body?.ReplayOnce ?? false, ct, social, catalog, orchestrator, fleet);
+});
+
+app.MapPost("/api/v1/session/stop", (BusHostState b, NlForkOrchestratorHost orchestrator) => b.Stop(orchestrator));
+
+app.MapGet("/api/v1/moderation", (ModerationHostState m) => Results.Json(m.GetStatus()));
+
+app.MapGet("/api/v1/moderation/recent", async (ModerationHostState m, string? streamer, int? count, CancellationToken ct) =>
+{
+    var streamerId = string.IsNullOrWhiteSpace(streamer) ? NlPaths.DefaultStreamerId : streamer.Trim();
+    var records = await m.Moderation.GetRecentActionsAsync(streamerId, count ?? 100, ct);
+    return Results.Json(records);
+});
+
+app.MapGet("/api/v1/moderation/players/{playerId}/history", (ModerationHostState m, string playerId, string? streamer, bool? includeArchived) =>
+{
+    var streamerId = string.IsNullOrWhiteSpace(streamer) ? NlPaths.DefaultStreamerId : streamer.Trim();
+    var history = m.Moderation.GetOffenseHistory(streamerId, playerId);
+    if (history is null)
+    {
+        return Results.NotFound(new { error = $"Unknown SP '{playerId}'." });
+    }
+
+    if (includeArchived == false)
+    {
+        return Results.Json(new
+        {
+            history.StreamerId,
+            history.Standing,
+            history.ActiveOffenseCount,
+            offenses = history.ActiveOffenses,
+            activeOffenses = history.ActiveOffenses,
+            archivedOffenses = Array.Empty<object>(),
+        });
+    }
+
+    return Results.Json(history);
+});
+
+app.MapPost("/api/v1/moderation/profiles", (ModerationHostState m, CreateProfileRequest body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.PlayerId))
+    {
+        return Results.BadRequest(new { error = "playerId required." });
+    }
+
+    var profile = m.Moderation.GetOrCreateProfile(body.PlayerId.Trim(), body.DisplayName?.Trim() ?? body.PlayerId.Trim());
+    return Results.Ok(new { playerId = profile.Id, displayName = profile.DisplayName });
+});
+
+app.MapPost("/api/v1/moderation/warning", async (ModerationHostState m, ModerationActionRequest body, CancellationToken ct) =>
+    await IssueModerationAsync(m, body, async (svc, s, p, by, reason, game) =>
+        await svc.IssueWarningAsync(s, p, by, reason, game, ct)));
+
+app.MapPost("/api/v1/moderation/ban", async (ModerationHostState m, ModerationActionRequest body, CancellationToken ct) =>
+    await IssueModerationAsync(m, body, async (svc, s, p, by, reason, game) =>
+        await svc.IssueBanAsync(s, p, by, reason, game, ct)));
+
+app.MapPost("/api/v1/moderation/graylist", async (ModerationHostState m, ModerationActionRequest body, CancellationToken ct) =>
+    await IssueModerationAsync(m, body, async (svc, s, p, by, reason, _) =>
+        await svc.IssueGraylistHoldAsync(s, p, by, reason, ct)));
+
+app.MapPost("/api/v1/moderation/clear", async (ModerationHostState m, ModerationActionRequest body, CancellationToken ct) =>
+    await IssueModerationAsync(m, body, async (svc, s, p, by, reason, _) =>
+        await svc.ClearStandingAsync(s, p, by, string.IsNullOrWhiteSpace(reason) ? null : reason, ct), requireReason: false));
+
+app.MapGet("/health", (NlSecuritySettings security, NlHardeningSettings hardening, NlDemoSettings demo, BusHostState bus) =>
+    Results.Json(new
+    {
+        status = "ok",
+        service = "nl-session-server",
+        uptimeSeconds = (long)NlOpsMetrics.Uptime.TotalSeconds,
+        publicMode = security.PublicMode,
+        hardening = hardening.Enabled,
+        demoMode = demo.Enabled,
+        sessionRunning = bus.Sessions.IsRunning,
+    }));
+
+app.MapGet("/api/v1/ops/status", (
+    NlHardeningSettings hardening,
+    NlPublicRateLimitService rateLimits,
+    NlDemoSettings demo,
+    NlSpectatorSettings spectator,
+    BusHostState bus,
+    NlForkOrchestratorHost orchestrator,
+    NlFleetHost fleet) =>
+{
+    var wsGuard = NlWebSocketConnectionGuard.Current;
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var fleetObs = fleet.Settings.Enabled
+        ? fleet.Metrics.BuildSnapshot(activeForks, activeNls)
+        : null;
+    var slos = fleetObs is not null
+        ? fleet.Slo.Evaluate(fleetObs, loadTest: null, fleet.Metrics, fleet.Incidents)
+        : null;
+    var warm = fleet.Settings.Enabled
+        ? fleet.Autoscale.Evaluate(activeForks, activeNls > 0, null)
+        : null;
+
+    return Results.Json(new
+    {
+        uptime = NlOpsMetrics.UptimePayload(),
+        hardening = hardening.ToPublicInfo(),
+        rateLimits = rateLimits.GetMetrics(),
+        webSocket = wsGuard?.GetMetrics(),
+        demo = demo.ToPublicInfo(bus.Sessions.IsRunning, bus.Sessions.DecisionCount, bus.GetProfile().ConfigPath),
+        spectator = new { triggersEnabled = spectator.TriggersEnabled, triggerRatePerMinute = spectator.TriggerRatePerMinute },
+        session = new { state = bus.Sessions.State.ToString(), decisions = bus.Sessions.DecisionCount },
+        fleet = fleet.Settings.Enabled
+            ? new
+            {
+                observability = fleetObs,
+                slos,
+                autoscale = warm,
+                incidents = fleet.Incidents.ListRecent(10),
+            }
+            : null,
+    });
+});
+
+app.MapGet("/api/v1/demo/status", (NlDemoSettings demo, BusHostState b) =>
+    Results.Json(demo.ToPublicInfo(
+        b.Sessions.IsRunning,
+        b.Sessions.DecisionCount,
+        b.GetProfile().ConfigPath)));
+
+app.MapGet("/api/v1/fork/status", () =>
+{
+    var path = Environment.GetEnvironmentVariable("NL_FORK_STATUS") ?? NlPaths.ForkStatus;
+    if (!File.Exists(path))
+    {
+        return Results.Json(new { connected = false, message = "No fork runtime status file yet." });
+    }
+
+    try
+    {
+        var json = File.ReadAllText(path);
+        return Results.Content(json, "application/json");
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { connected = false, error = ex.Message });
+    }
+});
+
+app.MapGet("/api/v1/spectator/status", (NlSpectatorService spectator, BusHostState b, NlDemoSettings demo) =>
+    Results.Json(spectator.BuildStatus(
+        b.Sessions.State,
+        b.Sessions.IsRunning,
+        b.Sessions.DecisionCount,
+        demo.Enabled,
+        b.GetProfile())));
+
+app.MapGet("/api/v1/spectator/scenarios", (NlSpectatorService spectator) =>
+    Results.Json(spectator.ListScenarios()));
+
+app.MapGet("/api/v1/spectator/decisions", async (
+    NlSpectatorService spectator,
+    ModerationHostState moderation,
+    BusHostState bus,
+    string? streamer,
+    string? since,
+    int? count,
+    CancellationToken ct) =>
+{
+    var streamerId = string.IsNullOrWhiteSpace(streamer) ? bus.GetProfile().StreamerId : streamer.Trim();
+    DateTimeOffset? sinceUtc = DateTimeOffset.TryParse(since, out var parsed) ? parsed : null;
+    var decisions = await spectator.GetDecisionsAsync(moderation, streamerId, sinceUtc, count, ct);
+    return Results.Json(new { decisions });
+});
+
+app.MapPost("/api/v1/spectator/trigger", async (
+    NlSpectatorService spectator,
+    BusHostState bus,
+    SpectatorTriggerRequest body,
+    HttpContext ctx,
+    CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(body.ScenarioId))
+    {
+        return Results.BadRequest(new { error = "scenarioId required." });
+    }
+
+    var clientKey = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    var result = await spectator.TriggerScenarioAsync(
+        body.ScenarioId.Trim(),
+        clientKey,
+        bus.Sessions.IsRunning,
+        bus.BindHost,
+        bus.WsPort,
+        bus.BusToken,
+        ct);
+
+    return Results.Json(result.Body, statusCode: result.StatusCode);
+});
+
+app.MapGet("/api/v1/editor/vocabulary", () => Results.Json(NlEditorVocabulary.ToPublicInfo()));
+
+app.MapGet("/api/v1/editor/config", (NlWebEditorStore store, BusHostState bus) =>
+{
+    var profile = bus.GetProfile();
+    var snap = store.Load(profile.ConfigPath);
+    return Results.Json(new
+    {
+        model = snap.Model,
+        nleText = snap.NleText,
+        sourcePath = snap.SourcePath,
+        isSandbox = snap.IsSandbox,
+        sessionUsesSandbox = store.IsSandboxPath(profile.ConfigPath),
+        sessionRunning = bus.Sessions.IsRunning,
+    });
+});
+
+app.MapPut("/api/v1/editor/config", async (NlWebEditorStore store, HttpRequest req) =>
+{
+    var model = await req.ReadFromJsonAsync<ConfigModel>();
+    if (model is null)
+    {
+        return Results.BadRequest(new { error = "Invalid config model JSON." });
+    }
+
+    try
+    {
+        var saved = store.Save(model);
+        return Results.Ok(new { ok = true, nleText = saved.NleText, sourcePath = saved.SourcePath });
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/v1/editor/evaluate", async (HttpRequest req) =>
+{
+    var body = await req.ReadFromJsonAsync<EditorEvaluateRequest>();
+    if (body is null || string.IsNullOrWhiteSpace(body.EventName))
+    {
+        return Results.BadRequest(new { error = "eventName required." });
+    }
+
+    var result = NleEditorEvaluate.Evaluate(new NleEvaluateRequest(
+        body.EventName,
+        body.Properties,
+        body.Model,
+        body.NleText));
+
+    if (!result.ParseOk)
+    {
+        return Results.BadRequest(new { error = result.Error, decision = result.Decision });
+    }
+
+    return Results.Json(new
+    {
+        decision = result.Decision,
+        message = result.Message,
+        allow = result.Decision.Equals("Allow", StringComparison.OrdinalIgnoreCase),
+    });
+});
+
+app.MapPost("/api/v1/editor/apply", async (
+    NlWebEditorStore store,
+    BusHostState bus,
+    NlSocialHost social,
+    NlForkCatalogHost catalog,
+    NlForkOrchestratorHost orchestrator,
+    EditorApplyRequest? body,
+    CancellationToken ct) =>
+{
+    if (!store.SandboxExists())
+    {
+        return Results.BadRequest(new { error = "Save rules to the sandbox first." });
+    }
+
+    var profile = bus.GetProfile();
+    profile.ConfigPath = store.SandboxPath;
+    bus.SaveProfile(profile);
+
+    if (body?.RestartSession == false)
+    {
+        return Results.Ok(new
+        {
+            ok = true,
+            configPath = store.SandboxPath,
+            sessionRunning = bus.Sessions.IsRunning,
+            restarted = false,
+        });
+    }
+
+    if (bus.Sessions.IsRunning)
+    {
+        bus.Stop(orchestrator);
+        await bus.WaitForIdleAsync(ct);
+    }
+
+    var start = await bus.StartAsync(replayOnce: false, ct, social, catalog, orchestrator);
+    return start;
+});
+
+app.MapPost("/api/v1/editor/reset", (NlWebEditorStore store, NlDemoSettings demo) =>
+{
+    var template = demo.Enabled ? demo.ConfigFileName : "demo.nle";
+    store.ResetFromTemplate(template);
+    var snap = store.Load(null);
+    return Results.Ok(new
+    {
+        ok = true,
+        template,
+        model = snap.Model,
+        nleText = snap.NleText,
+    });
+});
+
+var manifest = bus.GetManifest(orchestratorHost, fleetHost);
+Console.WriteLine($"NL Session Server      → {manifest.HttpBaseUrl}");
+Console.WriteLine($"Bridge (remote)        → {manifest.BridgeConnectUrl}");
+Console.WriteLine($"Join admission         → {manifest.AdmitUrl}");
+Console.WriteLine($"Moderation console     → {manifest.ModerationUrl}");
+Console.WriteLine($"Public mode            → {security.PublicMode}");
+Console.WriteLine($"Demo loop (Phase G)    → {demoSettings.Enabled}");
+Console.WriteLine($"Spectator UX (Phase H) → triggers={spectatorSettings.TriggersEnabled}, rate={spectatorSettings.TriggerRatePerMinute}/min");
+Console.WriteLine($"Hardening (Phase K)    → {hardeningSettings.Enabled} (admit={hardeningSettings.AdmitRatePerMinute}/min, ws max={hardeningSettings.WebSocketMaxConnections})");
+Console.WriteLine($"Social gate (Phase M)  → {socialSettings.Enabled} mode={socialSettings.Mode}");
+Console.WriteLine($"Fork catalog (Phase N) → {catalogSettings.Enabled} manifest={NlForkCatalogPaths.Manifest}");
+Console.WriteLine($"Fork orchestrator (O)  → {orchestratorSettings.Enabled} mode={orchestratorSettings.Mode} provisioner={orchestratorHost.ResolveProvisionerKind()}");
+Console.WriteLine($"Identity (Phase L)       → {identitySettings.Enabled} mode={identitySettings.Mode} steamOpenId=/identity-link.html");
+Console.WriteLine($"Partnership (Phase Q)  → {partnershipSettings.Enabled} gate={partnershipSettings.RequireGateAtAdmit}");
+Console.WriteLine($"NL Client (Phase R)    → /nl-client.html + NL.Client CLI");
+Console.WriteLine($"Fleet ops (Phase S)    → {fleetSettings.Enabled} /fleet-ops.html max={fleetSettings.Autoscale.MaxConcurrentSessions}");
+Console.WriteLine($"Public beta (Phase 5)  → {fleetHost.BetaSettings.Enabled} /beta.html waitlist={(fleetHost.BetaSettings.WaitlistOpen ? "open" : "closed")}");
+Console.WriteLine($"Web editor (Phase I)   → /editor.html + /api/v1/editor/*");
+if (demoSettings.Enabled)
+{
+    Console.WriteLine($"Demo config            → {demoSettings.ConfigFileName}");
+    Console.WriteLine($"Demo reset interval    → {(demoSettings.ResetInterval.TotalMinutes > 0 ? $"{demoSettings.ResetInterval.TotalMinutes} min" : "startup only")}");
+}
+Console.WriteLine($"Operator auth          → {(security.RequireOperatorAuth ? "required" : "off (local dev)")}");
+if (security.RequireOperatorAuth)
+{
+    Console.WriteLine($"Bus token              → {(string.IsNullOrEmpty(security.BusToken) ? busToken : "<configured>")}");
+}
+else
+{
+    Console.WriteLine($"Bus token              → {busToken}");
+}
+
+app.Run();
+
+static BetaValidationReport BuildBetaValidationReport(
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security)
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    var production = fleet.Validation.Evaluate(
+        fleet.Settings,
+        orchestrator.Settings.Mode.ToString(),
+        snap,
+        fleet.Metrics,
+        fleet.Incidents,
+        fleet.ValidationStore.GetLast()?.LastLoadTest);
+    return fleet.BetaValidation.Evaluate(
+        fleet.BetaSettings,
+        !string.IsNullOrEmpty(security.OperatorKey),
+        security.PublicMode,
+        identity.Mode.ToString(),
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY")),
+        production.ProductionReady);
+}
+
+static GaValidationReport BuildGaValidationReport(
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog)
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    var production = fleet.Validation.Evaluate(
+        fleet.Settings,
+        orchestrator.Settings.Mode.ToString(),
+        snap,
+        fleet.Metrics,
+        fleet.Incidents,
+        fleet.ValidationStore.GetLast()?.LastLoadTest);
+    var activeGameIds = catalog.Settings.Enabled
+        ? catalog.Catalog.ListGames()
+            .Select(e => e.GameId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList()
+        : (IReadOnlyList<string>)[];
+    var catalogCheck = fleet.GaCatalog.Evaluate(catalog.Settings.Enabled, activeGameIds, fleet.GaSettings);
+    var productionSlos = fleet.Slo.EvaluateProduction(
+        snap,
+        fleet.ValidationStore.GetLast()?.LastLoadTest,
+        fleet.Metrics,
+        fleet.Incidents);
+    return fleet.GaValidation.Evaluate(
+        fleet.GaSettings,
+        fleet.BetaSettings,
+        !string.IsNullOrEmpty(security.OperatorKey),
+        security.PublicMode,
+        identity.Mode.ToString(),
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY")),
+        production.ProductionReady,
+        catalog.Settings.Enabled,
+        catalogCheck,
+        fleet.Compliance.RetentionPolicy,
+        productionSlos);
+}
+
+static LiveProductionValidationReport BuildLiveProductionValidationReport(
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog)
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    var production = fleet.Validation.Evaluate(
+        fleet.Settings,
+        orchestrator.Settings.Mode.ToString(),
+        snap,
+        fleet.Metrics,
+        fleet.Incidents,
+        fleet.ValidationStore.GetLast()?.LastLoadTest);
+    var activeGameIds = catalog.Settings.Enabled
+        ? catalog.Catalog.ListGames()
+            .Select(e => e.GameId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList()
+        : (IReadOnlyList<string>)[];
+    var catalogCheck = fleet.GaCatalog.Evaluate(catalog.Settings.Enabled, activeGameIds, fleet.GaSettings);
+    return fleet.LiveProductionValidation.Evaluate(
+        fleet.LiveProductionSettings,
+        fleet.GaSettings,
+        fleet.BetaSettings,
+        !string.IsNullOrEmpty(security.OperatorKey),
+        security.PublicMode,
+        identity.Mode.ToString(),
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY")),
+        production.ProductionReady,
+        identity.PublicBaseUrl ?? Environment.GetEnvironmentVariable("NL_PUBLIC_BASE_URL"),
+        fleet.Settings.Relay.RelayWebSocketTemplate,
+        fleet.Settings.Relay.TurnUri,
+        catalog.Settings.Enabled,
+        catalogCheck,
+        fleet.Compliance.RetentionPolicy);
+}
+
+static MultiGameValidationReport BuildMultiGameValidationReport(
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    MultiGameValidationRunRequest? body)
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    var liveReport = fleet.LiveProductionValidation.Evaluate(
+        fleet.LiveProductionSettings,
+        fleet.GaSettings,
+        fleet.BetaSettings,
+        !string.IsNullOrEmpty(security.OperatorKey),
+        security.PublicMode,
+        identity.Mode.ToString(),
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY")),
+        fleet.Validation.Evaluate(
+            fleet.Settings,
+            orchestrator.Settings.Mode.ToString(),
+            snap,
+            fleet.Metrics,
+            fleet.Incidents,
+            fleet.ValidationStore.GetLast()?.LastLoadTest).ProductionReady,
+        identity.PublicBaseUrl ?? Environment.GetEnvironmentVariable("NL_PUBLIC_BASE_URL"),
+        fleet.Settings.Relay.RelayWebSocketTemplate,
+        fleet.Settings.Relay.TurnUri,
+        catalog.Settings.Enabled,
+        fleet.GaCatalog.Evaluate(
+            catalog.Settings.Enabled,
+            catalog.Catalog.ListGames()
+                .Select(e => e.GameId)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            fleet.GaSettings),
+        fleet.Compliance.RetentionPolicy);
+
+    var catalogGames = fleet.MultiGameSettings.RequiredGameIds
+        .Select(gameId =>
+        {
+            var stable = catalog.Catalog.ResolveLatestStableEntry(gameId);
+            return (gameId, stable?.DockerImage, stable?.MajorVersion);
+        })
+        .ToList();
+    var catalogCheck = fleet.MultiGameCatalog.Evaluate(catalog.Settings.Enabled, catalogGames, fleet.MultiGameSettings);
+
+    return fleet.MultiGameValidation.Evaluate(
+        fleet.MultiGameSettings,
+        fleet.LiveProductionSettings,
+        fleet.GaSettings,
+        catalog.Settings.Enabled,
+        catalogCheck,
+        liveReport.LiveProductionPassed,
+        partnership.Settings.Enabled,
+        partnership.Settings.RequireGateAtAdmit,
+        body?.HostImagesVerified ?? false,
+        body?.VerifiedGameIds);
+}
+
+static LaunchOpsValidationReport BuildLaunchOpsValidationReport(
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    LaunchOpsValidationRunRequest? body)
+{
+    var multiReport = BuildMultiGameValidationReport(
+        fleet,
+        orchestrator,
+        bus,
+        identity,
+        security,
+        catalog,
+        partnership,
+        body?.MultiGame is null
+            ? null
+            : new MultiGameValidationRunRequest
+            {
+                HostImagesVerified = body.MultiGame.HostImagesVerified,
+                VerifiedGameIds = body.MultiGame.VerifiedGameIds,
+            });
+
+    var backup = fleet.LaunchBackup.Evaluate(
+        fleet.LaunchOpsSettings,
+        body?.HostBackupVerified ?? false);
+
+    return fleet.LaunchOpsValidation.Evaluate(
+        fleet.LaunchOpsSettings,
+        fleet.MultiGameSettings,
+        multiReport.MultiGamePassed,
+        hardening.Enabled,
+        fleet.Settings.Abuse,
+        fleet.Compliance.RetentionPolicy,
+        backup,
+        body?.LegalPagesVerified ?? false,
+        fleet.LaunchAlerting.IsConfigured(fleet.LaunchOpsSettings),
+        body?.AlertingTestPassed ?? false);
+}
+
+static ProductionCutoverValidationReport BuildProductionCutoverValidationReport(
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    ProductionCutoverValidationRunRequest? body)
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    var productionReport = fleet.Validation.Evaluate(
+        fleet.Settings,
+        orchestrator.Settings.Mode.ToString(),
+        snap,
+        fleet.Metrics,
+        fleet.Incidents,
+        fleet.ValidationStore.GetLast()?.LastLoadTest);
+
+    var liveReport = BuildLiveProductionValidationReport(
+        fleet, orchestrator, bus, identity, security, catalog);
+
+    var launchBody = body?.LaunchOps ?? new LaunchOpsValidationRunRequest
+    {
+        LegalPagesVerified = body?.LegalPagesVerified ?? false,
+        HostBackupVerified = body?.HostBackupVerified ?? false,
+        AlertingTestPassed = body?.AlertingTestPassed ?? false,
+        MultiGame = body?.MultiGame,
+    };
+    if (launchBody.MultiGame is null && body?.MultiGame is not null)
+    {
+        launchBody.MultiGame = body.MultiGame;
+    }
+
+    var multiReport = BuildMultiGameValidationReport(
+        fleet,
+        orchestrator,
+        bus,
+        identity,
+        security,
+        catalog,
+        partnership,
+        body?.MultiGame);
+
+    var launchReport = BuildLaunchOpsValidationReport(
+        fleet,
+        orchestrator,
+        bus,
+        identity,
+        security,
+        catalog,
+        partnership,
+        hardening,
+        launchBody);
+
+    return fleet.ProductionCutoverValidation.Evaluate(
+        fleet.ProductionCutoverSettings,
+        fleet.LiveProductionSettings,
+        fleet.LaunchOpsSettings,
+        fleet.GaSettings,
+        fleet.BetaSettings,
+        !string.IsNullOrEmpty(security.OperatorKey),
+        security.PublicMode,
+        identity.Mode.ToString(),
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY")),
+        hardening.Enabled,
+        productionReport.ProductionReady,
+        identity.PublicBaseUrl ?? Environment.GetEnvironmentVariable("NL_PUBLIC_BASE_URL"),
+        fleet.Settings.Relay.RelayWebSocketTemplate,
+        fleet.Settings.Relay.TurnUri,
+        liveReport.LiveProductionPassed,
+        multiReport.MultiGamePassed,
+        launchReport.LaunchOpsPassed,
+        body?.PublicHttpsVerified ?? false);
+}
+
+static DistributionValidationReport BuildDistributionValidationReport(
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env,
+    DistributionValidationRunRequest? body)
+{
+    var wwwroot = Path.Combine(env.ContentRootPath, "wwwroot");
+    var manifest = fleet.DistributionClient.Build(
+        fleet.DistributionSettings,
+        identity.PublicBaseUrl ?? Environment.GetEnvironmentVariable("NL_PUBLIC_BASE_URL"),
+        wwwroot);
+    var onboarding = fleet.DistributionClient.BuildOnboardingPaths(fleet.GaSettings);
+
+    var cutoverReport = BuildProductionCutoverValidationReport(
+        fleet,
+        orchestrator,
+        bus,
+        identity,
+        security,
+        catalog,
+        partnership,
+        hardening,
+        body?.ProductionCutover);
+
+    return fleet.DistributionValidation.Evaluate(
+        fleet.DistributionSettings,
+        fleet.ProductionCutoverSettings,
+        fleet.GaSettings,
+        onboarding,
+        manifest,
+        cutoverReport.ProductionCutoverPassed,
+        body?.HostClientPackageVerified ?? false,
+        body?.StreamerSignupVerified ?? false,
+        body?.PlayerJoinVerified ?? false);
+}
+
+static ProductionDogfoodValidationReport BuildProductionDogfoodValidationReport(
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    bool identityEnabled,
+    ProductionDogfoodValidationRunRequest? body) =>
+    fleet.ProductionDogfoodValidation.Evaluate(
+        fleet.ProductionDogfoodSettings,
+        fleet.PublicGaLaunchSettings,
+        fleet.GaSettings,
+        fleet.DistributionSettings,
+        identityEnabled,
+        orchestrator.Settings.Enabled,
+        orchestrator.Settings.Mode.ToString(),
+        body?.StreamerSignupVerified ?? false,
+        body?.IdentityAccountVerified ?? false,
+        body?.PlayerJoinVerified ?? false,
+        body?.MinecraftJoinVerified ?? false,
+        body?.BeamngJoinVerified ?? false,
+        body?.ForkTeardownVerified ?? false,
+        body?.RimworldJoinVerified ?? false,
+        body?.KenshiJoinVerified ?? false);
+
+static ScaleReliabilityValidationReport BuildScaleReliabilityValidationReport(
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env,
+    ScaleReliabilityValidationRunRequest? body)
+{
+    var activeForks = orchestrator.Settings.Enabled ? orchestrator.Orchestrator.ListActive().Count : 0;
+    var activeNls = bus.Sessions.IsRunning ? 1 : 0;
+    var snap = fleet.Metrics.BuildSnapshot(activeForks, activeNls);
+    var last = fleet.ValidationStore.GetLast()?.LastLoadTest;
+
+    var distributionReport = BuildDistributionValidationReport(
+        fleet,
+        orchestrator,
+        bus,
+        identity,
+        security,
+        catalog,
+        partnership,
+        hardening,
+        env,
+        body?.Distribution);
+
+    return fleet.ScaleReliabilityValidation.Evaluate(
+        fleet.ScaleReliabilitySettings,
+        fleet.DistributionSettings,
+        fleet.Settings,
+        fleet.Regions.ListRegions(),
+        snap,
+        last,
+        fleet.Metrics,
+        fleet.Incidents,
+        distributionReport.DistributionPassed,
+        body?.LoadTestVerified ?? false,
+        body?.MultiRegionVerified ?? false,
+        body?.VerifiedRegionIds is { Count: > 0 } ids ? ids : Array.Empty<string>());
+}
+
+static LegalComplianceValidationReport BuildLegalComplianceValidationReport(
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env,
+    LegalComplianceValidationRunRequest? body)
+{
+    var manifest = fleet.LegalComplianceManifest.Build(fleet.LegalComplianceSettings, fleet.LaunchOpsSettings);
+    var onboarding = fleet.LegalComplianceManifest.BuildOnboardingPaths();
+    var auditCount = fleet.LegalComplianceAudit.ListRecent(500).Count;
+
+    var scaleReport = BuildScaleReliabilityValidationReport(
+        fleet,
+        orchestrator,
+        bus,
+        identity,
+        security,
+        catalog,
+        partnership,
+        hardening,
+        env,
+        body?.ScaleReliability);
+
+    return fleet.LegalComplianceValidation.Evaluate(
+        fleet.LegalComplianceSettings,
+        fleet.LaunchOpsSettings,
+        fleet.ScaleReliabilitySettings,
+        fleet.Settings.Retention,
+        partnership.Settings.Enabled,
+        onboarding,
+        manifest,
+        auditCount,
+        scaleReport.ScaleReliabilityPassed,
+        body?.GdprExportVerified ?? false,
+        body?.StreamerTermsVerified ?? false);
+}
+
+static PublicGaLaunchValidationReport BuildPublicGaLaunchValidationReport(
+    NlFleetHost fleet,
+    NlForkOrchestratorHost orchestrator,
+    BusHostState bus,
+    NlIdentitySettings identity,
+    NlSecuritySettings security,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlHardeningSettings hardening,
+    IWebHostEnvironment env,
+    PublicGaLaunchValidationRunRequest? body)
+{
+    var legalReport = BuildLegalComplianceValidationReport(
+        fleet,
+        orchestrator,
+        bus,
+        identity,
+        security,
+        catalog,
+        partnership,
+        hardening,
+        env,
+        body?.LegalCompliance);
+
+    var signoffCount = fleet.PublicGaLaunchSignoff.ListRecent(20).Count;
+
+    return fleet.PublicGaLaunchValidation.Evaluate(
+        fleet.PublicGaLaunchSettings,
+        fleet.GaSettings,
+        fleet.DistributionSettings,
+        fleet.ScaleReliabilitySettings,
+        fleet.LegalComplianceSettings,
+        fleet.LaunchOpsSettings,
+        fleet.ProductionCutoverSettings,
+        legalReport.LegalCompliancePassed,
+        body?.BackupVerified ?? false,
+        body?.OperatorSignoffVerified ?? false,
+        body?.SupportContactVerified ?? false,
+        body?.LaunchAnnouncementReady ?? false,
+        signoffCount);
+}
+
+static string ResolveIdentityPublicBase(HttpContext ctx, NlIdentitySettings settings)
+{
+    if (!string.IsNullOrWhiteSpace(settings.PublicBaseUrl))
+    {
+        return settings.PublicBaseUrl.TrimEnd('/');
+    }
+
+    var req = ctx.Request;
+    return $"{req.Scheme}://{req.Host}";
+}
+
+static string ResolveSocialPublicBase(HttpContext ctx)
+{
+    var publicBase = Environment.GetEnvironmentVariable("NL_PUBLIC_BASE_URL");
+    if (!string.IsNullOrWhiteSpace(publicBase))
+    {
+        return publicBase.TrimEnd('/');
+    }
+
+    var req = ctx.Request;
+    return $"{req.Scheme}://{req.Host}";
+}
+
+static string? ExtractSessionToken(HttpContext ctx)
+{
+    var auth = ctx.Request.Headers.Authorization.ToString();
+    if (!string.IsNullOrWhiteSpace(auth) && auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+    {
+        return auth["Bearer ".Length..].Trim();
+    }
+
+    if (ctx.Request.Headers.TryGetValue("X-NL-Session-Token", out var header))
+    {
+        return header.ToString();
+    }
+
+    return null;
+}
+
+static void ApplyUnifiedSession(NlIdentityHost identity, HttpContext ctx, NlAdmitPlayerRequest body)
+{
+    if (!string.IsNullOrWhiteSpace(body.NlAccountId))
+    {
+        return;
+    }
+
+    var account = identity.UnifiedAccounts.GetAccountFromSession(ExtractSessionToken(ctx));
+    if (account is null)
+    {
+        return;
+    }
+
+    body.NlAccountId = account.Id;
+    if (string.IsNullOrWhiteSpace(body.PlayerId))
+    {
+        body.PlayerId = account.PlayerId;
+    }
+
+    if (string.IsNullOrWhiteSpace(body.DisplayName))
+    {
+        body.DisplayName = account.DisplayName;
+    }
+}
+
+static NlClientJoinRequest ApplyUnifiedClientSession(NlIdentityHost identity, HttpContext ctx, NlClientJoinRequest body)
+{
+    if (!string.IsNullOrWhiteSpace(body.NlAccountId))
+    {
+        return body;
+    }
+
+    var account = identity.UnifiedAccounts.GetAccountFromSession(ExtractSessionToken(ctx));
+    if (account is null)
+    {
+        return body;
+    }
+
+    return body with
+    {
+        NlAccountId = account.Id,
+        PlayerId = string.IsNullOrWhiteSpace(body.PlayerId) ? account.PlayerId : body.PlayerId,
+        DisplayName = body.DisplayName ?? account.DisplayName,
+        StreamerId = string.IsNullOrWhiteSpace(body.StreamerId) && !string.IsNullOrWhiteSpace(account.StreamerId)
+            ? account.StreamerId!
+            : body.StreamerId,
+    };
+}
+
+static IResult MapIdentityPlatformAuthorize(
+    NlIdentityHost host,
+    NlIdentitySettings settings,
+    HttpContext ctx,
+    string accountId,
+    string? returnUrl,
+    bool configured,
+    string platformLabel,
+    Func<string> buildRedirect)
+{
+    if (!settings.Enabled)
+    {
+        return Results.Json(new { error = "Identity service disabled." }, statusCode: 503);
+    }
+
+    if (!configured)
+    {
+        return Results.Json(new { error = $"{platformLabel} OAuth is not configured." }, statusCode: 503);
+    }
+
+    if (string.IsNullOrWhiteSpace(accountId))
+    {
+        return Results.BadRequest(new { error = "accountId required." });
+    }
+
+    if (host.Identity.GetAccount(accountId.Trim()) is null)
+    {
+        return Results.NotFound(new { error = "Account not found." });
+    }
+
+    return Results.Redirect(buildRedirect());
+}
+
+static async Task<IResult> MapIdentityPlatformCallback(
+    NlIdentityHost host,
+    NlIdentitySettings settings,
+    HttpContext ctx,
+    CancellationToken ct,
+    NlPlatform platform,
+    string linkedName,
+    Func<IReadOnlyDictionary<string, string>, string, CancellationToken, Task<PlatformOAuthCallbackResult>> handler)
+{
+    if (!settings.Enabled)
+    {
+        return Results.Content("Identity service disabled.", "text/plain", statusCode: 503);
+    }
+
+    var query = ctx.Request.Query.ToDictionary(
+        kv => kv.Key,
+        kv => kv.Value.ToString(),
+        StringComparer.OrdinalIgnoreCase);
+
+    var publicBase = ResolveIdentityPublicBase(ctx, settings);
+    var result = await handler(query, publicBase, ct);
+    var landing = string.IsNullOrWhiteSpace(result.ReturnUrl)
+        ? "/identity-link.html"
+        : result.ReturnUrl!;
+
+    var sep = landing.Contains('?') ? "&" : "?";
+    if (result.Success)
+    {
+        return Results.Redirect(
+            $"{landing}{sep}linked={linkedName}&accountId={Uri.EscapeDataString(result.AccountId!)}&platformUserId={Uri.EscapeDataString(result.ExternalUserId!)}&displayName={Uri.EscapeDataString(result.DisplayName ?? "")}");
+    }
+
+    return Results.Redirect(
+        $"{landing}{sep}error={Uri.EscapeDataString(result.Error ?? $"{platform} sign-in failed.")}");
+}
+
+static string ResolveSamplesRoot()
+{
+    var overrideRoot = Environment.GetEnvironmentVariable("NL_SAMPLES_ROOT");
+    if (!string.IsNullOrWhiteSpace(overrideRoot) && Directory.Exists(overrideRoot))
+    {
+        return Path.GetFullPath(overrideRoot);
+    }
+
+    var dir = AppContext.BaseDirectory;
+    for (var i = 0; i < 8 && !string.IsNullOrEmpty(dir); i++)
+    {
+        var candidate = Path.Combine(dir, "samples");
+        if (Directory.Exists(candidate))
+        {
+            return candidate;
+        }
+
+        dir = Directory.GetParent(dir)?.FullName ?? "";
+    }
+
+    return Path.Combine(Directory.GetCurrentDirectory(), "samples");
+}
+
+static async Task<IResult> IssueModerationAsync(
+    ModerationHostState host,
+    ModerationActionRequest body,
+    Func<ModerationService, string, string, string, string, string?, Task> action,
+    bool requireReason = true)
+{
+    if (string.IsNullOrWhiteSpace(body.PlayerId))
+    {
+        return Results.BadRequest(new { error = "playerId required." });
+    }
+
+    if (requireReason && string.IsNullOrWhiteSpace(body.Reason))
+    {
+        return Results.BadRequest(new { error = "reason required." });
+    }
+
+    var streamerId = string.IsNullOrWhiteSpace(body.StreamerId) ? NlPaths.DefaultStreamerId : body.StreamerId.Trim();
+    var issuedBy = string.IsNullOrWhiteSpace(body.IssuedBy) ? "mod-web" : body.IssuedBy.Trim();
+    var reason = body.Reason?.Trim() ?? "";
+
+    try
+    {
+        await action(host.Moderation, streamerId, body.PlayerId.Trim(), issuedBy, reason, body.Game);
+        return Results.Ok(new { ok = true });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+}
+
+static NlClientHost CreateClientHost(
+    BusHostState bus,
+    ModerationHostState moderation,
+    NlIdentityHost identity,
+    NlSocialHost social,
+    NlForkCatalogHost catalog,
+    NlPartnershipHost partnership,
+    NlForkOrchestratorHost orchestrator,
+    NlFleetHost fleet)
+{
+    NlSessionManifestDto MapManifest()
+    {
+        var m = bus.GetManifest(orchestrator, fleet);
+        return new NlSessionManifestDto(
+            m.SessionId,
+            m.StreamerId,
+            m.HttpBaseUrl,
+            m.BridgeConnectUrl,
+            m.AdmitUrl,
+            m.ForkConnectEndpoint,
+            m.PartnershipTier,
+            m.RequiresAtOwnRiskAcknowledgment,
+            m.SessionRunning,
+            m.GameId,
+            m.CatalogMajorVersion);
+    }
+
+    return new NlClientHost(
+        bus.GetProfile,
+        () => bus.Sessions.IsRunning,
+        MapManifest,
+        req => bus.AdmitAsync(req, identity, social, catalog, partnership),
+        (playerId, gameId) =>
+        {
+            var entry = catalog.Catalog.ListGames(true).FirstOrDefault(e =>
+                string.Equals(e.GameId, gameId, StringComparison.OrdinalIgnoreCase));
+            var tier = entry?.Tier ?? PartnershipTier.AtOwnRisk;
+            partnership.Gate.RecordAcknowledgment(playerId, gameId, tier);
+            return Task.FromResult(true);
+        },
+        (playerId, streamerId) =>
+        {
+            var profile = moderation.Moderation.GetOrCreateProfile(playerId, playerId);
+            return Task.FromResult<NlClientOverlayState?>(NlClientOverlayBuilder.Build(profile, streamerId));
+        },
+        social);
+}
+
+internal sealed class StartSessionRequest
+{
+    public bool ReplayOnce { get; set; }
+}
+
+internal sealed class EditorEvaluateRequest
+{
+    public string? EventName { get; set; }
+    public Dictionary<string, double>? Properties { get; set; }
+    public ConfigModel? Model { get; set; }
+    public string? NleText { get; set; }
+}
+
+internal sealed class EditorApplyRequest
+{
+    public bool RestartSession { get; set; } = true;
+}
+
+internal sealed class CreateIdentityAccountRequest
+{
+    public string? DisplayName { get; set; }
+}
+
+internal sealed class EmailVerificationRequest
+{
+    public string? AccountId { get; set; }
+
+    public string? Email { get; set; }
+}
+
+internal sealed class EmailConfirmRequest
+{
+    public string? AccountId { get; set; }
+
+    public string? Code { get; set; }
+}
+
+internal sealed class AccountIdRequest
+{
+    public string? AccountId { get; set; }
+}
+
+internal sealed class TwoFactorCodeRequest
+{
+    public string? AccountId { get; set; }
+
+    public string? Code { get; set; }
+}
+
+internal sealed class AuthRegisterRequest
+{
+    public string? DisplayName { get; set; }
+
+    public string? Email { get; set; }
+
+    public string? Password { get; set; }
+}
+
+internal sealed class AuthLoginRequest
+{
+    public string? Email { get; set; }
+
+    public string? Password { get; set; }
+
+    public string? TwoFactorCode { get; set; }
+}
+
+internal sealed class EnableStreamerRequest
+{
+    public string? StreamerSlug { get; set; }
+}
+
+internal sealed class LinkPlatformRequest
+{
+    public string? AccountId { get; set; }
+    public string? Platform { get; set; }
+    public string? ExternalUserId { get; set; }
+    public string? RefreshToken { get; set; }
+}
+
+internal sealed class SocialLinkRequest
+{
+    public string? PlayerId { get; set; }
+    public string? TwitchUserId { get; set; }
+    public string? YouTubeChannelId { get; set; }
+    public string? KickUserId { get; set; }
+    public string? DiscordUserId { get; set; }
+}
+
+internal sealed class CatalogSelectRequest
+{
+    public string? GameId { get; set; }
+    public string? MajorVersion { get; set; }
+    public List<string>? ModIds { get; set; }
+    public bool? EnableOrchestrator { get; set; }
+}
+
+internal sealed class ForkOrchestratorCreateRequest
+{
+    public string? StreamerId { get; set; }
+    public string? GameId { get; set; }
+    public string? MajorVersion { get; set; }
+    public string? NlePath { get; set; }
+    public List<string>? ModIds { get; set; }
+    public string? DockerImage { get; set; }
+    public int? ReservedPrivilegedSlots { get; set; }
+    public string? PreferredRegion { get; set; }
+    public int? TwitchFollowers { get; set; }
+}
+
+internal sealed class FleetLoadTestReportRequest
+{
+    public int ConcurrentSessionsTarget { get; set; } = 100;
+    public int AdmitsPerSecondTarget { get; set; } = 10;
+    public int AdmitsSucceeded { get; set; }
+    public int AdmitsFailed { get; set; }
+    public double ElapsedSeconds { get; set; }
+    public int ActiveForkSessions { get; set; }
+    public int ActiveNlsSessions { get; set; }
+    public double ForkCreateP99Ms { get; set; }
+}
+
+internal sealed class PartnershipAcknowledgeRequest
+{
+    public string? PlayerId { get; set; }
+    public string? GameId { get; set; }
+}
+
+internal sealed class PublisherTitleStatusRequest
+{
+    public PublisherTitleStatus Status { get; set; } = PublisherTitleStatus.OptedIn;
+}
+
+internal sealed class PartnershipOwnershipTokenRequest
+{
+    public string? PlatformUserId { get; set; }
+    public string? GameId { get; set; }
+    public string? AppId { get; set; }
+    public string? Platform { get; set; }
+}
+
+internal sealed class NlClientBlockInviteRequest
+{
+    public string? InviteUrl { get; set; }
+    public string? ExpectedHost { get; set; }
+}
+
+internal sealed class BetaWaitlistSignupRequest
+{
+    public string? DisplayName { get; set; }
+    public string? Contact { get; set; }
+    public string? TwitchHandle { get; set; }
+    public string? RequestedGameId { get; set; }
+}
+
+internal sealed class BetaWaitlistApproveRequest
+{
+    public string? StreamerId { get; set; }
+}
+
+internal sealed class GaStreamerRegisterRequest
+{
+    public string? DisplayName { get; set; }
+    public string? Contact { get; set; }
+    public string? TwitchHandle { get; set; }
+    public string? PreferredGameId { get; set; }
+    public string? StreamerId { get; set; }
+    public bool? TermsAccepted { get; set; }
+}
+
+internal sealed class MultiGameValidationRunRequest
+{
+    public bool HostImagesVerified { get; set; }
+    public IReadOnlyList<string>? VerifiedGameIds { get; set; }
+}
+
+internal sealed class LaunchOpsValidationRunRequest
+{
+    public bool HostBackupVerified { get; set; }
+    public bool LegalPagesVerified { get; set; }
+    public bool AlertingTestPassed { get; set; }
+    public MultiGameValidationRunRequest? MultiGame { get; set; }
+}
+
+internal sealed class ProductionCutoverValidationRunRequest
+{
+    public bool PublicHttpsVerified { get; set; }
+    public bool LegalPagesVerified { get; set; }
+    public bool HostBackupVerified { get; set; }
+    public bool AlertingTestPassed { get; set; }
+    public MultiGameValidationRunRequest? MultiGame { get; set; }
+    public LaunchOpsValidationRunRequest? LaunchOps { get; set; }
+}
+
+internal sealed class DistributionValidationRunRequest
+{
+    public bool HostClientPackageVerified { get; set; }
+    public bool StreamerSignupVerified { get; set; }
+    public bool PlayerJoinVerified { get; set; }
+    public ProductionCutoverValidationRunRequest? ProductionCutover { get; set; }
+}
+
+internal sealed class ScaleReliabilityValidationRunRequest
+{
+    public bool LoadTestVerified { get; set; }
+    public bool MultiRegionVerified { get; set; }
+    public List<string>? VerifiedRegionIds { get; set; }
+    public DistributionValidationRunRequest? Distribution { get; set; }
+}
+
+internal sealed class LegalComplianceValidationRunRequest
+{
+    public bool GdprExportVerified { get; set; }
+    public bool StreamerTermsVerified { get; set; }
+    public ScaleReliabilityValidationRunRequest? ScaleReliability { get; set; }
+}
+
+internal sealed class PublicGaLaunchValidationRunRequest
+{
+    public bool OperatorSignoffVerified { get; set; }
+    public bool BackupVerified { get; set; }
+    public bool SupportContactVerified { get; set; }
+    public bool LaunchAnnouncementReady { get; set; }
+    public LegalComplianceValidationRunRequest? LegalCompliance { get; set; }
+}
+
+internal sealed class ProductionDogfoodValidationRunRequest
+{
+    public bool StreamerSignupVerified { get; set; }
+    public bool IdentityAccountVerified { get; set; }
+    public bool PlayerJoinVerified { get; set; }
+    public bool MinecraftJoinVerified { get; set; }
+    public bool BeamngJoinVerified { get; set; }
+    public bool RimworldJoinVerified { get; set; }
+    public bool KenshiJoinVerified { get; set; }
+    public bool ForkTeardownVerified { get; set; }
+    public string? StreamerId { get; set; }
+    public List<string>? VerifiedGames { get; set; }
+}

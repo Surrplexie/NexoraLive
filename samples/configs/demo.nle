@@ -1,0 +1,28 @@
+# Phase G public demo — matches integrations/python/nl_bridge.py --sample loop.
+# Visitors see Allow/Block/Warn decisions without installing a game.
+
+event sessionStart:
+    allow
+
+event playerJoin:
+    warn "Welcome — NLEvents are active for this demo session."
+    allow
+
+event shoot:
+    block
+
+event playerChat:
+    if chat.capsRatio > 0.8 and chat.length > 10:
+        warn "please avoid excessive caps"
+        block
+    else:
+        allow
+
+event respawn:
+    if player.health > 0:
+        block
+    else:
+        allow
+
+event playerLeave:
+    allow

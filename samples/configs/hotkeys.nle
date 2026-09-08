@@ -1,0 +1,55 @@
+# NL Hotkey Daemon — unified config (Phase 0.7+)
+# One file: hotkey bindings at the top, NLEvent rules below.
+# Edit either section and save — the daemon auto-reloads within ~1 second.
+
+# ── Hotkey bindings ───────────────────────────────────────────────────────────
+# Format: hotkey "Ctrl+Alt+<key>": actionName
+# Supported modifiers: Ctrl/Control, Alt, Shift, Win/Windows
+# Supported keys: 0-9, A-Z, F1-F24, Space, Enter, Esc, Tab,
+#                 Up/Down/Left/Right, Insert/Delete/Home/End/PageUp/PageDown
+# Tip: pick combos unlikely to clash with in-game keys.
+
+hotkey "Ctrl+Alt+0": toggleMic
+hotkey "Ctrl+Alt+9": announce
+hotkey "Ctrl+Alt+8": toggleNlEvents
+hotkey "Ctrl+Alt+7": openLog
+hotkey "Ctrl+Alt+6": clipStream
+hotkey "Ctrl+Alt+5": focusOBS
+hotkey "Ctrl+Alt+4": muteDesktop
+
+# ── NLEvent rules ─────────────────────────────────────────────────────────────
+# Each event block gates the matching action: allow lets it run, block skips it.
+# Change "allow" to "block" on any line and save to disable that hotkey instantly.
+# You can use "and" / "or" in conditions — see samples/configs/compound-conditions.nle.
+
+# Mic mute toggle
+event toggleMic:
+    allow
+
+# Tray notification — the warn text is the real notification body.
+# Edit the message here to change what appears on screen.
+event announce:
+    warn "Thanks for watching!"
+    allow
+
+# Master on/off switch for all other hotkeys.
+event toggleNlEvents:
+    allow
+
+# Opens %LOCALAPPDATA%\NL\hotkeys.log in Notepad.
+event openLog:
+    allow
+
+# Saves OBS replay buffer (requires OBS 28+ with WebSocket enabled).
+# Edit obs.json next to this file to set host/port/password.
+# Block this if OBS isn't running to avoid the timeout delay.
+event clipStream:
+    allow
+
+# Brings the OBS window to the foreground.
+event focusOBS:
+    allow
+
+# Mutes/unmutes the Windows master desktop audio output.
+event muteDesktop:
+    allow

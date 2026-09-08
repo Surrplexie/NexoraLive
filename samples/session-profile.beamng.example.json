@@ -1,0 +1,12 @@
+{
+  "StreamerId": "default-streamer",
+  "Game": "generic",
+  "ConfigPath": "samples/configs/beamng.nle",
+  "SourcePath": "C:\\\\Users\\\\YOU\\\\AppData\\\\Local\\\\NL\\\\beamng-events.ndjson",
+  "RconEndpoint": null,
+  "BeamngCommandEndpoint": "127.0.0.1:27022",
+  "AntiCheat": true,
+  "JoinGate": false,
+  "AnomalyAutoMod": false,
+  "UseDefaultDataPaths": true
+}

@@ -1,0 +1,8 @@
+{
+  "websocketUrl": "ws://127.0.0.1:27021/nl/v1?token=change-me",
+  "admitUrl": "http://127.0.0.1:27020/api/v1/session/admit",
+  "gameId": "kenshi",
+  "enforceJoinGate": true,
+  "writeStatusPath": "/data/fork-status.json",
+  "connectPort": 23386
+}
