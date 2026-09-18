@@ -80,6 +80,9 @@ secrets.*
 *secrets*
 *credentials*
 *credential*
+# Source types named *CredentialStore* are code, not secrets
+!*CredentialStore.cs
+!**/*CredentialStore.cs
 *.pem
 *.key
 *.p12

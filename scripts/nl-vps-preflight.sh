@@ -56,8 +56,11 @@ if [[ -f "$fleet_env" ]]; then
     echo "FAIL: NL_FORK_PUBLIC_CONNECT_HOST missing (T2-lite)" >&2
     ok=0
   fi
+  if grep -qiE '^NL_PUBLIC_GA_LAUNCH_DEV=(true|1|yes)\s*$' "$fleet_env"; then
     echo "FAIL: fleet env must not force GA launch DEV on" >&2
     ok=0
+  else
+    echo "OK: GA launch DEV not forced on"
   fi
 fi
 
