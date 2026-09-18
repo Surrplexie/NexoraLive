@@ -61,6 +61,50 @@ public sealed class BusHostState
         }
     }
 
+    /// <summary>
+    /// Operator UI sends a partial profile. Merge onto the current profile so
+    /// start/save never wipe catalog, social, fork, and fleet fields back to defaults.
+    /// </summary>
+    public void MergeOperatorProfile(SessionProfileFile incoming)
+    {
+        ArgumentNullException.ThrowIfNull(incoming);
+        lock (_lock)
+        {
+            var p = CloneProfile(_profile);
+            p.StreamerId = string.IsNullOrWhiteSpace(incoming.StreamerId)
+                ? p.StreamerId
+                : incoming.StreamerId.Trim();
+            if (!string.IsNullOrWhiteSpace(incoming.Game))
+            {
+                p.Game = incoming.Game.Trim();
+            }
+
+            p.GameId = string.IsNullOrWhiteSpace(incoming.GameId) ? p.GameId : incoming.GameId.Trim();
+            if (!string.IsNullOrWhiteSpace(incoming.ConfigPath))
+            {
+                p.ConfigPath = incoming.ConfigPath.Trim();
+            }
+
+            if (!string.IsNullOrWhiteSpace(incoming.SourcePath))
+            {
+                p.SourcePath = incoming.SourcePath.Trim();
+            }
+
+            p.RconEndpoint = string.IsNullOrWhiteSpace(incoming.RconEndpoint) ? null : incoming.RconEndpoint.Trim();
+            p.NlActionEndpoint = string.IsNullOrWhiteSpace(incoming.NlActionEndpoint)
+                ? p.NlActionEndpoint
+                : incoming.NlActionEndpoint.Trim();
+            p.UseSessionBus = incoming.UseSessionBus;
+            p.AntiCheat = incoming.AntiCheat;
+            p.JoinGate = incoming.JoinGate;
+            p.AnomalyAutoMod = incoming.AnomalyAutoMod;
+            p.ForkOrchestratorEnabled = incoming.ForkOrchestratorEnabled;
+            p.UseDefaultDataPaths = incoming.UseDefaultDataPaths;
+            _profile = p;
+            NlSessionRunner.SaveProfile(NlPaths.SessionProfile, _profile);
+        }
+    }
+
     public void LoadBusDefaults(string? configPath = null)
     {
         var profile = GetProfile();

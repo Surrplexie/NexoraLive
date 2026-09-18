@@ -65,4 +65,26 @@ public class NlWebSocketTokenTests
 
         await readTask;
     }
+
+    [Fact]
+    public async Task TryInjectLine_DeliversEventWithoutSecondSocket()
+    {
+        var port = GetFreePort();
+        await using var listener = new NlWebSocketListenerEventSource("127.0.0.1", port);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var readTask = Task.Run(async () =>
+        {
+            await foreach (var evt in listener.ReadEventsAsync(cts.Token))
+            {
+                Assert.Equal("shoot", evt.Event.Name);
+                cts.Cancel();
+                return;
+            }
+        }, cts.Token);
+
+        await Task.Delay(80, CancellationToken.None);
+        Assert.True(listener.TryInjectLine("""{"nl":1,"event":"shoot","player":"Visitor"}"""));
+        await readTask;
+    }
 }

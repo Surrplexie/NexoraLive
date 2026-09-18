@@ -55,7 +55,7 @@ public sealed class NlTcpClientActionChannel : INlActionChannel, IAsyncDisposabl
 }
 
 /// <summary>NL.Server listens; game bridges connect and push NDJSON event lines.</summary>
-public sealed class NlTcpListenerEventSource : IGameEventSource, IAsyncDisposable
+public sealed class NlTcpListenerEventSource : IGameEventSource, IAsyncDisposable, ISessionEventLineInjector
 {
     private readonly TcpListener _listener;
     private readonly Channel<string> _lines;
@@ -81,6 +81,16 @@ public sealed class NlTcpListenerEventSource : IGameEventSource, IAsyncDisposabl
         var displayHost = NlListenHost.IsAllInterfaces(host) ? "0.0.0.0" : address.ToString();
         _log?.Invoke($"[nl tcp] listening on {displayHost}:{Port}");
         _acceptLoop = AcceptLoopAsync(_acceptLoopCts.Token);
+    }
+
+    public bool TryInjectLine(string line)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return false;
+        }
+
+        return _lines.Writer.TryWrite(line.TrimEnd('\r', '\n'));
     }
 
     public IGameEventSource CreateEventSource() =>

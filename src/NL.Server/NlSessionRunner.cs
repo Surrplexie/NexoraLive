@@ -26,6 +26,10 @@ public sealed class NlSessionRunner
 
     public ModerationService? Moderation { get; private set; }
 
+    private ISessionEventLineInjector? _lineInjector;
+
+    public bool TryInjectEventLine(string line) => _lineInjector?.TryInjectLine(line) ?? false;
+
     public static SessionProfileFile LoadProfile(string path)
     {
         if (!File.Exists(path))
@@ -79,6 +83,7 @@ public sealed class NlSessionRunner
         }
 
         await using var bootstrap = EventSourceFactory.Create(o, Write);
+        _lineInjector = bootstrap.LineInjector;
         IGameEventSource source = bootstrap.EventSource;
 
         if (o.AntiCheat)
@@ -186,6 +191,7 @@ public sealed class NlSessionRunner
             Write($"NL Server stopped. Decisions: {host.Decisions.Count}");
         }
 
+        _lineInjector = null;
         return 0;
     }
 

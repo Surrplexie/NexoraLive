@@ -8,15 +8,18 @@ public sealed class IntegrationBootstrap : IAsyncDisposable
 {
     public IGameEventSource EventSource { get; }
     public IActiveActionChannelProvider? ActionChannelProvider { get; }
+    public ISessionEventLineInjector? LineInjector { get; }
     private readonly IAsyncDisposable? _disposable;
 
     public IntegrationBootstrap(
         IGameEventSource eventSource,
         IActiveActionChannelProvider? actionChannelProvider = null,
-        IAsyncDisposable? disposable = null)
+        IAsyncDisposable? disposable = null,
+        ISessionEventLineInjector? lineInjector = null)
     {
         EventSource = eventSource;
         ActionChannelProvider = actionChannelProvider;
+        LineInjector = lineInjector;
         _disposable = disposable;
     }
 
@@ -71,7 +74,7 @@ public static class EventSourceFactory
     private static IntegrationBootstrap CreateTcp(string host, int port, Action<string>? log)
     {
         var listener = new NlTcpListenerEventSource(host, port, log);
-        return new IntegrationBootstrap(listener, disposable: listener);
+        return new IntegrationBootstrap(listener, disposable: listener, lineInjector: listener);
     }
 
     private static IntegrationBootstrap CreateWebSocket(string host, int port, Action<string>? log, string? busToken)
@@ -86,6 +89,7 @@ public static class EventSourceFactory
         return new IntegrationBootstrap(
             listener,
             actionChannelProvider: listener,
-            disposable: listener);
+            disposable: listener,
+            lineInjector: listener);
     }
 }

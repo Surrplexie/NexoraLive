@@ -1,8 +1,5 @@
-using System.Net.WebSockets;
-using System.Text;
 using NL.Moderation;
 using NL.Moderation.Core;
-using NL.Server.Core.Integration;
 
 namespace NL.Server;
 
@@ -70,79 +67,59 @@ public sealed class NlSpectatorService
             .ToList();
     }
 
-    public async Task<SpectatorTriggerResult> TriggerScenarioAsync(
+    public Task<SpectatorTriggerResult> TriggerScenarioAsync(
         string scenarioId,
         string clientKey,
         bool sessionRunning,
-        string bindHost,
-        int wsPort,
-        string busToken,
-        CancellationToken cancellationToken)
+        Func<string, bool> injectLine,
+        CancellationToken cancellationToken = default)
     {
+        _ = cancellationToken;
         if (!_settings.TriggersEnabled)
         {
-            return SpectatorTriggerResult.Fail(503, "Spectator triggers are disabled.");
+            return Task.FromResult(SpectatorTriggerResult.Fail(503, "Spectator triggers are disabled."));
         }
 
         if (!sessionRunning)
         {
-            return SpectatorTriggerResult.Fail(503, "Session is not running. Wait for the demo loop to start.");
+            return Task.FromResult(SpectatorTriggerResult.Fail(503, "Session is not running. Wait for the demo loop to start."));
         }
 
         var scenario = NlSpectatorScenarios.Find(scenarioId);
         if (scenario is null)
         {
-            return SpectatorTriggerResult.Fail(400, $"Unknown scenario '{scenarioId}'.");
+            return Task.FromResult(SpectatorTriggerResult.Fail(400, $"Unknown scenario '{scenarioId}'."));
         }
 
         if (!_rateLimiter.TryAcquire(clientKey))
         {
-            return SpectatorTriggerResult.Fail(429, "Rate limit exceeded. Try again in a minute.");
+            return Task.FromResult(SpectatorTriggerResult.Fail(429, "Rate limit exceeded. Try again in a minute."));
         }
 
         var line = NlSpectatorScenarios.ToNdjsonLine(scenario);
         try
         {
-            await InjectEventLineAsync(bindHost, wsPort, busToken, line, cancellationToken);
+            // In-process inject only. Opening a second WebSocket to the session bus
+            // was treated as a game bridge: it stole ActiveSession and logged
+            // connected/disconnected on every demo click.
+            if (!injectLine(line))
+            {
+                return Task.FromResult(SpectatorTriggerResult.Fail(503, "Session bus is not accepting injected events."));
+            }
         }
         catch (Exception ex)
         {
-            return SpectatorTriggerResult.Fail(503, $"Could not inject event: {ex.Message}");
+            return Task.FromResult(SpectatorTriggerResult.Fail(503, $"Could not inject event: {ex.Message}"));
         }
 
-        return SpectatorTriggerResult.Success(new
+        return Task.FromResult(SpectatorTriggerResult.Success(new
         {
             ok = true,
             scenarioId = scenario.Id,
             eventName = scenario.Event,
             player = scenario.Player,
             expectedDecision = scenario.ExpectedDecision,
-        });
-    }
-
-    internal static async Task InjectEventLineAsync(
-        string bindHost,
-        int wsPort,
-        string busToken,
-        string line,
-        CancellationToken cancellationToken)
-    {
-        var connectHost = bindHost is "0.0.0.0" or "+" or "*" ? "127.0.0.1" : bindHost;
-        var uri = new Uri(
-            $"ws://{connectHost}:{wsPort}{NlIntegrationProtocol.WebSocketPath}?token={Uri.EscapeDataString(busToken)}");
-
-        using var ws = new ClientWebSocket();
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(8));
-        await ws.ConnectAsync(uri, timeout.Token);
-
-        var payload = Encoding.UTF8.GetBytes(line);
-        await ws.SendAsync(payload, WebSocketMessageType.Text, endOfMessage: true, timeout.Token);
-
-        if (ws.State == WebSocketState.Open)
-        {
-            await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "spectator-trigger", timeout.Token);
-        }
+        }));
     }
 }
 

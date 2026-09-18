@@ -42,7 +42,7 @@ Visitors can fire preset scenarios from `/` (e.g. shoot → Block, ALL CAPS chat
 | `NL_SPECTATOR_TRIGGER_RATE_PER_MIN` | `12` | Max triggers per client IP per minute |
 | `NL_SPECTATOR_FEED_MAX` | `100` | Max decisions returned per feed request |
 
-Triggers inject events by opening a short-lived internal WebSocket client to the session bus (same path as game bridges). Requires an active session (`NL_DEMO_MODE` demo loop satisfies this).
+Triggers inject events **in-process** into the running session bus. They must not open a second WebSocket — that was treated as a game bridge connect/disconnect and stole the live action channel. Requires an active session (`NL_DEMO_MODE` demo loop satisfies this).
 
 ## Local development
 

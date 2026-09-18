@@ -99,6 +99,19 @@ public sealed class SessionHostService
 
     public bool IsRunning => State == SessionHostState.Running;
 
+    public bool TryInjectEventLine(string line)
+    {
+        lock (_lock)
+        {
+            if (State != SessionHostState.Running || _runner is null)
+            {
+                return false;
+            }
+
+            return _runner.TryInjectEventLine(line);
+        }
+    }
+
     private void AppendLog(string line)
     {
         lock (_lock)

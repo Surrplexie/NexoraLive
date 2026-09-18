@@ -2472,7 +2472,8 @@ app.MapPut("/api/v1/session/profile", async (BusHostState b, HttpRequest req) =>
         return Results.BadRequest(new { error = "Invalid profile JSON." });
     }
 
-    b.SaveProfile(profile);
+    // Partial operator payloads must merge — full replace resets non-form fields to defaults.
+    b.MergeOperatorProfile(profile);
     return Results.Ok(b.GetStatus(includeSecrets: true));
 });
 
@@ -2674,9 +2675,7 @@ app.MapPost("/api/v1/spectator/trigger", async (
         body.ScenarioId.Trim(),
         clientKey,
         bus.Sessions.IsRunning,
-        bus.BindHost,
-        bus.WsPort,
-        bus.BusToken,
+        bus.Sessions.TryInjectEventLine,
         ct);
 
     return Results.Json(result.Body, statusCode: result.StatusCode);

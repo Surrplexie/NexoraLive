@@ -84,9 +84,29 @@ public class NlSpectatorServiceTests
     {
         var service = new NlSpectatorService(new NlSpectatorSettings { TriggersEnabled = false });
         var result = await service.TriggerScenarioAsync(
-            "shoot", "127.0.0.1", sessionRunning: true, "127.0.0.1", 27021, "token", CancellationToken.None);
+            "shoot", "127.0.0.1", sessionRunning: true, _ => true, CancellationToken.None);
 
         Assert.Equal(503, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task TriggerScenario_InjectsWithoutOpeningWebSocket()
+    {
+        string? captured = null;
+        var service = new NlSpectatorService(new NlSpectatorSettings { TriggersEnabled = true });
+        var result = await service.TriggerScenarioAsync(
+            "shoot",
+            "127.0.0.1",
+            sessionRunning: true,
+            line =>
+            {
+                captured = line;
+                return true;
+            },
+            CancellationToken.None);
+
+        Assert.Equal(200, result.StatusCode);
+        Assert.Contains("shoot", captured);
     }
 }
 

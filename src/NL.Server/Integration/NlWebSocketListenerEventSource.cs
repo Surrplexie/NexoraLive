@@ -37,7 +37,7 @@ public sealed class NlWebSocketSession : INlActionChannel
 }
 
 /// <summary>NL.Server listens for WebSocket upgrades at <see cref="NlIntegrationProtocol.WebSocketPath"/>.</summary>
-public sealed class NlWebSocketListenerEventSource : IGameEventSource, IAsyncDisposable, IActiveActionChannelProvider
+public sealed class NlWebSocketListenerEventSource : IGameEventSource, IAsyncDisposable, IActiveActionChannelProvider, ISessionEventLineInjector
 {
     private readonly HttpListener _listener;
     private readonly Channel<string> _lines;
@@ -75,6 +75,16 @@ public sealed class NlWebSocketListenerEventSource : IGameEventSource, IAsyncDis
     }
 
     public INlActionChannel? GetActiveActionChannel() => ActiveSession;
+
+    public bool TryInjectLine(string line)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return false;
+        }
+
+        return _lines.Writer.TryWrite(line.TrimEnd('\r', '\n'));
+    }
 
     private async Task AcceptLoopAsync(CancellationToken cancellationToken)
     {
@@ -150,7 +160,12 @@ public sealed class NlWebSocketListenerEventSource : IGameEventSource, IAsyncDis
 
             var socket = wsContext.WebSocket;
             var session = new NlWebSocketSession(socket);
-            ActiveSession = session;
+            var existing = ActiveSession;
+            if (existing is null)
+            {
+                ActiveSession = session;
+            }
+
             _log?.Invoke("[nl ws] bridge connected");
 
             var buffer = new byte[8192];
