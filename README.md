@@ -1,6 +1,6 @@
 # NexoraLive (NL)
 
-**Status:** public-line **code complete** — local dogfood + RimWorld path. **Path A funded $50/mo (2026-09-16)**; still no live domain. See [`docs/NL_PUBLIC_LINE.md`](docs/NL_PUBLIC_LINE.md). No new titles until a public URL exists and a second session is attempted.
+**Status (2026-09-19):** Path A **live** on `https://play.20062006.xyz` — health OK, T2-lite ready, RimWorld operator session + fan join **Completed** (mock Steam64 for demo). Proof: [`docs/PATH_A_PROOF.md`](docs/PATH_A_PROOF.md). **Next:** session 2, then restore live ownership. No new titles until session 2.
 
 NexoraLive is a streamer-oriented session rules system. You author plain-text `.nle` configs; a shared rule engine evaluates gameplay (or hotkey) events and returns **Allow**, **Block**, or **Warn**. This repository implements that core loop plus integrations toward **NL Server** (session control) and **NL Fork** (licensed game snapshots on NL infrastructure).
 

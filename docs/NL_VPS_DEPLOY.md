@@ -107,20 +107,28 @@ powershell -File scripts/nl-production-dogfood-validate.ps1 `
 
 ## Upgrade / redeploy
 
-On VPS:
+On VPS (`/opt/NexoraLive`):
 
 ```bash
+# Stop (also removes leftover nl-fork-* containers)
+sudo bash scripts/nl-vps-stack-down.sh
+
+# Start without rebuild (env already generated)
+sudo docker compose -f docker/docker-compose.vps-production.yml --env-file docker/.env.vps up -d
+
+# Pull + rebuild images + start
 cd /opt/NexoraLive
-git pull --ff-only
-bash scripts/nl-vps-deploy.sh
+sudo git pull --ff-only
+sudo bash scripts/nl-vps-deploy.sh
 ```
 
-Stop:
+Stop only:
 
 ```bash
-bash scripts/nl-vps-stack-down.sh
+sudo bash scripts/nl-vps-stack-down.sh
 ```
 
+Live Path A proof (this deployment): [PATH_A_PROOF.md](PATH_A_PROOF.md).
 ---
 
 ## OAuth (after base deploy)

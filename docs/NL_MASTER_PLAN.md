@@ -8,7 +8,7 @@ vision. Use this doc to orient; use linked docs for implementation detail.
 
 **Status legend:** ✅ built / validated in repo · 🟡 partial or operator-deploy pending · ❌ not started
 
-**Last updated:** 2026-09-15 — operator Path B blocker (no domain/VPS). Do not start T1 Cities until a public URL exists and session 2 is attempted. See `docs/NL_PUBLIC_LINE.md` and `vault/canon/NEXT-90.md`.
+**Last updated:** 2026-09-19 — Path A live; session 1 join Completed. Next: session 2. See `docs/PATH_A_PROOF.md`.
 
 ---
 
@@ -483,12 +483,12 @@ Ordered by dependency and conversation priority:
 
 | Priority | Work | Track |
 |----------|------|-------|
-| 1 | **Operator VPS signoff** on real domain — **or keep the 2026-09-15 Path B blocker dated** (`docs/NL_PUBLIC_LINE.md`) | D |
-| 2 | After URL: one RimWorld session, then **attempt a second**. No third title to avoid that metric | E |
+| 1 | **Session 2** on `play.20062006.xyz` (then restore live ownership) — [PATH_A_PROOF.md](PATH_A_PROOF.md) | D/E |
+| 2 | Set `NL_PUBLIC_BASE_URL`; optional native RimWorld connect to `:25555` | D |
 | 3 | ~~**T2-lite** — public `forkConnectEndpoint` on VPS for RimWorld~~ ✅ | F |
 | 4 | ~~**T1 Kenshi** — second mod-backed title~~ ✅ | F |
 | 5 | **T1 Cities: Skylines** — **frozen** until session 2 exists | F |
-| — | ~~T0 adapter template~~ ✅ · ~~T1 RimWorld~~ ✅ · ~~public-line code path~~ ✅ | F/D |
+| — | ~~T0 adapter template~~ ✅ · ~~T1 RimWorld~~ ✅ · ~~public-line code path~~ ✅ · ~~Path A session 1~~ ✅ | F/D |
 
 **Defer** marketing/support claims for pure SP AAA titles (Hollow Knight, Witcher 3) until T5/T7.
 

@@ -2,7 +2,7 @@
 
 Get NL onto a real URL with **dev flags off** and **RimWorld** as the first public title.
 
-**Hardware (2026-09-17):** domain `20062006.xyz` + OVH US VPS-2 (`40.160.88.114`, Ubuntu 24.04, Virginia). Apex marketing can stay on Workers. **Next:** DNS `play.` / relays → that IP (**DNS only / grey cloud**), open ports, bootstrap NL. Do not start Cities / Away. Session 2 is N/A until session 1 on `https://play.20062006.xyz`.
+**Path A live (2026-09-18/19):** `https://play.20062006.xyz` — health OK, T2-lite `ready:true` (`rimworld://play.20062006.xyz:25555`), streamer session + fan join **Completed**. Full checklist: [PATH_A_PROOF.md](PATH_A_PROOF.md). Demo still uses **mock** ownership / 0 followers — revert before GA. **Next:** session 2. Do not start Cities / Away.
 
 This is the week-2 gate: a stranger can open `/play.html`, a streamer can sign up, and a RimWorld session can start on NL-hosted infrastructure.
 
@@ -94,12 +94,23 @@ These cannot be finished in git:
 
 - [x] Domain — `20062006.xyz` (Cloudflare)
 - [x] VPS — OVH US VPS-2 `40.160.88.114` (Virginia, Ubuntu 24.04, 8 GB)
-- [ ] DNS A records for `play.` + relays → VPS IP (**grey cloud**)
-- [ ] OVH + ufw ports 80/443/3478/25555
-- [ ] Bootstrap / deploy → `https://play.20062006.xyz`
-- [ ] `STEAM_WEB_API_KEY` in `docker/vps-production-fleet.env`
+- [x] DNS A records for `play.` + relays → VPS IP (**grey cloud**)
+- [x] OVH + ufw ports 80/443/3478/25555
+- [x] Bootstrap / deploy → `https://play.20062006.xyz`
+- [x] `STEAM_WEB_API_KEY` present (rotate if pasted in chat)
 - [ ] Twitch/Discord OAuth redirect URIs (after base deploy)
-- [ ] Push / sync GitHub so VPS clone is current
-- [ ] Validation PASSED + RimWorld session 1
+- [x] GitHub sync for CredentialStore build fix (`9562b28`)
+- [x] RimWorld session 1 + fan join **Completed** (mock Steam64) — [PATH_A_PROOF.md](PATH_A_PROOF.md)
+- [ ] `NL_PUBLIC_BASE_URL=https://play.20062006.xyz` (manifest still may show 127.0.0.1)
+- [ ] Session 2
+- [ ] Restore live ownership / followers=50 when demo is boring
+
+### Docker down / up (VPS, `/opt/NexoraLive`)
+
+```bash
+sudo bash scripts/nl-vps-stack-down.sh
+sudo docker compose -f docker/docker-compose.vps-production.yml --env-file docker/.env.vps up -d
+# full rebuild: sudo bash scripts/nl-vps-deploy.sh
+```
 
 Then: attempt a **second** session. If the URL exists and session 2 never happens, hobby or change wedge — do not add a title.
