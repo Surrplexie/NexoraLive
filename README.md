@@ -1,6 +1,6 @@
 # NexoraLive (NL)
 
-**Status (2026-09-19):** Path A **live** on `https://play.20062006.xyz` — health OK, T2-lite ready, RimWorld operator session + fan join **Completed** (mock Steam64 for demo). Proof: [`docs/PATH_A_PROOF.md`](docs/PATH_A_PROOF.md). **Next:** session 2, then restore live ownership. No new titles until session 2.
+**Status (2026-09-20):** Path A **live** on `https://play.20062006.xyz` — health OK, T2-lite ready, sessions **1 + 2** join Completed (mock Steam64). Proof: [`docs/PATH_A_PROOF.md`](docs/PATH_A_PROOF.md) · log: [`docs/PATH_A_SESSION_LOG.md`](docs/PATH_A_SESSION_LOG.md). **Next:** restore live ownership. No new titles until live admit is boring.
 
 NexoraLive is a streamer-oriented session rules system. You author plain-text `.nle` configs; a shared rule engine evaluates gameplay (or hotkey) events and returns **Allow**, **Block**, or **Warn**. This repository implements that core loop plus integrations toward **NL Server** (session control) and **NL Fork** (licensed game snapshots on NL infrastructure).
 
