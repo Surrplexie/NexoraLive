@@ -39,7 +39,7 @@ public static class DogfoodSetup
         profile.GameId = resolvedGameId;
         profile.Game = bridgeGame;
         profile.GameMajorVersion ??= "1.0";
-        profile.PlatformAppId = ResolvePlatformAppId(resolvedGameId, profile.PlatformAppId);
+        profile.PlatformAppId = ResolveSteamAppId(resolvedGameId, profile.PlatformAppId);
         profile.ForkOrchestratorEnabled = true;
         profile.PartnershipGateEnabled = false;
         profile.RequireGameOwnership = true;
@@ -200,7 +200,8 @@ public static class DogfoodSetup
         return string.IsNullOrWhiteSpace(value) ? fallback : value;
     }
 
-    private static string ResolvePlatformAppId(string gameId, string? existing)
+    /// <summary>Maps NL game id → Steam app id for live ownership (public RimWorld = 294100).</summary>
+    public static string ResolveSteamAppId(string gameId, string? existing = null)
     {
         var id = gameId.Trim().ToLowerInvariant();
         var fromGame = id switch

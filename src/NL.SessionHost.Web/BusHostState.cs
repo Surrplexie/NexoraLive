@@ -80,6 +80,17 @@ public sealed class BusHostState
             }
 
             p.GameId = string.IsNullOrWhiteSpace(incoming.GameId) ? p.GameId : incoming.GameId.Trim();
+            // Operator form does not send platformAppId — keep Steam app id in sync with gameId
+            // so live ownership never checks a stale dogfood id (e.g. hello-fork).
+            if (!string.IsNullOrWhiteSpace(incoming.PlatformAppId))
+            {
+                p.PlatformAppId = incoming.PlatformAppId.Trim();
+            }
+            else if (!string.IsNullOrWhiteSpace(p.GameId))
+            {
+                p.PlatformAppId = DogfoodSetup.ResolveSteamAppId(p.GameId, p.PlatformAppId);
+            }
+
             if (!string.IsNullOrWhiteSpace(incoming.ConfigPath))
             {
                 p.ConfigPath = incoming.ConfigPath.Trim();

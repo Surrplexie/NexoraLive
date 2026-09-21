@@ -65,4 +65,4 @@ curl -fsS https://play.20062006.xyz/api/v1/t2-lite/status
 4. Optional: native Together to `rimworld://play.20062006.xyz:25555`  
 5. Twitch OAuth / followers floor when ready  
 
-See also: [NL_PUBLIC_LINE.md](NL_PUBLIC_LINE.md) · [NL_IDEAL_DEMO_GUIDE.md](NL_IDEAL_DEMO_GUIDE.md) · [NL_VPS_DEPLOY.md](NL_VPS_DEPLOY.md)
+See also: [NL_LIVE_ADMIT.md](NL_LIVE_ADMIT.md) · [NL_PUBLIC_LINE.md](NL_PUBLIC_LINE.md) · [NL_IDEAL_DEMO_GUIDE.md](NL_IDEAL_DEMO_GUIDE.md) · [NL_VPS_DEPLOY.md](NL_VPS_DEPLOY.md)

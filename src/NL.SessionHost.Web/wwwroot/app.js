@@ -205,12 +205,19 @@ document.getElementById("save-profile")?.addEventListener("click", async () => {
 
 document.getElementById("load-dogfood-profile")?.addEventListener("click", async () => {
   try {
-    const data = await api("/api/v1/dogfood/setup", { method: "POST" });
+    // Prefer the Game id field; default to RimWorld (public line) so live Steam
+    // never verifies the hello-fork placeholder app id.
+    const gameId = document.getElementById("game-id").value.trim() || "rimworld";
+    const data = await api("/api/v1/dogfood/setup", {
+      method: "POST",
+      body: JSON.stringify({ gameId }),
+    });
     _lockForm = false;
     _formDirty = false;
     renderStatus(data, { applyProfile: true, forceProfile: true });
     _lockForm = true;
-    document.getElementById("status").textContent = "Dogfood profile loaded — click Start session.";
+    document.getElementById("status").textContent =
+      `Dogfood profile loaded (${gameId}) — check streamer id, then Start session.`;
   } catch (e) {
     showActionError(e);
   }

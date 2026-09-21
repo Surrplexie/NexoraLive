@@ -83,6 +83,9 @@ Verified in container (`docker inspect` … `Config.Env`):
 
 ## Next
 
-1. Optional native Together connect
-2. Wire Twitch OAuth when ready; then raise `NL_FLEET_MIN_TWITCH_FOLLOWERS`
-3. Keep freeze: no Cities / new titles until live admit is boring
+1. Keep profile on `platformAppId=294100` (operator Load dogfood now defaults to rimworld after deploy)
+2. Optional: mock Steam64 deny once; native Together
+3. Twitch OAuth → then followers=50 — [NL_LIVE_ADMIT.md](NL_LIVE_ADMIT.md) Part 4
+4. Keep freeze: no Cities / new titles
+
+Full checklist: [NL_LIVE_ADMIT.md](NL_LIVE_ADMIT.md)

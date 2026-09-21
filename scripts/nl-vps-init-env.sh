@@ -30,6 +30,27 @@ sed -i "s|support@yourdomain.com|${support_email}|g" "$fleet_env"
 sed -i "s|change-me-turn-secret|${turn_secret}|g" "$fleet_env" "$caddy_env"
 sed -i "s|NL_OPERATOR_KEY=change-me|NL_OPERATOR_KEY=${operator_key}|g" "$fleet_env"
 sed -i "s|NL_BUS_TOKEN=change-me|NL_BUS_TOKEN=${bus_token}|g" "$fleet_env"
+
+# Public HTTP/WS (session manifest) — must not stay as yourdomain placeholders
+if ! grep -q '^NL_PUBLIC_HTTP=' "$fleet_env"; then
+  printf '\nNL_PUBLIC_HTTP=https://%s\n' "$play_domain" >> "$fleet_env"
+fi
+if ! grep -q '^NL_PUBLIC_WS=' "$fleet_env"; then
+  printf 'NL_PUBLIC_WS=wss://%s/nl/v1\n' "$play_domain" >> "$fleet_env"
+fi
+if ! grep -q '^NL_PUBLIC_HOST=' "$fleet_env"; then
+  printf 'NL_PUBLIC_HOST=%s\n' "$play_domain" >> "$fleet_env"
+fi
+if ! grep -q '^NL_OWNERSHIP_MODE=' "$fleet_env"; then
+  printf 'NL_OWNERSHIP_MODE=live\n' >> "$fleet_env"
+fi
+if ! grep -q '^NL_SOCIAL_MODE=' "$fleet_env"; then
+  printf 'NL_SOCIAL_MODE=live\n' >> "$fleet_env"
+fi
+if ! grep -q '^NL_FLEET_MIN_TWITCH_FOLLOWERS=' "$fleet_env"; then
+  printf 'NL_FLEET_MIN_TWITCH_FOLLOWERS=0\n' >> "$fleet_env"
+fi
+
 if [[ -n "$steam_key" ]]; then
   sed -i "s|STEAM_WEB_API_KEY=|STEAM_WEB_API_KEY=${steam_key}|g" "$fleet_env"
 fi
