@@ -61,15 +61,28 @@ Verified in container (`docker inspect` … `Config.Env`):
 
 ---
 
-## Still demo / not done
+## Session 3 — live Steam ownership — 2026-09-21 (~05:19Z)
 
-- Mock ownership/social + followers=0 (and any compose GA mock overrides) — revert before live GA
+| | |
+|--|--|
+| Result | **Pass** — join `success:true`, `step:Completed`, admit `Allow` |
+| Player id | `sp-live-1` |
+| Platform user | real Steam64 `76561199353783794` (not mock) |
+| Streamer | `surrplexie-7c0056` — LIVE |
+| Connect | `rimworld://play.20062006.xyz:25555` |
+| Ownership | Live Steam Web API; profile `platformAppId` **`294100`** (RimWorld) |
+| Notes | Earlier deny `Steam app hello-fork not in library` was stale dogfood `platformAppId`. Fixed via `POST /api/v1/dogfood/setup` with `{ gameId: "rimworld" }` then re-set streamer / join gate / Start. |
+
+---
+
+## Still open
+
 - Native RimWorld/Together to `:25555` — optional
-- Twitch/Discord OAuth redirect URIs — not wired
-- Live Steam join (real Steam64 + `NL_OWNERSHIP_MODE=live`) — **next**
+- Twitch/Discord OAuth + follower floor 50 — not wired (keep followers=0 until then)
+- Optional: one deny with mock Steam64 `76561198000000001` to prove live gate
 
 ## Next
 
-1. Restore live ownership / social (Steam key, undo mock compose overrides)
-2. Optional native Together connect
+1. Optional native Together connect
+2. Wire Twitch OAuth when ready; then raise `NL_FLEET_MIN_TWITCH_FOLLOWERS`
 3. Keep freeze: no Cities / new titles until live admit is boring

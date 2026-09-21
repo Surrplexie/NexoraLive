@@ -2,7 +2,7 @@
 
 Get NL onto a real URL with **dev flags off** and **RimWorld** as the first public title.
 
-**Path A live (2026-09-18/20):** `https://play.20062006.xyz` — health OK, T2-lite `ready:true` (`rimworld://play.20062006.xyz:25555`), sessions **1 + 2** Completed. Proof: [PATH_A_PROOF.md](PATH_A_PROOF.md) · [PATH_A_SESSION_LOG.md](PATH_A_SESSION_LOG.md). Demo still uses **mock** ownership / 0 followers — revert before GA. **Next:** live ownership. Do not start Cities / Away.
+**Path A live (2026-09-18/21):** `https://play.20062006.xyz` — sessions 1–2 (mock) + **live Steam** join Completed (`sp-live-1`, app 294100). Proof: [PATH_A_PROOF.md](PATH_A_PROOF.md) · [PATH_A_SESSION_LOG.md](PATH_A_SESSION_LOG.md). Followers still 0 until Twitch OAuth. **Next:** optional native Together. Do not start Cities / Away.
 
 This is the week-2 gate: a stranger can open `/play.html`, a streamer can sign up, and a RimWorld session can start on NL-hosted infrastructure.
 
@@ -103,7 +103,8 @@ These cannot be finished in git:
 - [x] RimWorld session 1 + fan join **Completed** (mock Steam64) — [PATH_A_PROOF.md](PATH_A_PROOF.md)
 - [x] Public HTTP/WS + `NL_FORK_PUBLIC_CONNECT_HOST` (no loopback in manifest) — 2026-09-20
 - [x] Session 2 (`sp-fan-2`) — [PATH_A_SESSION_LOG.md](PATH_A_SESSION_LOG.md)
-- [ ] Restore live ownership / followers=50 when demo is boring
+- [x] Live Steam ownership join (`sp-live-1`, app `294100`) — 2026-09-21
+- [ ] Twitch/Discord OAuth + followers=50 when social is wired
 
 ### Docker down / up (VPS, `/opt/NexoraLive`)
 

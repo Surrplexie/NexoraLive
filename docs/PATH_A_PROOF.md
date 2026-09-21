@@ -26,23 +26,18 @@ Session-by-session detail: [PATH_A_SESSION_LOG.md](PATH_A_SESSION_LOG.md).
 | **Session 1** fan join | `success:true`, `step:Completed`, admit Allow, clipboard `rimworld://play.20062006.xyz:25555` | 2026-09-19 (~02:47Z) |
 | Public URL env | `NL_PUBLIC_HTTP` / `NL_PUBLIC_WS` / `NL_FORK_PUBLIC_CONNECT_HOST` → `play.20062006.xyz` in container; manifest `httpBaseUrl` HTTPS public | 2026-09-20 |
 | **Session 2** fan join | Player `sp-fan-2`, mock Steam64 `76561198000000001`, Completed; public fork URI | 2026-09-20 (~07:30Z) |
+| **Session 3** live Steam | Player `sp-live-1`, Steam64 `76561199353783794`, app `294100`, Completed / Allow | 2026-09-21 (~05:19Z) |
 
-## Demo overrides still on the box (revert before real GA)
+## Live ownership status
 
-Temporary for first two-person pass ([NL_IDEAL_DEMO_GUIDE.md](NL_IDEAL_DEMO_GUIDE.md) §1.4):
-
-- `NL_FLEET_MIN_TWITCH_FOLLOWERS=0`
-- `NL_OWNERSHIP_MODE=mock` / `NL_SOCIAL_MODE=mock`
-- Compose may still have `NL_GA_REQUIRE_LIVE_IDENTITY=false`, `NL_GA_ALLOW_MOCK_IDENTITY=true`
-
-Restore live Steam/social + follower floor **50** when the admit loop is boring.
+- Steam Web API live; RimWorld checked as app **`294100`** (not `hello-fork`)
+- `NL_FLEET_MIN_TWITCH_FOLLOWERS=0` until Twitch OAuth is wired
 
 ## Known gaps
 
 - Native RimWorld/Together connect to `:25555` optional — not required to count NL admit
 - Twitch/Discord OAuth redirect URIs not wired
 - Apex Worker marketing page separate from `play.`
-- Live ownership cutover not done
 
 ## Docker down / up (on the VPS)
 
@@ -66,7 +61,8 @@ curl -fsS https://play.20062006.xyz/api/v1/t2-lite/status
 
 1. ~~Public HTTP / fork host (no loopback in manifest)~~ ✅ 2026-09-20  
 2. ~~**Session 2**~~ ✅ 2026-09-20 — see [PATH_A_SESSION_LOG.md](PATH_A_SESSION_LOG.md)  
-3. Optional: native connect to `rimworld://play.20062006.xyz:25555`  
-4. Revert mock → live ownership when ready  
+3. ~~Live Steam ownership~~ ✅ 2026-09-21 (`sp-live-1`)  
+4. Optional: native Together to `rimworld://play.20062006.xyz:25555`  
+5. Twitch OAuth / followers floor when ready  
 
 See also: [NL_PUBLIC_LINE.md](NL_PUBLIC_LINE.md) · [NL_IDEAL_DEMO_GUIDE.md](NL_IDEAL_DEMO_GUIDE.md) · [NL_VPS_DEPLOY.md](NL_VPS_DEPLOY.md)
