@@ -104,7 +104,7 @@ These cannot be finished in git:
 - [x] Session 2 (`sp-fan-2`) — [PATH_A_SESSION_LOG.md](PATH_A_SESSION_LOG.md)
 - [x] Live Steam ownership join (`sp-live-1`, app `294100`) — 2026-09-21
 - [x] Public GA launch `devMode:false` + support contact on VPS — probed 2026-09-22
-- [ ] Operator backup + GA signoff + `PUBLIC READY (VPS)` — [NL_PUBLIC_READY.md](NL_PUBLIC_READY.md)
+- [x] Operator backup + GA signoff + `PUBLIC READY (VPS)` — 2026-09-22 [PATH_A_SESSION_LOG.md](PATH_A_SESSION_LOG.md)
 - [ ] Deploy rimworld `platformAppId` Save-profile fix to VPS (if hello-fork still sticks)
 - [ ] Twitch/Discord OAuth + followers=50 when social is wired
 

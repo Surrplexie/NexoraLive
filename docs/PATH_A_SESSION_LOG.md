@@ -81,26 +81,21 @@ Verified in container (`docker inspect` … `Config.Env`):
 - Twitch/Discord OAuth + follower floor 50 — not wired (keep followers=0 until then)
 - Optional: one deny with mock Steam64 `76561198000000001` to prove live gate
 
-## Public ready track — 2026-09-22
+## Public ready — **PASSED** 2026-09-22
 
-Probed live host (no operator key from this agent):
+`scripts/nl-public-ready-finish.ps1` → **`PUBLIC READY (VPS)`**
 
-| Check | Result |
-|-------|--------|
-| health | ok · publicMode · hardening · not demo |
-| identity | Live · steamConfigured · publicBaseUrl correct |
-| t2-lite | ready · `rimworld://play.20062006.xyz:25555` |
-| public GA | enabled · **devMode=false** · support `support@20062006.xyz` |
-| legal | enabled · 6 docs |
+| Gate | Result |
+|------|--------|
+| Fleet / production_ready | PASS |
+| Legal compliance (Phase 13) | PASS |
+| Public GA launch (Phase 14) | PASS |
 
-**Still needs operator key:** backup + GA signoff + Phase 14 validation → `PUBLIC READY (VPS)`.
-
-Guide: [NL_PUBLIC_READY.md](NL_PUBLIC_READY.md)  
-Script: `scripts/nl-public-ready-cutover.ps1`
+Host: `https://play.20062006.xyz` · GA `devMode=false` · support `support@20062006.xyz`
 
 ## Next
 
-1. Run `nl-public-ready-cutover.ps1 -OperatorKey …` (or `/public-ga-launch-ops.html`)
-2. Keep profile on `platformAppId=294100`
-3. Twitch OAuth → followers=50 later
-4. Keep freeze: no Cities / new titles
+1. Optional: free leftover forks on VPS (`docker rm` nl-fork-*)
+2. Twitch OAuth → followers=50 later
+3. Keep freeze: no Cities / new titles
+4. Optional native Together

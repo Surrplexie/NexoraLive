@@ -74,6 +74,6 @@ powershell -File scripts/nl-public-ga-launch-validate.ps1 -OperatorKey "<key>"
 - [x] Runbook + deploy README
 - [x] Production dogfood local gate — [`docs/NL_PRODUCTION_DOGFOOD.md`](NL_PRODUCTION_DOGFOOD.md)
 - [x] Public-line code path — [`docs/NL_PUBLIC_LINE.md`](NL_PUBLIC_LINE.md) (RimWorld first title, fork callback ports, git allowlist for `docker/`)
-- [ ] Production VPS signoff with `NL_PUBLIC_GA_LAUNCH_DEV=false` — Path A host is live (`devMode:false` probed 2026-09-22); finish backup+signoff via [NL_PUBLIC_READY.md](NL_PUBLIC_READY.md) / `scripts/nl-public-ready-cutover.ps1`
+- [x] Production VPS signoff with `NL_PUBLIC_GA_LAUNCH_DEV=false` — **PUBLIC READY (VPS)** 2026-09-22 on `play.20062006.xyz`
 
 See also: [`docs/NL_PUBLIC_GA_LAUNCH_RUNBOOK.md`](NL_PUBLIC_GA_LAUNCH_RUNBOOK.md)
