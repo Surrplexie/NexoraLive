@@ -173,13 +173,24 @@ try {
     Invoke-NlApi GET "/health" | Out-Null
 
     Write-Host "Clearing existing fork sessions before load test..." -ForegroundColor DarkGray
-    $existing = @(Invoke-NlApi GET "/api/v1/fork/orchestrator/sessions")
-    foreach ($s in $existing) {
-        if ($s.sessionId) {
-            try { Invoke-NlApi POST ("/api/v1/fork/orchestrator/destroy/{0}" -f $s.sessionId) | Out-Null } catch { }
+    for ($clearRound = 1; $clearRound -le 5; $clearRound++) {
+        $existing = @(Invoke-NlApi GET "/api/v1/fork/orchestrator/sessions")
+        if ($existing.Count -eq 0) { break }
+        foreach ($s in $existing) {
+            if ($s.sessionId) {
+                try { Invoke-NlApi POST ("/api/v1/fork/orchestrator/destroy/{0}" -f $s.sessionId) | Out-Null } catch { }
+            }
         }
+        Write-Host ("  clear round {0}: destroyed {1} session(s), waiting..." -f $clearRound, $existing.Count) -ForegroundColor DarkGray
+        Start-Sleep -Seconds 3
     }
-    Start-Sleep -Seconds 2
+    $left = @(Invoke-NlApi GET "/api/v1/fork/orchestrator/sessions").Count
+    if ($left -gt 0) {
+        Write-Warning ("Still {0} sessions after clear - use unique run ids below; consider: docker rm -f nl-fork-*" -f $left)
+    }
+
+    $runTag = Get-Date -Format "HHmmss"
+    Write-Host ("Load-test run tag: {0} (unique streamer ids)" -f $runTag) -ForegroundColor DarkGray
 
     $settings = Invoke-NlApi GET "/api/v1/fleet/settings"
     if (-not $settings.enabled) {
@@ -194,7 +205,11 @@ try {
     Write-Host ("Orchestrator mode: {0}" -f $orch.mode)
     $isRealProvisioner = $orch.mode -in @("Docker", "Kubernetes")
     $createTimeoutSec = if ($isRealProvisioner) { 180 } else { 120 }
-    $createDelayMs = if ($isRealProvisioner) { 150 } else { 0 }
+    $createDelayMs = if ($isRealProvisioner) {
+        # VPS default NL_FLEET_FORK_CREATE_RATE_PER_MIN=30 -> need ~2.1s between creates
+        # unless the operator raised the rate for load testing (scale env uses 200).
+        if ($env:NL_LOADTEST_CREATE_DELAY_MS) { [int]$env:NL_LOADTEST_CREATE_DELAY_MS } else { 2200 }
+    } else { 0 }
 
     $created = @()
     $latencies = New-Object System.Collections.Generic.List[double]
@@ -215,20 +230,31 @@ try {
 
     function Try-CreateForkSession([string]$StreamerId) {
         $t = [System.Diagnostics.Stopwatch]::StartNew()
-        try {
-            $r = Invoke-NlApi POST "/api/v1/fork/orchestrator/create" (New-ForkCreateBody $StreamerId) -TimeoutSec $createTimeoutSec
-            $t.Stop()
-            return @{ Ok = $true; SessionId = $r.sessionId; Ms = $t.Elapsed.TotalMilliseconds }
-        } catch {
-            return @{ Ok = $false; Error = $_.Exception.Message }
+        $attempts = 0
+        while ($attempts -lt 8) {
+            $attempts++
+            try {
+                $r = Invoke-NlApi POST "/api/v1/fork/orchestrator/create" (New-ForkCreateBody $StreamerId) -TimeoutSec $createTimeoutSec
+                $t.Stop()
+                return @{ Ok = $true; SessionId = $r.sessionId; Ms = $t.Elapsed.TotalMilliseconds }
+            } catch {
+                $msg = $_.Exception.Message
+                if ($msg -match 'rate limit' -and $attempts -lt 8) {
+                    Write-Host ("  rate limited on {0}; sleeping 5s (attempt {1}/8)..." -f $StreamerId, $attempts) -ForegroundColor DarkYellow
+                    Start-Sleep -Seconds 5
+                    continue
+                }
+                return @{ Ok = $false; Error = $msg }
+            }
         }
+        return @{ Ok = $false; Error = "rate limit retries exhausted" }
     }
 
     $provisionLabel = if ($isRealProvisioner) { "real container forks" } else { "mock/process" }
     if ($isRealProvisioner) {
         Write-Host "Warming up Docker/Kubernetes provisioner (3 sessions)..." -ForegroundColor DarkGray
         for ($w = 1; $w -le 3; $w++) {
-            $warm = Try-CreateForkSession ("warmup-{0}" -f $w)
+            $warm = Try-CreateForkSession ("warmup-{0}-{1}" -f $runTag, $w)
             if ($warm.Ok) { $created += $warm.SessionId }
             Start-Sleep -Milliseconds 500
         }
@@ -236,7 +262,7 @@ try {
 
     Write-Host ("Creating {0} fork sessions ({1})..." -f $ConcurrentSessions, $provisionLabel) -ForegroundColor Yellow
     for ($i = 1; $i -le $ConcurrentSessions; $i++) {
-        $sid = "load-{0:D4}" -f $i
+        $sid = "load-{0}-{1:D4}" -f $runTag, $i
         $result = Try-CreateForkSession $sid
         if ($result.Ok) {
             $latencies.Add($result.Ms) | Out-Null
@@ -245,14 +271,14 @@ try {
             Write-Warning ("Create {0} failed: {1}" -f $sid, $result.Error)
         }
         if ($createDelayMs -gt 0) { Start-Sleep -Milliseconds $createDelayMs }
-        if ($i % 25 -eq 0) { Write-Host ("  ... {0} / {1}" -f $i, $ConcurrentSessions) }
+        if ($i % 25 -eq 0) { Write-Host ("  ... {0} / {1} (created={2})" -f $i, $ConcurrentSessions, $created.Count) }
     }
 
     if ($isRealProvisioner -and $created.Count -lt $ConcurrentSessions) {
         $need = $ConcurrentSessions - $created.Count
         Write-Host ("Retrying with extra streamer IDs (need {0} more)..." -f $need) -ForegroundColor Yellow
         for ($j = 1; $j -le ($need + 20) -and $created.Count -lt $ConcurrentSessions; $j++) {
-            $sid = "load-retry-{0:D4}" -f $j
+            $sid = "load-{0}-r{1:D4}" -f $runTag, $j
             $result = Try-CreateForkSession $sid
             if ($result.Ok) {
                 $latencies.Add($result.Ms) | Out-Null
@@ -266,7 +292,7 @@ try {
     while ($isRealProvisioner -and $topUp -lt 30) {
         $activeList = @(Invoke-NlApi GET "/api/v1/fork/orchestrator/sessions")
         if ($activeList.Count -ge $ConcurrentSessions) { break }
-        $sid = "load-topup-{0:D4}" -f $topUp
+        $sid = "load-{0}-t{1:D4}" -f $runTag, $topUp
         $result = Try-CreateForkSession $sid
         if ($result.Ok) {
             $latencies.Add($result.Ms) | Out-Null
@@ -287,28 +313,33 @@ try {
     Write-Host ("Running admit burst ({0} requests)..." -f $AdmitBurst) -ForegroundColor Yellow
     $admitOk = 0
     $admitFail = 0
-    $jobs = 1..$AdmitBurst | ForEach-Object {
-        Start-Job -ScriptBlock {
-            param($url, $idx)
+    # Sequential + retry: parallel Start-Job against a live host often loses 1/50
+    # to timeouts/rate limits and fails the 99% admit SLO (49/50 = 0.98).
+    for ($idx = 1; $idx -le $AdmitBurst; $idx++) {
+        $ok = $false
+        for ($attempt = 1; $attempt -le 4 -and -not $ok; $attempt++) {
             $body = @{
                 playerId = "sp-load-$idx"
                 displayName = "Load SP $idx"
                 platform = "steam"
                 platformUserId = "76561198000000001"
+                atOwnRiskAcknowledged = $true
+                gameId = "hello-fork"
             } | ConvertTo-Json -Compress
             try {
-                Invoke-RestMethod -Uri ($url + "/api/v1/session/admit") -Method POST -Body $body -ContentType "application/json" -TimeoutSec 60 | Out-Null
-                return $true
+                Invoke-RestMethod -Uri ($BaseUrl.TrimEnd('/') + "/api/v1/session/admit") `
+                    -Method POST -Body $body -ContentType "application/json" -TimeoutSec 60 | Out-Null
+                $ok = $true
             } catch {
-                return $false
+                if ($attempt -lt 4) { Start-Sleep -Milliseconds (200 * $attempt) }
             }
-        } -ArgumentList $BaseUrl, $_
+        }
+        if ($ok) { $admitOk++ } else { $admitFail++ }
+        if ($idx % 10 -eq 0) {
+            Write-Host ("  admits ... {0} / {1} (ok={2} fail={3})" -f $idx, $AdmitBurst, $admitOk, $admitFail)
+        }
     }
-    $jobs | Wait-Job | Out-Null
-    foreach ($j in $jobs) {
-        if (Receive-Job $j) { $admitOk++ } else { $admitFail++ }
-        Remove-Job $j
-    }
+    Write-Host ("Admit burst done: ok={0} fail={1} rate={2:P1}" -f $admitOk, $admitFail, ($(if (($admitOk + $admitFail) -gt 0) { $admitOk / ($admitOk + $admitFail) } else { 0 }))) -ForegroundColor $(if ($admitFail -eq 0) { "Green" } else { "Yellow" })
     $swTotal.Stop()
 
     $reportBody = @{

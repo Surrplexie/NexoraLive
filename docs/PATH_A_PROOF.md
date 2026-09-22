@@ -62,7 +62,8 @@ curl -fsS https://play.20062006.xyz/api/v1/t2-lite/status
 1. ~~Public HTTP / fork host (no loopback in manifest)~~ ✅ 2026-09-20  
 2. ~~**Session 2**~~ ✅ 2026-09-20 — see [PATH_A_SESSION_LOG.md](PATH_A_SESSION_LOG.md)  
 3. ~~Live Steam ownership~~ ✅ 2026-09-21 (`sp-live-1`)  
-4. Optional: native Together to `rimworld://play.20062006.xyz:25555`  
-5. Twitch OAuth / followers floor when ready  
+4. **Public ready** — backup + operator GA signoff + Phase 14 validation — [NL_PUBLIC_READY.md](NL_PUBLIC_READY.md)  
+5. Optional: native Together; mock Steam64 deny  
+6. Twitch OAuth / followers floor when ready  
 
-See also: [NL_LIVE_ADMIT.md](NL_LIVE_ADMIT.md) · [NL_PUBLIC_LINE.md](NL_PUBLIC_LINE.md) · [NL_IDEAL_DEMO_GUIDE.md](NL_IDEAL_DEMO_GUIDE.md) · [NL_VPS_DEPLOY.md](NL_VPS_DEPLOY.md)
+See also: [NL_PUBLIC_READY.md](NL_PUBLIC_READY.md) · [NL_LIVE_ADMIT.md](NL_LIVE_ADMIT.md) · [NL_PUBLIC_LINE.md](NL_PUBLIC_LINE.md) · [NL_IDEAL_DEMO_GUIDE.md](NL_IDEAL_DEMO_GUIDE.md) · [NL_VPS_DEPLOY.md](NL_VPS_DEPLOY.md)

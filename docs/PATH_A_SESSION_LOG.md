@@ -81,11 +81,26 @@ Verified in container (`docker inspect` … `Config.Env`):
 - Twitch/Discord OAuth + follower floor 50 — not wired (keep followers=0 until then)
 - Optional: one deny with mock Steam64 `76561198000000001` to prove live gate
 
+## Public ready track — 2026-09-22
+
+Probed live host (no operator key from this agent):
+
+| Check | Result |
+|-------|--------|
+| health | ok · publicMode · hardening · not demo |
+| identity | Live · steamConfigured · publicBaseUrl correct |
+| t2-lite | ready · `rimworld://play.20062006.xyz:25555` |
+| public GA | enabled · **devMode=false** · support `support@20062006.xyz` |
+| legal | enabled · 6 docs |
+
+**Still needs operator key:** backup + GA signoff + Phase 14 validation → `PUBLIC READY (VPS)`.
+
+Guide: [NL_PUBLIC_READY.md](NL_PUBLIC_READY.md)  
+Script: `scripts/nl-public-ready-cutover.ps1`
+
 ## Next
 
-1. Keep profile on `platformAppId=294100` (operator Load dogfood now defaults to rimworld after deploy)
-2. Optional: mock Steam64 deny once; native Together
-3. Twitch OAuth → then followers=50 — [NL_LIVE_ADMIT.md](NL_LIVE_ADMIT.md) Part 4
+1. Run `nl-public-ready-cutover.ps1 -OperatorKey …` (or `/public-ga-launch-ops.html`)
+2. Keep profile on `platformAppId=294100`
+3. Twitch OAuth → followers=50 later
 4. Keep freeze: no Cities / new titles
-
-Full checklist: [NL_LIVE_ADMIT.md](NL_LIVE_ADMIT.md)

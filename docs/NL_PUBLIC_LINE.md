@@ -2,7 +2,7 @@
 
 Get NL onto a real URL with **dev flags off** and **RimWorld** as the first public title.
 
-**Path A live (2026-09-18/21):** `https://play.20062006.xyz` — sessions 1–2 (mock) + **live Steam** join Completed (`sp-live-1`, app 294100). Proof: [PATH_A_PROOF.md](PATH_A_PROOF.md) · [PATH_A_SESSION_LOG.md](PATH_A_SESSION_LOG.md). Full live-admit checklist: [NL_LIVE_ADMIT.md](NL_LIVE_ADMIT.md). Followers still 0 until Twitch OAuth. Do not start Cities / Away.
+**Path A live (2026-09-18/22):** `https://play.20062006.xyz` — live Steam + public GA `devMode:false`. Proof: [PATH_A_PROOF.md](PATH_A_PROOF.md) · [PATH_A_SESSION_LOG.md](PATH_A_SESSION_LOG.md). **Next (public ready):** backup + operator signoff + Phase 14 validation — [NL_PUBLIC_READY.md](NL_PUBLIC_READY.md). Twitch followers=50 still deferred. Do not start Cities / Away.
 
 This is the week-2 gate: a stranger can open `/play.html`, a streamer can sign up, and a RimWorld session can start on NL-hosted infrastructure.
 
@@ -98,12 +98,14 @@ These cannot be finished in git:
 - [x] OVH + ufw ports 80/443/3478/25555
 - [x] Bootstrap / deploy → `https://play.20062006.xyz`
 - [x] `STEAM_WEB_API_KEY` present (rotate if pasted in chat)
-- [ ] Twitch/Discord OAuth redirect URIs (after base deploy)
 - [x] GitHub sync for CredentialStore build fix (`9562b28`)
 - [x] RimWorld session 1 + fan join **Completed** (mock Steam64) — [PATH_A_PROOF.md](PATH_A_PROOF.md)
 - [x] Public HTTP/WS + `NL_FORK_PUBLIC_CONNECT_HOST` (no loopback in manifest) — 2026-09-20
 - [x] Session 2 (`sp-fan-2`) — [PATH_A_SESSION_LOG.md](PATH_A_SESSION_LOG.md)
 - [x] Live Steam ownership join (`sp-live-1`, app `294100`) — 2026-09-21
+- [x] Public GA launch `devMode:false` + support contact on VPS — probed 2026-09-22
+- [ ] Operator backup + GA signoff + `PUBLIC READY (VPS)` — [NL_PUBLIC_READY.md](NL_PUBLIC_READY.md)
+- [ ] Deploy rimworld `platformAppId` Save-profile fix to VPS (if hello-fork still sticks)
 - [ ] Twitch/Discord OAuth + followers=50 when social is wired
 
 ### Docker down / up (VPS, `/opt/NexoraLive`)
@@ -114,4 +116,16 @@ sudo docker compose -f docker/docker-compose.vps-production.yml --env-file docke
 # full rebuild: sudo bash scripts/nl-vps-deploy.sh
 ```
 
-Then: attempt a **second** session. If the URL exists and session 2 never happens, hobby or change wedge — do not add a title.
+Public ready cutover (Windows, needs operator key):
+
+```powershell
+powershell -File scripts/nl-public-ready-cutover.ps1 -BaseUrl https://play.20062006.xyz -OperatorKey YOUR_OPERATOR_KEY
+```
+
+Pages-only (no key):
+
+```powershell
+powershell -File scripts/nl-public-ready-cutover.ps1 -BaseUrl https://play.20062006.xyz -PagesOnly
+```
+
+Cities / new titles stay frozen until public ready is logged and live admit stays boring.

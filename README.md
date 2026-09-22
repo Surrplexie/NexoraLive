@@ -1,6 +1,6 @@
 # NexoraLive (NL)
 
-**Status (2026-09-20):** Path A **live** on `https://play.20062006.xyz` — health OK, T2-lite ready, sessions **1 + 2** join Completed (mock Steam64). Proof: [`docs/PATH_A_PROOF.md`](docs/PATH_A_PROOF.md) · log: [`docs/PATH_A_SESSION_LOG.md`](docs/PATH_A_SESSION_LOG.md). **Next:** restore live ownership. No new titles until live admit is boring.
+**Status (2026-09-22):** Path A **live** on `https://play.20062006.xyz` — Live Steam admit proven; public GA `devMode:false`. Proof: [`docs/PATH_A_PROOF.md`](docs/PATH_A_PROOF.md) · log: [`docs/PATH_A_SESSION_LOG.md`](docs/PATH_A_SESSION_LOG.md). **Next:** [`docs/NL_PUBLIC_READY.md`](docs/NL_PUBLIC_READY.md) (backup + signoff + validation). No new titles until public ready is logged.
 
 NexoraLive is a streamer-oriented session rules system. You author plain-text `.nle` configs; a shared rule engine evaluates gameplay (or hotkey) events and returns **Allow**, **Block**, or **Warn**. This repository implements that core loop plus integrations toward **NL Server** (session control) and **NL Fork** (licensed game snapshots on NL infrastructure).
 

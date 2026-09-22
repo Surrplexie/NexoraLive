@@ -28,6 +28,9 @@ upsert NL_FORK_PUBLIC_CONNECT_HOST "$domain"
 upsert NL_OWNERSHIP_MODE live
 upsert NL_SOCIAL_MODE live
 upsert NL_FLEET_MIN_TWITCH_FOLLOWERS 0
+# Load-test friendly (Path A public ready). Dial back to 30 / 6 after PUBLIC READY.
+upsert NL_FLEET_FORK_CREATE_RATE_PER_MIN 200
+upsert NL_FLEET_MAX_FORK_CREATES_PER_HOUR 9999
 
 if ! grep -q '^STEAM_WEB_API_KEY=.\+' "$fleet"; then
   echo "WARN: STEAM_WEB_API_KEY empty — paste a real key into $fleet before recreate." >&2
