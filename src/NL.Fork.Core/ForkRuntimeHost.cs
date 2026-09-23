@@ -78,6 +78,25 @@ public sealed class ForkRuntimeHost : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Production dogfood: one <c>sessionStart</c>, then idle with connect listener open.
+    /// Avoids the demo loop's repeated <c>sessionEnd</c> spam on the operator bus.
+    /// </summary>
+    public async Task RunServeAsync(CancellationToken cancellationToken)
+    {
+        await ForkDemoScenarios.EnsureSessionStartedAsync(_game, _runtime, cancellationToken);
+        WriteStatus(sessionStarted: true);
+        _log?.Invoke("[fork] serve mode — session held open (no demo loop)");
+        try
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // stop
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (_bridge is not null)

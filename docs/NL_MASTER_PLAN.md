@@ -6,9 +6,14 @@ vision. Use this doc to orient; use linked docs for implementation detail.
 
 **Audience:** Operators, contributors, and future-you picking up work.
 
+**Plain-English product picture (streamers / gamers / pubs):** start with
+[**NL_HOW_IT_WORKS.md**](NL_HOW_IT_WORKS.md) — door → mod → fork → absolute rules. This master
+plan is the phase/track map underneath that story.
+
 **Status legend:** ✅ built / validated in repo · 🟡 partial or operator-deploy pending · ❌ not started
 
-**Last updated:** 2026-09-19 — Path A live; session 1 join Completed. Next: session 2. See `docs/PATH_A_PROOF.md`.
+**Last updated:** 2026-09-22 — Path A live + ideal-plan doc published. See `docs/PATH_A_PROOF.md`,
+`docs/NL_HOW_IT_WORKS.md`.
 
 ---
 
@@ -38,6 +43,21 @@ vision. Use this doc to orient; use linked docs for implementation detail.
 
 **One live stream session = one NL-governed world.**
 
+Audience-facing write-up (recommended first read): [**NL_HOW_IT_WORKS.md**](NL_HOW_IT_WORKS.md).
+
+### Ideal plan — four pieces everyone should recognize
+
+| # | Piece | Meaning |
+|---|--------|---------|
+| **1. NL door** | App (preferred) or web: account, ownership, social gate, admit, connect string — **not** the game |
+| **2. Game mod** | Per-title bridge inside the real licensed client so the `.exe` can report/enforce with NL |
+| **3. Fork** | The live room for *this* stream — NL infra or streamer-chosen host; not random public matchmaking |
+| **4. Absolute rules** | Streamer’s `.nle` on the session bus: propose → Allow / Block / Warn → commit |
+
+```text
+Door (app/web)  →  ticket  →  join fork  →  play via game.exe + mod  →  rules bind everyone
+```
+
 | Principle | Meaning |
 |-----------|---------|
 | **NL hosts** | Authoritative game instance on NL infrastructure (fork or modded dedicated), not a random viewer PC |
@@ -55,7 +75,7 @@ Streamer goes live
   → NL verifies ownership + social gate + (optional) live-only
   → Fork Orchestrator starts ephemeral instance
   → SPs admit via NL Client / app → receive connect manifest
-  → native game client connects to NL-hosted world
+  → native game client (+ mod) connects to NL-hosted world
   → events: Fork → session bus → RuleEngine → actions back
 Stream ends → fork destroyed → only .nle, moderation, metadata persist
 ```
@@ -571,6 +591,7 @@ Streamer picks game
 
 | Doc | Track |
 |-----|-------|
+| [**NL_HOW_IT_WORKS.md**](NL_HOW_IT_WORKS.md) | **Start here** — ideal plan in plain English (streamers / gamers / pubs) |
 | [ROADMAP.md](../ROADMAP.md) | A, B, C — checkbox source of truth |
 | [NL_GAME_EXPANSION_PLAN.md](NL_GAME_EXPANSION_PLAN.md) | F — T0–T8 deep dive |
 | [NL_GAME_ADAPTER.md](NL_GAME_ADAPTER.md) | F — T0 adapter contract / template |

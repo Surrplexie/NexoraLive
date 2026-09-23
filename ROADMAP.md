@@ -1,5 +1,8 @@
 # NL Roadmap / Progress Guide
 
+**How NL really works (ideal plan, plain English):** [docs/NL_HOW_IT_WORKS.md](docs/NL_HOW_IT_WORKS.md) —
+door → mod → fork → absolute rules (for streamers, gamers, game makers).
+
 **Consolidated overview of all tracks (core, fork, production P3–P14, dogfood, T0–T8):**
 [docs/NL_MASTER_PLAN.md](docs/NL_MASTER_PLAN.md)
 

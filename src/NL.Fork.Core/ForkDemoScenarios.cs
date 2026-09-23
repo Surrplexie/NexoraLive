@@ -39,6 +39,26 @@ public static class ForkDemoScenarios
             _ => RunHelloOnceAsync(runtime, log, cancellationToken),
         };
 
+    /// <summary>Emit a single sessionStart and hold — no fake players / sessionEnd.</summary>
+    public static Task EnsureSessionStartedAsync(
+        ForkGameKind game,
+        IForkRuntimeDetails runtime,
+        CancellationToken cancellationToken) =>
+        game switch
+        {
+            ForkGameKind.Minecraft when runtime is MinecraftForkRuntime mc =>
+                mc.EnsureSessionStartedAsync(cancellationToken),
+            ForkGameKind.Beamng when runtime is BeamngForkRuntime beamng =>
+                beamng.EnsureSessionStartedAsync(cancellationToken),
+            ForkGameKind.RimWorld when runtime is RimWorldForkRuntime rim =>
+                rim.EnsureSessionStartedAsync(cancellationToken),
+            ForkGameKind.Kenshi when runtime is KenshiForkRuntime ken =>
+                ken.EnsureSessionStartedAsync(cancellationToken),
+            _ when runtime is HelloForkRuntime hello =>
+                hello.EnsureSessionStartedAsync(cancellationToken),
+            _ => Task.CompletedTask,
+        };
+
     private static async Task RunHelloOnceAsync(
         IForkRuntimeDetails runtime,
         Action<string>? log,

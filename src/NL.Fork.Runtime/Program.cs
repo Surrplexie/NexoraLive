@@ -16,6 +16,8 @@ var statusPath = parser.Get("status") ?? Environment.GetEnvironmentVariable("NL_
 var admitUrl = parser.Get("admit-url") ?? Environment.GetEnvironmentVariable("NL_FORK_ADMIT_URL");
 var gameRaw = parser.Get("game") ?? Environment.GetEnvironmentVariable("NL_FORK_GAME");
 var loop = parser.Flag("loop");
+var serve = parser.Flag("serve")
+    || string.Equals(Environment.GetEnvironmentVariable("NL_FORK_SERVE"), "1", StringComparison.OrdinalIgnoreCase);
 var interval = parser.GetDouble("interval", 8);
 var embeddedConfig = parser.Get("config");
 var connectPortRaw = parser.Get("connect-port") ?? Environment.GetEnvironmentVariable("NL_FORK_CONNECT_PORT");
@@ -79,7 +81,12 @@ try
             cts.Cancel();
         };
 
-        if (loop)
+        if (serve)
+        {
+            log("[fork] serve mode (idle after sessionStart)");
+            await host.RunServeAsync(cts.Token);
+        }
+        else if (loop)
         {
             log($"[fork] demo loop every {interval}s");
             await host.RunDemoLoopAsync(interval, admitUrl, cts.Token);
@@ -115,10 +122,12 @@ NL.Fork.Runtime — Phase P/T1 game fork runtimes (hello / minecraft / beamng / 
   --status path/to/fork-status.json          Operator status file
   --admit-url http://host/api/v1/session/admit Pre-connect join gate
   --connect-port 25555                       TCP banner (rimworld:// 25555, kenshi:// 23386)
-  --loop                                     Repeat demo scenario
+  --serve                                    Hold session open (production dogfood; no demo cycle)
+  --loop                                     Repeat demo scenario (smoke / CI)
   --interval 8                               Loop seconds (default 8)
 
-Env: NL_FORK_GAME, NL_FORK_WS_URL, NL_FORK_MODS, NL_FORK_STATUS, NL_FORK_ADMIT_URL, NL_FORK_CONNECT_PORT
+Env: NL_FORK_GAME, NL_FORK_WS_URL, NL_FORK_MODS, NL_FORK_STATUS, NL_FORK_ADMIT_URL, NL_FORK_CONNECT_PORT,
+     NL_FORK_SERVE=1
 """);
 }
 

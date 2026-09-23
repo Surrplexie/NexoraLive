@@ -66,7 +66,7 @@ public static class KubernetesForkJobManifestBuilder
                   containers:
                     - name: fork
                       image: {image}
-                      args: ["--game", "{gameArg}", "--loop", "--interval", "8"]
+                      args: ["--game", "{gameArg}", "--serve"]
                       env:
                         - name: NL_FORK_WS_URL
                           value: "{EscapeYaml(request.BridgeWebSocketUrl)}"

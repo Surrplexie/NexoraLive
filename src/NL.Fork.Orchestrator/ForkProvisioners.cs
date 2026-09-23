@@ -73,7 +73,7 @@ public sealed class ProcessForkProvisioner : IForkProvisioner
         var args =
             $"\"{runtimeDll}\" --game {gameArg} --url \"{request.BridgeWebSocketUrl}\" " +
             $"--mods \"{request.ModsJsonPath}\" --status \"{statusPath}\" " +
-            $"--admit-url \"{request.AdmitUrl}\" --loop --interval 8{connectArg}";
+            $"--admit-url \"{request.AdmitUrl}\" --serve{connectArg}";
 
         var psi = new ProcessStartInfo
         {
@@ -192,7 +192,7 @@ public sealed class DockerForkProvisioner : IForkProvisioner
             $"-e NL_FORK_GAME={gameArg} " +
             connectEnv +
             $"-e NL_DATA_ROOT=/data " +
-            $"{image} --game {gameArg} --loop --interval 8";
+            $"{image} --game {gameArg} --serve";
 
         var (code, output, err) = await RunDockerAsync(args, cancellationToken);
         if (code != 0)

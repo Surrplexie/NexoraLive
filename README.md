@@ -2,9 +2,24 @@
 
 **Status (2026-09-22):** Path A **live** on `https://play.20062006.xyz` — Live Steam admit proven; public GA `devMode:false`. Proof: [`docs/PATH_A_PROOF.md`](docs/PATH_A_PROOF.md) · log: [`docs/PATH_A_SESSION_LOG.md`](docs/PATH_A_SESSION_LOG.md). **Next:** [`docs/NL_PUBLIC_READY.md`](docs/NL_PUBLIC_READY.md) (backup + signoff + validation). No new titles until public ready is logged.
 
+**How it really works (start here):** [`docs/NL_HOW_IT_WORKS.md`](docs/NL_HOW_IT_WORKS.md) — plain-English ideal plan for **streamers, gamers, and game makers**: NL door (app/web) → game mod → hosted fork → absolute `.nle` rules. Not a Steam replacement; not rules-only-in-the-browser.
+
 NexoraLive is a streamer-oriented session rules system. You author plain-text `.nle` configs; a shared rule engine evaluates gameplay (or hotkey) events and returns **Allow**, **Block**, or **Warn**. This repository implements that core loop plus integrations toward **NL Server** (session control) and **NL Fork** (licensed game snapshots on NL infrastructure).
 
-For the long-form NLE walkthrough, see [`NLE_GUIDE.md`](NLE_GUIDE.md). For build vs. plan, see [`ROADMAP.md`](ROADMAP.md). For the fork-platform architecture, see [`docs/NL_FORK_PLATFORM.md`](docs/NL_FORK_PLATFORM.md).
+For the long-form NLE walkthrough, see [`NLE_GUIDE.md`](NLE_GUIDE.md). For build vs. plan, see [`ROADMAP.md`](ROADMAP.md). For the fork-platform architecture, see [`docs/NL_FORK_PLATFORM.md`](docs/NL_FORK_PLATFORM.md). Master plan: [`docs/NL_MASTER_PLAN.md`](docs/NL_MASTER_PLAN.md).
+
+---
+
+## Ideal plan (four pieces)
+
+| # | Piece | Ideal | Today (short) |
+|---|--------|--------|----------------|
+| 1 | **NL door** | Win/mac app (later consoles): account, admit, connect | **Web** operator + NL Client live |
+| 2 | **Game mod** | Small bridge (+ MP where needed) in the real `.exe` install | In-repo per title; manual install |
+| 3 | **Fork** | NL or streamer host runs the live world for that stream | Orchestrator + Docker; sidecar until licensed `/game` |
+| 4 | **Rules** | Absolute Allow / Block / Warn on the session bus | Engine + bus live |
+
+Full audience write-up: [`docs/NL_HOW_IT_WORKS.md`](docs/NL_HOW_IT_WORKS.md).
 
 ---
 
