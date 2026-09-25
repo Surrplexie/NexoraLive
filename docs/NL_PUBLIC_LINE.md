@@ -2,7 +2,7 @@
 
 Get NL onto a real URL with **dev flags off** and **RimWorld** as the first public title.
 
-**Path A live (2026-09-18/22):** `https://play.20062006.xyz` — live Steam + public GA `devMode:false`. Proof: [PATH_A_PROOF.md](PATH_A_PROOF.md) · [PATH_A_SESSION_LOG.md](PATH_A_SESSION_LOG.md). **Next (public ready):** backup + operator signoff + Phase 14 validation — [NL_PUBLIC_READY.md](NL_PUBLIC_READY.md). Twitch followers=50 still deferred. Do not start Cities / Away.
+**Path A PUBLIC READY (2026-09-22):** `https://play.20062006.xyz` — Live Steam + Phase 13/14 PASS. Proof: [PATH_A_PROOF.md](PATH_A_PROOF.md) · [PATH_A_SESSION_LOG.md](PATH_A_SESSION_LOG.md). **Next:** operate RimWorld dogfood; Twitch OAuth when you want followers=50. Do not start Cities / Away.
 
 This is the week-2 gate: a stranger can open `/play.html`, a streamer can sign up, and a RimWorld session can start on NL-hosted infrastructure.
 
