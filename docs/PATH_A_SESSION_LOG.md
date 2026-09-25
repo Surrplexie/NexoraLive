@@ -77,9 +77,11 @@ Verified in container (`docker inspect` … `Config.Env`):
 
 ## Still open
 
-- Native RimWorld/Together to `:25555` — optional
+- ~~Native RimWorld/Together to `:25555`~~ → **done** (session 4)
 - Twitch/Discord OAuth + follower floor 50 — not wired (keep followers=0 until then)
 - Optional: one deny with mock Steam64 `76561198000000001` to prove live gate
+- NL Harmony bridge inside Together world (in-game Allow/Block) — not wired yet
+- Native NL desktop door (T3) — not started
 
 ## Public ready — **PASSED** 2026-09-22
 
@@ -93,9 +95,22 @@ Verified in container (`docker inspect` … `Config.Env`):
 
 Host: `https://play.20062006.xyz` · GA `devMode=false` · support `support@20062006.xyz`
 
+## Session 4 — native Together world — 2026-09-25 (~05:35–05:37Z)
+
+| | |
+|--|--|
+| Result | **Pass** — RimWorld Together Direct Connect → in-colony (~8 ms) |
+| Server | `/opt/rimworld-together/RTServer` **26.8.31.1** on VPS `0.0.0.0:25555` |
+| Client | Workshop Together `3005289691` · Direct Connect `play.20062006.xyz` / `25555` |
+| Player | `ByteSizedKai` from `207.110.231.254` · first-join admin · world + settlement created |
+| NL sidecar | Stopped for this test (`nl-fork-*` freed port); session-host may still show Running |
+| Notes | Sidecar banner alone cannot Together-handshake. Official zip binary is **`RTServer`** (not `GameServer`). Docker image `ghcr.io/mrgreaterthan/rimworld-together` was **25.3.9.1** (version mismatch → silent menu bounce); switching to zip **26.8.31.1** fixed join. See [NL_RIMWORLD_TOGETHER_VPS.md](NL_RIMWORLD_TOGETHER_VPS.md). |
+
 ## Next
 
-1. Optional: free leftover forks on VPS (`docker rm` nl-fork-*)
-2. Twitch OAuth → followers=50 later
-3. Keep freeze: no Cities / new titles
-4. Optional native Together
+1. Set a Together **server password** (discovery is ENABLED / public browser)
+2. Optional: wire NL Harmony bridge into this Together world for live `.nle` cancel
+3. Native NL door (Win app / CLI against `play.20062006.xyz`) — ideal-plan piece 1
+4. Twitch OAuth → followers=50 later
+5. Keep freeze: no Cities / new titles
+6. Do **not** Operator-Start rimworld fork while `RTServer` owns `:25555`

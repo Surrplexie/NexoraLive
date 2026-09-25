@@ -27,25 +27,33 @@ Only one listener can own `:25555`:
 
 ```bash
 ssh ubuntu@40.160.88.114
-cd /opt/NexoraLive
-sudo git pull --ff-only
-sudo chmod +x scripts/nl-vps-together-up.sh scripts/nl-vps-together-down.sh
-sudo bash scripts/nl-vps-together-up.sh
-```
+# Free NL sidecar on 25555
+sudo docker ps --format '{{.Names}}' | grep '^nl-fork-' | xargs -r sudo docker stop
 
-Expect: `OK: Together PID …` and connect hint.
-
-```bash
-# prove listen
+sudo mkdir -p /opt/rimworld-together && cd /opt/rimworld-together
+sudo curl -fsSL -o server.zip \
+  https://github.com/RimWorld-Together/Rimworld-Together/releases/download/26.8.31.1/Server-linux-x64.zip
+sudo apt-get install -y unzip   # if needed
+sudo unzip -qo server.zip && sudo rm -f server.zip
+# Release binary is named RTServer (not GameServer)
+sudo chmod +x ./RTServer
+sudo bash -c 'cd /opt/rimworld-together && nohup ./RTServer >> together.log 2>&1 & echo $! > together.pid'
 sudo ss -tlnp | grep 25555
-tail -f /opt/rimworld-together/together.log
+sudo tail -20 together.log
 ```
+
+Expect: `Server version 26.8.31.1`, `Listening for users at 0.0.0.0:25555`  
+(`0.0.0.0` = bind all interfaces; clients still use `play.20062006.xyz`.)
+
+**Proven 2026-09-25:** player `ByteSizedKai` joined, first-join admin, world created — [PATH_A_SESSION_LOG.md](PATH_A_SESSION_LOG.md) session 4.
 
 Stop later:
 
 ```bash
-sudo bash /opt/NexoraLive/scripts/nl-vps-together-down.sh
+sudo kill "$(cat /opt/rimworld-together/together.pid)" 2>/dev/null || sudo pkill -f RTServer
 ```
+
+Or use repo helpers (after pull): `scripts/nl-vps-together-up.sh` / `nl-vps-together-down.sh`.
 
 ---
 

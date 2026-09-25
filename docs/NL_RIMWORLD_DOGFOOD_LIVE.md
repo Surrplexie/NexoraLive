@@ -122,7 +122,7 @@ Use a **private window** (avoids stale mock ids).
    or paste `rimworld://play.20062006.xyz:25555` if the mod accepts that URI.
 4. You should join the **NL-hosted** session (not Steam’s public browser list).
 
-**If Together won’t handshake:** Step 2A still counts as NL admit dogfood. Full dedicated Together often needs a licensed RimWorld tree mounted on the VPS fork (`/game`) — NL does not ship the game. Sidecar may only speak the `NL-RIMWORLD/1` banner until `/game` is mounted.
+**If Together won’t handshake:** Step 2A still counts as NL admit dogfood. Full dedicated Together needs **`RTServer`** (Together release zip) on `:25555` — not the NL sidecar banner. See [NL_RIMWORLD_TOGETHER_VPS.md](NL_RIMWORLD_TOGETHER_VPS.md). **Session 4 (2026-09-25):** native Together pass logged in [PATH_A_SESSION_LOG.md](PATH_A_SESSION_LOG.md).
 
 ### 2C — Stop
 
