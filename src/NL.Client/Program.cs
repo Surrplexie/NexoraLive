@@ -33,12 +33,14 @@ public static class Program
         var streamerId = Arg(args, "--streamer", "default-streamer");
         var platformUser = Arg(args, "--platform-user", "76561198000000001");
         var ack = HasFlag(args, "--ack");
+        var sessionPassword = Arg(args, "--session-password", null);
 
         var result = await flow.ExecuteAsync(new NlClientJoinRequest(
             playerId,
             streamerId,
             PlatformUserId: platformUser,
             Platform: Arg(args, "--platform", "steam"),
+            SessionPassword: string.IsNullOrWhiteSpace(sessionPassword) ? null : sessionPassword,
             AtOwnRiskAcknowledged: ack));
 
         PrintResult(result);
@@ -136,7 +138,7 @@ public static class Program
             NL Client shell (Phase R)
 
             Commands:
-              join --player ID --streamer ID [--platform-user STEAM64] [--ack]
+              join --player ID --streamer ID [--platform-user STEAM64] [--session-password PW] [--ack]
               deeplink --url nlclient://join?... [--player ID] [--platform-user STEAM64] [--ack]
               streamers
               block-invite --url INVITE_URL [--host expected-host]

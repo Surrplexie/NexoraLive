@@ -35,6 +35,7 @@ async function loadRequirements() {
   var rv = Number(req.requiredVerification ?? req.RequiredVerification ?? 0);
   document.getElementById("req-verify-email").checked = (rv & 1) !== 0;
   document.getElementById("req-verify-2fa").checked = (rv & 4) !== 0;
+  document.getElementById("session-password").value = req.sessionPassword ?? req.SessionPassword ?? "";
 }
 
 async function loadStreamerConfig() {
@@ -80,6 +81,7 @@ document.getElementById("save-requirements").onclick = async () => {
     maxActiveOffenses: Number(document.getElementById("max-offenses").value) || 999999,
     allowGraylistWithHold: document.getElementById("graylist-hold").checked,
     requiredVerification: verificationFlags,
+    sessionPassword: document.getElementById("session-password").value.trim() || null,
   };
   await api("/api/v1/social/join-requirements", { method: "PUT", body: JSON.stringify(body) });
   setStatus("Join requirements saved.");

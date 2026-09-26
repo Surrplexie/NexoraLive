@@ -108,7 +108,7 @@ Host: `https://play.20062006.xyz` · GA `devMode=false` · support `support@2006
 
 ## Next
 
-1. Set a Together **server password** (discovery is ENABLED / public browser)
+1. **NL viewer session password** on join gate (Together `PasswordConfig` is not for SPs — leave it empty)
 2. Optional: wire NL Harmony bridge into this Together world for live `.nle` cancel
 3. Native NL door (Win app / CLI against `play.20062006.xyz`) — ideal-plan piece 1
 4. Twitch OAuth → followers=50 later

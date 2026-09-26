@@ -125,6 +125,8 @@ public class NlSecurityPathsTests
     [InlineData("POST", "/api/v1/session/admit", false)]
     [InlineData("GET", "/api/v1/session/manifest", false)]
     [InlineData("PUT", "/api/v1/session/profile/", true)]
+    [InlineData("PUT", "/api/v1/social/join-requirements", true)]
+    [InlineData("GET", "/api/v1/social/join-requirements", false)]
     public void RequiresOperatorAuth_MatchesWriteEndpoints(string method, string path, bool expected)
     {
         Assert.Equal(expected, NlSecurityPaths.RequiresOperatorAuth(method, path));

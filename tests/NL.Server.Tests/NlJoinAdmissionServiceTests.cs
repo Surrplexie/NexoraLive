@@ -1,6 +1,7 @@
 using NL.Core;
 using NL.Core.Sp;
 using NL.Moderation;
+using NL.Moderation.Core;
 using NL.Server;
 using NL.Server.Core.Integration;
 using Xunit;
@@ -51,6 +52,43 @@ public class NlJoinAdmissionServiceTests
 
             Assert.Equal(JoinDecision.Allow, result.Decision);
             Assert.True(result.Admit);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("NL_DATA_ROOT", previous);
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task SessionPassword_WrongOrMissing_IsDenied()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"nl-admit-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        var previous = Environment.GetEnvironmentVariable("NL_DATA_ROOT");
+
+        try
+        {
+            Environment.SetEnvironmentVariable("NL_DATA_ROOT", dir);
+            var moderation = new ModerationService(
+                new JsonlModerationStore(Path.Combine(dir, "mod.jsonl")),
+                new JsonFileSpProfileRepository(Path.Combine(dir, "sp.json")));
+            var admission = new NlJoinAdmissionService(
+                moderation,
+                NlPaths.DefaultStreamerId,
+                new JoinRequirements(SessionPassword: "nlpass123"));
+
+            var missing = await admission.EvaluateAsync(
+                new NlAdmitPlayerRequest { PlayerId = "fan" }, null, null);
+            var wrong = await admission.EvaluateAsync(
+                new NlAdmitPlayerRequest { PlayerId = "fan", SessionPassword = "nope" }, null, null);
+            var ok = await admission.EvaluateAsync(
+                new NlAdmitPlayerRequest { PlayerId = "fan", SessionPassword = "nlpass123" }, null, null);
+
+            Assert.False(missing.Admit);
+            Assert.Contains("password", missing.Reason, StringComparison.OrdinalIgnoreCase);
+            Assert.False(wrong.Admit);
+            Assert.True(ok.Admit);
         }
         finally
         {

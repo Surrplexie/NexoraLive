@@ -694,8 +694,16 @@ app.MapDelete("/api/v1/identity/verification/2fa", async (
 
 app.MapGet("/api/v1/social/settings", (NlSocialSettings s) => Results.Json(s.ToPublicInfo()));
 
-app.MapGet("/api/v1/social/join-requirements", () =>
-    Results.Json(JoinRequirementsStore.LoadOrDefault(NlPaths.JoinRequirements)));
+app.MapGet("/api/v1/social/join-requirements", (HttpContext ctx) =>
+{
+    var req = JoinRequirementsStore.LoadOrDefault(NlPaths.JoinRequirements);
+    if (NlWebSecurityExtensions.IsAuthorized(ctx))
+    {
+        return Results.Json(req);
+    }
+
+    return Results.Json(req with { SessionPassword = req.RequiresSessionPassword ? "*" : null });
+});
 
 app.MapPut("/api/v1/social/join-requirements", async (HttpRequest req) =>
 {

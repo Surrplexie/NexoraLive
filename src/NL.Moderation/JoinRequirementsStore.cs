@@ -55,6 +55,7 @@ public static class JoinRequirementsStore
         public SpVerification RequiredVerification { get; set; }
         public int MaxActiveOffenses { get; set; } = int.MaxValue;
         public bool AllowGraylistWithHold { get; set; } = true;
+        public string? SessionPassword { get; set; }
 
         public static JoinRequirementsDto FromRequirements(JoinRequirements r) => new()
         {
@@ -65,6 +66,7 @@ public static class JoinRequirementsStore
             RequiredVerification = r.RequiredVerification,
             MaxActiveOffenses = r.MaxActiveOffenses,
             AllowGraylistWithHold = r.AllowGraylistWithHold,
+            SessionPassword = r.SessionPassword,
         };
 
         public JoinRequirements ToRequirements() => new(
@@ -74,6 +76,7 @@ public static class JoinRequirementsStore
             MinAccountAgeDays,
             RequiredVerification,
             MaxActiveOffenses,
-            AllowGraylistWithHold);
+            AllowGraylistWithHold,
+            SessionPassword);
     }
 }

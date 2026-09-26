@@ -92,12 +92,14 @@
       if (accountId) document.getElementById('nl-account-id').value = accountId;
 
       var twoFactorCode = document.getElementById('join-2fa').value.trim() || undefined;
+      var sessionPassword = document.getElementById('session-password').value.trim() || undefined;
       var body = {
         playerId: playerId,
         streamerId: document.getElementById('streamer-id').value.trim(),
         platformUserId: document.getElementById('platform-user').value.trim(),
         nlAccountId: accountId,
         twoFactorCode: twoFactorCode,
+        sessionPassword: sessionPassword,
         platform: 'steam',
         atOwnRiskAcknowledged: document.getElementById('at-own-risk-ack').checked,
         mode: mode(),

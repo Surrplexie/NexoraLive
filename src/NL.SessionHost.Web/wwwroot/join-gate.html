@@ -48,7 +48,11 @@
       <label><input type="checkbox" id="graylist-hold" checked /> Allow graylist with hold</label>
       <label><input type="checkbox" id="req-verify-email" /> Require email verification</label>
       <label><input type="checkbox" id="req-verify-2fa" /> Require 2FA (TOTP)</label>
+      <label class="wide">Viewer session password
+        <input id="session-password" type="password" autocomplete="off" placeholder="blank = anyone who passes other gates" />
+      </label>
     </div>
+    <p class="hint">SPs enter this on NL Client join — not the RimWorld Together account password. Leave blank to disable.</p>
     <div class="actions">
       <button type="button" id="save-requirements">Save requirements</button>
     </div>

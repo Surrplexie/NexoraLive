@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using NL.Core;
 using NL.Core.Sp;
 using NL.Identity;
@@ -69,6 +71,15 @@ public sealed class NlJoinAdmissionService
         var playerId = request.PlayerId.Trim();
         var name = string.IsNullOrWhiteSpace(request.DisplayName) ? playerId : request.DisplayName.Trim();
         var spProfile = _moderation.GetOrCreateProfile(playerId, name);
+
+        if (_requirements.RequiresSessionPassword
+            && !SessionPasswordMatches(_requirements.SessionPassword, request.SessionPassword))
+        {
+            return NlJoinAdmissionResult.FromJoinResult(
+                JoinResult.Deny("Session password required."),
+                playerId,
+                spProfile.GetRelationship(_streamerId).Standing);
+        }
 
         if (identity?.Settings.VerificationEnabled == true && !string.IsNullOrWhiteSpace(request.NlAccountId))
         {
@@ -237,6 +248,18 @@ public sealed class NlJoinAdmissionService
     }
 
     public ModerationService Moderation => _moderation;
+
+    private static bool SessionPasswordMatches(string? expected, string? provided)
+    {
+        var a = Encoding.UTF8.GetBytes((expected ?? "").Trim());
+        var b = Encoding.UTF8.GetBytes((provided ?? "").Trim());
+        if (a.Length != b.Length)
+        {
+            return false;
+        }
+
+        return CryptographicOperations.FixedTimeEquals(a, b);
+    }
 }
 
 /// <summary>Builds public URLs and manifests for remote bridges.</summary>
@@ -423,6 +446,9 @@ public sealed class NlAdmitPlayerRequest
 
     /// <summary>Authenticator app code when streamer requires 2FA verification.</summary>
     public string? TwoFactorCode { get; set; }
+
+    /// <summary>Streamer-set join password for SPs (NL door). Not the Together/game account password.</summary>
+    public string? SessionPassword { get; set; }
 
     /// <summary>Phase Q — SP confirmed at-own-risk disclaimer for this admit attempt.</summary>
     public bool AtOwnRiskAcknowledged { get; set; }

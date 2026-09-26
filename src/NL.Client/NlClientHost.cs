@@ -175,6 +175,7 @@ internal sealed class InProcessNlClientSessionApi : INlClientSessionApi
             AppId = request.AppId,
             NlAccountId = request.NlAccountId,
             TwoFactorCode = request.TwoFactorCode,
+            SessionPassword = request.SessionPassword,
             AtOwnRiskAcknowledged = request.AtOwnRiskAcknowledged,
         });
 

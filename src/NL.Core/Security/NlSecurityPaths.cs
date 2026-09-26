@@ -17,6 +17,7 @@ public static class NlSecurityPaths
         ("PUT", "/api/v1/editor/config"),
         ("POST", "/api/v1/editor/apply"),
         ("POST", "/api/v1/editor/reset"),
+        ("PUT", "/api/v1/social/join-requirements"),
     };
 
     public static bool RequiresOperatorAuth(string method, string? path)

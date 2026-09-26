@@ -14,7 +14,10 @@ public sealed record JoinRequirements(
     int MinAccountAgeDays = 0,
     SpVerification RequiredVerification = SpVerification.None,
     int MaxActiveOffenses = int.MaxValue,
-    bool AllowGraylistWithHold = true)
+    bool AllowGraylistWithHold = true,
+    string? SessionPassword = null)
 {
     public static readonly JoinRequirements None = new();
+
+    public bool RequiresSessionPassword => !string.IsNullOrWhiteSpace(SessionPassword);
 }

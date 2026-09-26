@@ -52,6 +52,7 @@ public sealed class HttpNlClientSessionApi : INlClientSessionApi, IDisposable
             appId = request.AppId,
             nlAccountId = request.NlAccountId,
             twoFactorCode = request.TwoFactorCode,
+            sessionPassword = request.SessionPassword,
             atOwnRiskAcknowledged = request.AtOwnRiskAcknowledged,
         };
 
