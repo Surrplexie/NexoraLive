@@ -106,11 +106,19 @@ Host: `https://play.20062006.xyz` · GA `devMode=false` · support `support@2006
 | NL sidecar | Stopped for this test (`nl-fork-*` freed port); session-host may still show Running |
 | Notes | Sidecar banner alone cannot Together-handshake. Official zip binary is **`RTServer`** (not `GameServer`). Docker image `ghcr.io/mrgreaterthan/rimworld-together` was **25.3.9.1** (version mismatch → silent menu bounce); switching to zip **26.8.31.1** fixed join. See [NL_RIMWORLD_TOGETHER_VPS.md](NL_RIMWORLD_TOGETHER_VPS.md). |
 
+## Session 4b — Together `setpassword` — 2026-09-27
+
+| | |
+|--|--|
+| Result | **Pass** — in-game Server Password `nlpass123` |
+| How | Console `setpassword nlpass123` (hashes `PasswordConfig.json`). Plaintext JSON edits fail. |
+| Ops | `tmux` session `together`. `killall -9 RTServer` if port stuck. Never start a second `RTServer`. |
+
 ## Next
 
-1. **NL viewer session password** on join gate (Together `PasswordConfig` is not for SPs — leave it empty)
-2. Optional: wire NL Harmony bridge into this Together world for live `.nle` cancel
-3. Native NL door (Win app / CLI against `play.20062006.xyz`) — ideal-plan piece 1
+1. **NL rules in the colony** — Harmony / `NLBridge` (in-game Allow/Block). Together password is not that.
+2. Optional: NL Client admit (ownership) before sharing host + password
+3. Native NL door (Win app / CLI)
 4. Twitch OAuth → followers=50 later
 5. Keep freeze: no Cities / new titles
 6. Do **not** Operator-Start rimworld fork while `RTServer` owns `:25555`
